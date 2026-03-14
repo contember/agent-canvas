@@ -1,9 +1,15 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useAnnotations } from "#canvas/runtime";
-import { getPopoverPosition } from "../popoverPosition";
+import { AnnotationCreatePopover } from "../Popover";
 
 interface MermaidProps {
   children?: React.ReactNode;
+}
+
+interface NodePopoverState {
+  anchorEl: HTMLElement;
+  snippet: string;
+  prefix: string;
 }
 
 export function Mermaid({ children }: MermaidProps) {
@@ -11,6 +17,11 @@ export function Mermaid({ children }: MermaidProps) {
   const [error, setError] = useState<string | null>(null);
   const source = typeof children === "string" ? children : String(children ?? "");
   const { addAnnotationWithId } = useAnnotations();
+  const [nodePopover, setNodePopover] = useState<NodePopoverState | null>(null);
+
+  const showPopoverRef = useRef((anchorEl: HTMLElement, snippet: string, prefix: string) => {
+    setNodePopover({ anchorEl, snippet, prefix });
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -24,7 +35,7 @@ export function Mermaid({ children }: MermaidProps) {
         const { svg } = await mermaid.render(id, source.trim());
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
-          setupNodeAnnotations(containerRef.current, addAnnotationWithId);
+          setupNodeAnnotations(containerRef.current, showPopoverRef.current);
         }
         setError(null);
       } catch (e: any) {
@@ -53,12 +64,37 @@ export function Mermaid({ children }: MermaidProps) {
     );
   }
 
-  return <div ref={containerRef} className="mt-3 flex justify-center overflow-x-auto mermaid-container" data-md="mermaid" data-md-source={source.trim()} />;
+  const scrollContainer = containerRef.current?.closest("#plan-scroll-container") as HTMLElement | null;
+
+  return (
+    <>
+      <div ref={containerRef} className="mt-3 flex justify-center overflow-x-auto mermaid-container" data-md="mermaid" data-md-source={source.trim()} />
+      {nodePopover && (
+        <AnnotationCreatePopover
+          anchorEl={nodePopover.anchorEl}
+          scrollContainer={scrollContainer}
+          snippet={nodePopover.snippet}
+          header={
+            <div style={{ fontSize: "12px", color: "var(--color-text-tertiary)", marginBottom: "8px", lineHeight: "1.4", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--color-accent-amber)", flexShrink: 0 }} />
+              {nodePopover.snippet}
+            </div>
+          }
+          onAdd={(note) => {
+            const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            addAnnotationWithId(id, `[Diagram ${nodePopover.prefix.toLowerCase()}] ${nodePopover.snippet}`, note);
+            setNodePopover(null);
+          }}
+          onCancel={() => setNodePopover(null)}
+        />
+      )}
+    </>
+  );
 }
 
 function setupNodeAnnotations(
   container: HTMLElement,
-  addAnnotationWithId: (id: string, snippet: string, note: string, filePath?: string) => void,
+  showPopover: (anchorEl: HTMLElement, snippet: string, prefix: string) => void,
 ) {
   const makeClickable = (el: SVGElement, getSnippet: () => string, prefix: string) => {
     el.style.cursor = "pointer";
@@ -67,7 +103,7 @@ function setupNodeAnnotations(
     el.addEventListener("click", (e) => {
       e.stopPropagation();
       e.preventDefault();
-      showNodePopover(el as unknown as HTMLElement, getSnippet(), prefix, container, addAnnotationWithId);
+      showPopover(el as unknown as HTMLElement, getSnippet(), prefix);
     });
   };
 
@@ -114,69 +150,4 @@ function setupNodeAnnotations(
     if (!text) continue;
     makeClickable(label as SVGElement, () => text, "Edge");
   }
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-function showNodePopover(
-  anchor: HTMLElement,
-  snippet: string,
-  prefix: string,
-  mermaidContainer: HTMLElement,
-  addAnnotationWithId: (id: string, snippet: string, note: string, filePath?: string) => void,
-) {
-  const existing = document.getElementById("mermaid-annotation-popover");
-  if (existing) existing.remove();
-
-  const scrollContainer = mermaidContainer.closest("#plan-scroll-container") as HTMLElement | null;
-  const { style: posStyle, parent } = getPopoverPosition(anchor, scrollContainer);
-
-  const popover = document.createElement("div");
-  popover.id = "mermaid-annotation-popover";
-  Object.assign(popover.style, {
-    ...posStyle, zIndex: "50",
-    width: "280px", background: "var(--color-bg-elevated)",
-    border: "1px solid var(--color-border-hover)",
-    borderRadius: "8px", boxShadow: "0 4px 12px var(--color-shadow)",
-    padding: "12px", fontFamily: "'Inter', sans-serif",
-  });
-
-  popover.innerHTML = `
-    <div style="font-size:12px;color:var(--color-text-tertiary);margin-bottom:8px;line-height:1.4;display:flex;align-items:center;gap:6px;">
-      <span style="width:8px;height:8px;border-radius:50%;background:var(--color-accent-amber);flex-shrink:0;"></span>
-      ${escapeHtml(snippet)}
-    </div>
-    <textarea id="mermaid-ann-note" style="width:100%;min-height:60px;background:transparent;border:none;color:var(--color-text-primary);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;resize:vertical;outline:none;" placeholder="Add your note about this node..."></textarea>
-    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
-      <button id="mermaid-ann-cancel" style="font-size:12px;color:var(--color-text-tertiary);background:none;border:none;cursor:pointer;padding:4px 12px;font-family:'Inter',sans-serif;">Cancel</button>
-      <button id="mermaid-ann-add" style="font-size:12px;font-weight:500;padding:4px 12px;border-radius:6px;background:var(--color-highlight-bg);color:var(--color-text-primary);border:1px solid var(--color-highlight-border);cursor:pointer;font-family:'Inter',sans-serif;">Add</button>
-    </div>
-  `;
-  parent.appendChild(popover);
-  (document.getElementById("mermaid-ann-note") as HTMLTextAreaElement).focus();
-
-  const cleanup = () => popover.remove();
-  const submit = () => {
-    const note = (document.getElementById("mermaid-ann-note") as HTMLTextAreaElement).value.trim();
-    if (note) {
-      const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      addAnnotationWithId(id, `[Diagram ${prefix.toLowerCase()}] ${snippet}`, note);
-    }
-    cleanup();
-  };
-
-  document.getElementById("mermaid-ann-cancel")!.onclick = cleanup;
-  document.getElementById("mermaid-ann-add")!.onclick = submit;
-  (document.getElementById("mermaid-ann-note") as HTMLTextAreaElement).addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit();
-    if (e.key === "Escape") cleanup();
-  });
-  setTimeout(() => {
-    const handler = (e: MouseEvent) => {
-      if (!popover.contains(e.target as Node)) { cleanup(); document.removeEventListener("mousedown", handler); }
-    };
-    document.addEventListener("mousedown", handler);
-  }, 0);
 }

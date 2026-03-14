@@ -3,7 +3,7 @@ import { SessionContext } from "#canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
 import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks } from "./highlightRange";
 import { extractContext } from "./annotationContext";
-import { getPopoverPosition } from "./popoverPosition";
+import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 
 interface PlanRendererProps {
   revision: number;
@@ -17,6 +17,10 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { annotations, addAnnotationWithId, removeAnnotation, updateAnnotation, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
   const [editingAnn, setEditingAnn] = useState<{ id: string; note: string } | null>(null);
+
+  // Popover state
+  const [editPopover, setEditPopover] = useState<{ anchorEl: HTMLElement; annId: string } | null>(null);
+  const [createPopover, setCreatePopover] = useState<{ anchorEl: HTMLElement; tempId: string; snippet: string; ctx: any } | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -42,8 +46,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
       e.stopPropagation();
       const annId = mark.getAttribute("data-annotation-id")!;
       if (annId === activeAnnotationId) {
-        const ann = annotations.find((a) => a.id === annId);
-        if (ann) showInlinePopover(mark, ann, document.getElementById("plan-scroll-container"), setEditingAnn, removeAnnotation, setActiveAnnotationId, updateAnnotation);
+        setEditPopover({ anchorEl: mark, annId });
       } else {
         setActiveAnnotationId(annId);
       }
@@ -104,12 +107,12 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
     const tempId = `__pending_${Date.now()}`;
     try { wrapRangeWithMark(savedRange, tempId); } catch {}
     window.getSelection()?.removeAllRanges();
-    const scrollContainer = document.getElementById("plan-scroll-container");
-    showAnnotationPopover(tempId, snippet, scrollContainer, (s, n) => {
-      const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      renameMarkId(tempId, id);
-      addAnnotationWithId(id, s, n, undefined, ctx);
-    });
+
+    const marks = document.querySelectorAll(`[data-annotation-id="${tempId}"]`);
+    const lastMark = marks[marks.length - 1] as HTMLElement | undefined;
+    if (!lastMark) return;
+
+    setCreatePopover({ anchorEl: lastMark, tempId, snippet, ctx });
   }, [addAnnotationWithId]);
 
   if (loading) {
@@ -129,6 +132,8 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
     return <div className="text-text-tertiary text-center py-8 font-body text-body">No plan loaded</div>;
   }
 
+  const scrollContainer = document.getElementById("plan-scroll-container");
+
   return (
     <>
       <div ref={containerRef} className="plan-content plan-updated">
@@ -139,6 +144,40 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
           note={editingAnn.note}
           onSave={(note) => { updateAnnotation(editingAnn.id, note); setEditingAnn(null); }}
           onCancel={() => setEditingAnn(null)}
+        />
+      )}
+
+      {editPopover && (() => {
+        const ann = annotations.find((a) => a.id === editPopover.annId);
+        if (!ann) return null;
+        return (
+          <AnnotationEditPopover
+            anchorEl={editPopover.anchorEl}
+            scrollContainer={scrollContainer}
+            initialNote={ann.note}
+            onUpdate={(note) => updateAnnotation(editPopover.annId, note)}
+            onDelete={() => { removeAnnotation(editPopover.annId); setActiveAnnotationId(null); }}
+            onClose={() => setEditPopover(null)}
+          />
+        );
+      })()}
+
+      {createPopover && (
+        <AnnotationCreatePopover
+          anchorEl={createPopover.anchorEl}
+          scrollContainer={scrollContainer}
+          snippet={createPopover.snippet}
+          truncateAt={80}
+          onAdd={(note) => {
+            const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            renameMarkId(createPopover.tempId, id);
+            addAnnotationWithId(id, createPopover.snippet, note, undefined, createPopover.ctx);
+            setCreatePopover(null);
+          }}
+          onCancel={() => {
+            unwrapMarks(createPopover.tempId);
+            setCreatePopover(null);
+          }}
         />
       )}
     </>
@@ -169,130 +208,3 @@ function EditAnnotationModal({ note, onSave, onCancel }: { note: string; onSave:
   );
 }
 
-function showAnnotationPopover(
-  tempId: string,
-  snippet: string,
-  scrollContainer: HTMLElement | null,
-  onAdd: (snippet: string, note: string) => void
-) {
-  const existing = document.getElementById("annotation-popover");
-  if (existing) existing.remove();
-
-  // Position based on the temp mark elements (always valid after wrapRangeWithMark)
-  const marks = document.querySelectorAll(`[data-annotation-id="${tempId}"]`);
-  const lastMark = marks[marks.length - 1] as HTMLElement | undefined;
-  if (!lastMark) return;
-
-  const { style: posStyle, parent } = getPopoverPosition(lastMark, scrollContainer);
-  const popover = document.createElement("div");
-  popover.id = "annotation-popover";
-  Object.assign(popover.style, {
-    ...posStyle, zIndex: "50",
-    width: "280px", background: "var(--color-bg-elevated)",
-    border: "1px solid var(--color-border-hover)",
-    borderRadius: "8px", boxShadow: "0 4px 12px var(--color-shadow)",
-    padding: "12px", fontFamily: "'Inter', sans-serif",
-  });
-
-  const truncated = snippet.length > 80 ? snippet.slice(0, 80) + "..." : snippet;
-  popover.innerHTML = `
-    <div style="font-size:12px;color:var(--color-text-tertiary);font-style:italic;margin-bottom:8px;line-height:1.4;">"${escapeHtml(truncated)}"</div>
-    <textarea id="annotation-note" style="width:100%;min-height:60px;background:transparent;border:none;color:var(--color-text-primary);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;resize:vertical;outline:none;" placeholder="Add your note..."></textarea>
-    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
-      <button id="annotation-cancel" style="font-size:12px;color:var(--color-text-tertiary);background:none;border:none;cursor:pointer;padding:4px 12px;font-family:'Inter',sans-serif;">Cancel</button>
-      <button id="annotation-add" style="font-size:12px;font-weight:500;padding:4px 12px;border-radius:6px;background:var(--color-highlight-bg);color:var(--color-text-primary);border:1px solid var(--color-highlight-border);cursor:pointer;font-family:'Inter',sans-serif;">Add</button>
-    </div>
-  `;
-  parent.appendChild(popover);
-  (document.getElementById("annotation-note") as HTMLTextAreaElement).focus();
-
-  const cleanup = (cancelled = false) => { popover.remove(); window.getSelection()?.removeAllRanges(); if (cancelled) unwrapMarks(tempId); };
-
-  document.getElementById("annotation-cancel")!.onclick = () => cleanup(true);
-  const submit = () => {
-    const note = (document.getElementById("annotation-note") as HTMLTextAreaElement).value.trim();
-    if (note) { onAdd(snippet, note); cleanup(); }
-    else cleanup(true);
-  };
-  document.getElementById("annotation-add")!.onclick = submit;
-  (document.getElementById("annotation-note") as HTMLTextAreaElement).addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit();
-    if (e.key === "Escape") cleanup(true);
-  });
-  setTimeout(() => {
-    const handler = (e: MouseEvent) => {
-      if (!popover.contains(e.target as Node)) { cleanup(true); document.removeEventListener("mousedown", handler); }
-    };
-    document.addEventListener("mousedown", handler);
-  }, 0);
-}
-
-function showInlinePopover(
-  anchor: HTMLElement,
-  ann: { id: string; snippet: string; note: string },
-  scrollContainer: HTMLElement | null,
-  onEdit: (a: { id: string; note: string }) => void,
-  onDelete: (id: string) => void,
-  setActive: (id: string | null) => void,
-  updateAnnotation?: (id: string, note: string) => void,
-) {
-  document.getElementById("ann-inline-popover")?.remove();
-  const { style: posStyle, parent } = getPopoverPosition(anchor, scrollContainer);
-  const pop = document.createElement("div");
-  pop.id = "ann-inline-popover";
-  Object.assign(pop.style, {
-    ...posStyle, zIndex: "60",
-    width: "280px", background: "var(--color-bg-elevated)",
-    border: "1px solid var(--color-border-hover)",
-    borderRadius: "8px", boxShadow: "0 4px 12px var(--color-shadow)",
-    padding: "10px 12px", fontFamily: "'Inter', sans-serif",
-  });
-
-  pop.innerHTML = `
-    <textarea id="ann-pop-textarea" style="width:100%;background:transparent;border:none;color:var(--color-text-primary);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;resize:none;outline:none;overflow:hidden;">${escapeHtml(ann.note)}</textarea>
-    <div style="display:flex;justify-content:flex-end;margin-top:6px;">
-      <button id="ann-pop-delete" style="font-size:11px;color:var(--color-text-tertiary);background:none;border:none;cursor:pointer;padding:2px 0;font-family:'Inter',sans-serif;">Delete</button>
-    </div>
-  `;
-  parent.appendChild(pop);
-
-  const textarea = document.getElementById("ann-pop-textarea") as HTMLTextAreaElement;
-  // Auto-size
-  textarea.style.height = "auto";
-  textarea.style.height = textarea.scrollHeight + "px";
-  textarea.focus();
-  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-
-  textarea.addEventListener("input", () => {
-    textarea.style.height = "auto";
-    textarea.style.height = textarea.scrollHeight + "px";
-    if (updateAnnotation) updateAnnotation(ann.id, textarea.value);
-  });
-
-  const cleanup = () => pop.remove();
-
-  const deleteBtn = document.getElementById("ann-pop-delete")!;
-  deleteBtn.onclick = (e) => { e.stopPropagation(); cleanup(); onDelete(ann.id); setActive(null); };
-  deleteBtn.addEventListener("mouseenter", () => { deleteBtn.style.color = "var(--color-accent-red)"; });
-  deleteBtn.addEventListener("mouseleave", () => { deleteBtn.style.color = "var(--color-text-tertiary)"; });
-
-  textarea.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") cleanup();
-  });
-
-  setTimeout(() => {
-    const handler = (e: MouseEvent) => {
-      if (!pop.contains(e.target as Node) && !(e.target as HTMLElement).closest("[data-annotation-id]")) {
-        // Save on close
-        if (updateAnnotation) updateAnnotation(ann.id, textarea.value);
-        cleanup();
-        document.removeEventListener("mousedown", handler);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-  }, 0);
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
