@@ -62,7 +62,7 @@ async function build() {
 
   // 4. Build Tailwind CSS
   console.log("  Building CSS...");
-  await $`cd ${ROOT} && npx tailwindcss -i client/styles.css -o dist/client.css --minify`.quiet();
+  await $`cd ${ROOT} && npx @tailwindcss/cli -i client/styles.css -o dist/client.css --minify`.quiet();
 
   // 5. Create React shims for import maps
   // These re-export from the global React loaded via UMD

@@ -9,7 +9,9 @@
       "Bash(git commit:*)",
       "Bash(ls:*)",
       "Bash(git status:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "WebSearch",
+      "Bash(npm info:*)"
     ]
   }
 }

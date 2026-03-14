@@ -1,8 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* ── Theme variables ── */
-:root {
-  /* Backgrounds */
+@import "tailwindcss";
+@source "./**/*.{tsx,ts,jsx,js}";
+
+/* ── Tailwind theme ── */
+@theme {
+  /* Colors — initial values, overridden by :root / [data-theme] below */
   --color-bg-base: #1a1a1a;
   --color-bg-surface: #1e1e1e;
   --color-bg-elevated: #242424;
@@ -10,7 +13,6 @@
   --color-bg-input: rgba(255, 248, 240, 0.03);
   --color-bg-elevated-half: rgba(36, 36, 36, 0.5);
 
-  /* Text */
   --color-text-primary: #e8e4df;
   --color-text-secondary: #a09a92;
   --color-text-tertiary: #847d75;
@@ -18,13 +20,11 @@
   --color-text-disabled: #3a3530;
   --color-text-inverse: #1a1a1a;
 
-  /* Borders */
   --color-border-subtle: rgba(255, 248, 240, 0.06);
   --color-border-medium: rgba(255, 248, 240, 0.08);
   --color-border-hover: rgba(255, 248, 240, 0.12);
   --color-border-strong: rgba(255, 248, 240, 0.15);
 
-  /* Accents */
   --color-accent-green: #4a9e6d;
   --color-accent-green-muted: rgba(74, 158, 109, 0.12);
   --color-accent-amber: #c49a3a;
@@ -34,30 +34,52 @@
   --color-accent-blue: #5a8ec4;
   --color-accent-blue-muted: rgba(90, 142, 196, 0.10);
 
-  /* Highlights */
   --color-highlight-bg: rgba(255, 220, 100, 0.15);
   --color-highlight-border: rgba(255, 220, 100, 0.35);
   --color-highlight-annotation: rgba(255, 220, 100, 0.08);
   --color-highlight-active: rgba(255, 220, 100, 0.25);
   --color-highlight-selected: rgba(255, 220, 100, 0.10);
 
-  /* UI elements */
   --color-badge-bg: rgba(196, 154, 58, 0.20);
   --color-btn-primary: #e8e4df;
   --color-btn-primary-text: #1a1a1a;
-  --color-shadow: rgba(0, 0, 0, 0.25);
 
-  /* Scrollbar */
+  /* Fonts */
+  --font-heading: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+
+  /* Font sizes */
+  --text-section: 1.75rem;
+  --text-section--line-height: 1.25;
+  --text-section--letter-spacing: -0.01em;
+  --text-task-label: 0.9375rem;
+  --text-task-label--line-height: 1.4;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.65;
+  --text-code: 0.8125rem;
+  --text-code--line-height: 1.6;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1.4;
+  --text-meta--letter-spacing: 0.02em;
+  --text-tiny: 0.6875rem;
+  --text-tiny--line-height: 1.4;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px var(--color-shadow);
+  --shadow-md: 0 4px 12px var(--color-shadow);
+  --shadow-lg: 0 8px 24px var(--color-shadow);
+}
+
+/* ── Non-theme CSS variables (not used by Tailwind utilities, just custom CSS) ── */
+:root {
+  --color-shadow: rgba(0, 0, 0, 0.25);
   --color-scrollbar: rgba(255, 248, 240, 0.06);
   --color-scrollbar-hover: rgba(255, 248, 240, 0.12);
-
-  /* Folder icon */
   --color-folder-fill: rgba(196, 154, 58, 0.15);
   --color-folder-fill-active: rgba(196, 154, 58, 0.25);
   --color-folder-stroke: rgba(196, 154, 58, 0.5);
   --color-folder-stroke-active: #c49a3a;
-
-  /* Syntax highlighting */
   --color-hljs-base: #c4beb7;
   --color-hljs-keyword: #d2a6ff;
   --color-hljs-string: #a8cc8c;
@@ -69,7 +91,7 @@
 }
 
 [data-theme="light"] {
-  /* Backgrounds — warm cream/parchment */
+  /* Override Tailwind theme vars */
   --color-bg-base: #faf6ef;
   --color-bg-surface: #f3ede4;
   --color-bg-elevated: #ebe5db;
@@ -77,7 +99,6 @@
   --color-bg-input: rgba(80, 60, 30, 0.04);
   --color-bg-elevated-half: rgba(235, 229, 219, 0.5);
 
-  /* Text — warm dark browns */
   --color-text-primary: #2a2520;
   --color-text-secondary: #5a5550;
   --color-text-tertiary: #9a9390;
@@ -85,13 +106,11 @@
   --color-text-disabled: #c5c0b8;
   --color-text-inverse: #faf6ef;
 
-  /* Borders */
   --color-border-subtle: rgba(80, 60, 30, 0.08);
   --color-border-medium: rgba(80, 60, 30, 0.10);
   --color-border-hover: rgba(80, 60, 30, 0.15);
   --color-border-strong: rgba(80, 60, 30, 0.20);
 
-  /* Accents — adjusted for contrast on light */
   --color-accent-green: #3a8a5a;
   --color-accent-green-muted: rgba(58, 138, 90, 0.10);
   --color-accent-amber: #a07820;
@@ -101,30 +120,24 @@
   --color-accent-blue: #4a7eb4;
   --color-accent-blue-muted: rgba(74, 126, 180, 0.08);
 
-  /* Highlights */
   --color-highlight-bg: rgba(200, 160, 30, 0.15);
   --color-highlight-border: rgba(200, 160, 30, 0.40);
   --color-highlight-annotation: rgba(200, 160, 30, 0.08);
   --color-highlight-active: rgba(200, 160, 30, 0.25);
   --color-highlight-selected: rgba(200, 160, 30, 0.10);
 
-  /* UI elements */
   --color-badge-bg: rgba(160, 120, 32, 0.15);
   --color-btn-primary: #2a2520;
   --color-btn-primary-text: #faf6ef;
-  --color-shadow: rgba(80, 60, 30, 0.10);
 
-  /* Scrollbar */
+  /* Override non-theme vars */
+  --color-shadow: rgba(80, 60, 30, 0.10);
   --color-scrollbar: rgba(80, 60, 30, 0.08);
   --color-scrollbar-hover: rgba(80, 60, 30, 0.15);
-
-  /* Folder icon */
   --color-folder-fill: rgba(160, 120, 32, 0.12);
   --color-folder-fill-active: rgba(160, 120, 32, 0.22);
   --color-folder-stroke: rgba(160, 120, 32, 0.4);
   --color-folder-stroke-active: #a07820;
-
-  /* Syntax highlighting — adjusted for light bg */
   --color-hljs-base: #4a4540;
   --color-hljs-keyword: #7c3aed;
   --color-hljs-string: #2e7d32;
@@ -135,10 +148,7 @@
   --color-hljs-punctuation: #6b6560;
 }
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
+/* ── Base styles ── */
 @layer base {
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -255,7 +265,7 @@ input[type="range"]::-moz-range-track {
   background: transparent;
 }
 
-/* highlight.js overrides to blend with our theme */
+/* highlight.js overrides */
 .hljs {
   background: transparent !important;
   color: var(--color-hljs-base) !important;
@@ -265,46 +275,28 @@ pre code.hljs {
   padding: 0 !important;
 }
 
-/* Tone down hljs colors to be more muted */
-.hljs-keyword,
-.hljs-selector-tag,
-.hljs-built_in,
-.hljs-name,
-.hljs-tag {
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag {
   color: var(--color-hljs-keyword) !important;
 }
 
-.hljs-string,
-.hljs-title,
-.hljs-section,
-.hljs-attribute,
-.hljs-literal,
-.hljs-template-tag,
-.hljs-template-variable,
-.hljs-type {
+.hljs-string, .hljs-title, .hljs-section, .hljs-attribute, .hljs-literal,
+.hljs-template-tag, .hljs-template-variable, .hljs-type {
   color: var(--color-hljs-string) !important;
 }
 
-.hljs-comment,
-.hljs-quote,
-.hljs-deletion,
-.hljs-meta {
+.hljs-comment, .hljs-quote, .hljs-deletion, .hljs-meta {
   color: var(--color-hljs-comment) !important;
 }
 
-.hljs-number,
-.hljs-regexp,
-.hljs-addition {
+.hljs-number, .hljs-regexp, .hljs-addition {
   color: var(--color-hljs-number) !important;
 }
 
-.hljs-variable,
-.hljs-attr {
+.hljs-variable, .hljs-attr {
   color: var(--color-hljs-variable) !important;
 }
 
-.hljs-function .hljs-title,
-.hljs-title.function_ {
+.hljs-function .hljs-title, .hljs-title.function_ {
   color: var(--color-hljs-function) !important;
 }
 

@@ -13,8 +13,6 @@
     "daemon/dist/",
     "daemon/build.ts",
     "daemon/package.json",
-    "daemon/tailwind.config.js",
-    "daemon/postcss.config.js",
     "skills/",
     "hooks/"
   ],
@@ -27,11 +25,10 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "4",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "tailwindcss": "^3.4.17",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49"
+    "tailwindcss": "4"
   },
   "license": "MIT",
   "keywords": ["claude-code", "canvas", "interactive", "annotations"]
