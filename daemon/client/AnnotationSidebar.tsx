@@ -2,16 +2,18 @@ import React, { useRef, useEffect, useCallback, useState, useContext } from "rea
 import { useAnnotations, Annotation } from "./AnnotationProvider";
 import { setMarkActive } from "./highlightRange";
 import { generateMarkdown, hasValue, getMissingRequired } from "./generateMarkdown";
-import { RevisionContext } from "./App";
+import { RevisionContext, ActiveViewContext } from "./App";
 import { SessionContext } from "#canvas/runtime";
 import { MarkdownPreview } from "./ResponsePreview";
+import { FileIcon } from "./FileIcon";
 
 interface AnnotationSidebarProps {
   onPreview: () => void;
   onSubmit: (feedback: string) => void;
+  collapseButton?: React.ReactNode;
 }
 
-export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProps) {
+export function AnnotationSidebar({ onPreview, onSubmit, collapseButton }: AnnotationSidebarProps) {
   const { isReadOnly, selectedRevision, currentRevision, revisions } = useContext(RevisionContext);
   const sessionId = useContext(SessionContext);
   const isCurrentButSubmitted = isReadOnly && selectedRevision === currentRevision;
@@ -19,13 +21,13 @@ export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProp
   const roundLabel = selectedRevInfo?.label || `Round ${selectedRevision}`;
 
   if (isReadOnly) {
-    return <FeedbackDisplay sessionId={sessionId} revision={selectedRevision} label={roundLabel} waitingForUpdate={isCurrentButSubmitted} />;
+    return <FeedbackDisplay sessionId={sessionId} revision={selectedRevision} label={roundLabel} waitingForUpdate={isCurrentButSubmitted} collapseButton={collapseButton} />;
   }
 
-  return <AnnotationSidebarInner onPreview={onPreview} onSubmit={onSubmit} />;
+  return <AnnotationSidebarInner onPreview={onPreview} onSubmit={onSubmit} collapseButton={collapseButton} />;
 }
 
-function FeedbackDisplay({ sessionId, revision, label, waitingForUpdate }: { sessionId: string; revision: number; label: string; waitingForUpdate?: boolean }) {
+function FeedbackDisplay({ sessionId, revision, label, waitingForUpdate, collapseButton }: { sessionId: string; revision: number; label: string; waitingForUpdate?: boolean; collapseButton?: React.ReactNode }) {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -39,10 +41,11 @@ function FeedbackDisplay({ sessionId, revision, label, waitingForUpdate }: { ses
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 flex-shrink-0">
+      <div className="px-4 py-3 flex items-center justify-between flex-shrink-0">
         <span className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary font-body">
           {waitingForUpdate ? "Feedback sent" : `Feedback — ${label}`}
         </span>
+        {collapseButton}
       </div>
 
       {waitingForUpdate && (
@@ -65,13 +68,14 @@ function FeedbackDisplay({ sessionId, revision, label, waitingForUpdate }: { ses
   );
 }
 
-function AnnotationSidebarInner({ onPreview, onSubmit }: AnnotationSidebarProps) {
+function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: AnnotationSidebarProps) {
   const {
     annotations, updateAnnotation, removeAnnotation,
     generalNote, setGeneralNote,
     activeAnnotationId, setActiveAnnotationId,
     responses,
   } = useAnnotations();
+  const { setActiveView } = React.useContext(ActiveViewContext);
 
   const listRef = useRef<HTMLDivElement>(null);
   const annRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -125,7 +129,21 @@ function AnnotationSidebarInner({ onPreview, onSubmit }: AnnotationSidebarProps)
       }`}
       onMouseEnter={() => handleMouseEnter(ann.id)}
       onMouseLeave={() => handleMouseLeave(ann.id)}
-      onClick={() => setActiveAnnotationId(ann.id === activeAnnotationId ? null : ann.id)}
+      onClick={() => {
+        if (ann.id === activeAnnotationId) {
+          setActiveAnnotationId(null);
+        } else {
+          setActiveAnnotationId(ann.id);
+          if (ann.filePath) {
+            setActiveView({ type: "file", path: ann.filePath });
+            // Scroll to mark after file view renders
+            setTimeout(() => {
+              const mark = document.querySelector(`[data-annotation-id="${ann.id}"]`) as HTMLElement | null;
+              if (mark) mark.scrollIntoView({ behavior: "smooth", block: "center" });
+            }, 150);
+          }
+        }
+      }}
     >
       {/* Snippet quote */}
       <div className="text-[11px] text-text-tertiary italic line-clamp-2 mb-1.5 leading-snug font-body border-l-2 border-border-medium pl-2">
@@ -169,12 +187,13 @@ function AnnotationSidebarInner({ onPreview, onSubmit }: AnnotationSidebarProps)
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-4 py-3 flex items-center justify-between flex-shrink-0">
-        <span className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary font-body">
+        <span className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary font-body flex items-center gap-2">
           Annotations
           {annotations.length > 0 && (
-            <span className="ml-1 font-normal">{annotations.length}</span>
+            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-border-subtle text-[10px] font-medium text-text-secondary">{annotations.length}</span>
           )}
         </span>
+        {collapseButton}
       </div>
 
       {/* Annotation list */}
@@ -192,9 +211,14 @@ function AnnotationSidebarInner({ onPreview, onSubmit }: AnnotationSidebarProps)
 
         {Object.entries(fileGroups).map(([filePath, anns]) => (
           <div key={filePath}>
-            <div className="text-[10px] uppercase tracking-widest text-text-tertiary font-body px-3 pt-3 pb-1 truncate" title={filePath}>
-              {filePath}
-            </div>
+            <button
+              onClick={() => setActiveView({ type: "file", path: filePath })}
+              className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-text-tertiary hover:text-text-secondary font-body px-3 pt-3 pb-1 truncate transition-colors w-full text-left"
+              title={filePath}
+            >
+              <FileIcon name={filePath.split("/").pop() || filePath} type="file" />
+              <span className="truncate">{filePath}</span>
+            </button>
             {anns.map(renderAnnotation)}
           </div>
         ))}
