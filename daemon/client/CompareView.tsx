@@ -1,28 +1,45 @@
-import React, { useEffect, useState, useRef, useContext, useCallback } from "react";
-import { SessionContext } from "#canvas/runtime";
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import { RevisionSelect } from "./RevisionSelect";
 import { runDomDiff } from "./domDiff";
 
 interface CompareViewProps {
-  oldRevision: number;
-  newRevision: number;
+  initialLeft: number;
+  initialRight: number;
   sessionId: string;
   onExit: () => void;
 }
 
-export function CompareView({ oldRevision, newRevision, sessionId, onExit }: CompareViewProps) {
+export function CompareView({ initialLeft, initialRight, sessionId, onExit }: CompareViewProps) {
+  const [leftRev, setLeftRev] = useState(initialLeft);
+  const [rightRev, setRightRev] = useState(initialRight);
+
   const oldRef = useRef<HTMLDivElement>(null);
   const newRef = useRef<HTMLDivElement>(null);
-  const [oldReady, setOldReady] = useState(false);
-  const [newReady, setNewReady] = useState(false);
+  const diffGen = useRef(0);
   const [diffDone, setDiffDone] = useState(false);
   const [hasChanges, setHasChanges] = useState(true);
+  const [syncScroll, setSyncScroll] = useState(true);
+  const [leftReady, setLeftReady] = useState(false);
+  const [rightReady, setRightReady] = useState(false);
 
-  // Run diff after both panels mount
+  // Only reset the flag for the panel whose revision actually changed
+  const prevLeft = useRef(leftRev);
+  const prevRight = useRef(rightRev);
+  if (prevLeft.current !== leftRev || prevRight.current !== rightRev) {
+    diffGen.current++;
+    setDiffDone(false);
+    setHasChanges(true);
+    if (prevLeft.current !== leftRev) setLeftReady(false);
+    if (prevRight.current !== rightRev) setRightReady(false);
+    prevLeft.current = leftRev;
+    prevRight.current = rightRev;
+  }
+
+  // Run diff once both panels are ready
   useEffect(() => {
-    if (!oldReady || !newReady) return;
+    if (!leftReady || !rightReady || diffDone) return;
     if (!oldRef.current || !newRef.current) return;
 
-    // Double rAF to ensure paint is complete
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (!oldRef.current || !newRef.current) return;
@@ -31,15 +48,15 @@ export function CompareView({ oldRevision, newRevision, sessionId, onExit }: Com
         setDiffDone(true);
       });
     });
-  }, [oldReady, newReady]);
+  }, [leftReady, rightReady, diffDone]);
 
   // Synchronized scrolling
   const isSyncing = useRef(false);
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
 
-  const syncScroll = useCallback((source: HTMLDivElement, target: HTMLDivElement) => {
-    if (isSyncing.current) return;
+  const handleSyncScroll = useCallback((source: HTMLDivElement, target: HTMLDivElement) => {
+    if (!syncScroll || isSyncing.current) return;
     isSyncing.current = true;
 
     const sourceMax = source.scrollHeight - source.clientHeight;
@@ -52,15 +69,15 @@ export function CompareView({ oldRevision, newRevision, sessionId, onExit }: Com
     requestAnimationFrame(() => {
       isSyncing.current = false;
     });
-  }, []);
+  }, [syncScroll]);
 
   useEffect(() => {
     const left = leftPanelRef.current;
     const right = rightPanelRef.current;
     if (!left || !right) return;
 
-    const onLeftScroll = () => syncScroll(left, right);
-    const onRightScroll = () => syncScroll(right, left);
+    const onLeftScroll = () => handleSyncScroll(left, right);
+    const onRightScroll = () => handleSyncScroll(right, left);
 
     left.addEventListener("scroll", onLeftScroll);
     right.addEventListener("scroll", onRightScroll);
@@ -68,68 +85,72 @@ export function CompareView({ oldRevision, newRevision, sessionId, onExit }: Com
       left.removeEventListener("scroll", onLeftScroll);
       right.removeEventListener("scroll", onRightScroll);
     };
-  }, [syncScroll]);
+  }, [handleSyncScroll]);
 
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-border-subtle bg-bg-surface flex-shrink-0">
         <div className="flex items-center gap-3">
-          <span className="text-[13px] font-body font-medium text-text-primary">
-            Comparing Round {oldRevision} → Round {newRevision}
-          </span>
+          <span className="text-[13px] font-body font-medium text-text-primary">Compare</span>
+          <RevisionSelect value={leftRev} onChange={setLeftRev} accent="red" />
+          <span className="text-text-tertiary text-[13px]">&rarr;</span>
+          <RevisionSelect value={rightRev} onChange={setRightRev} accent="green" />
           {diffDone && !hasChanges && (
             <span className="text-[11px] font-body text-text-tertiary bg-bg-elevated px-2 py-0.5 rounded">
               No changes
             </span>
           )}
         </div>
-        <button
-          onClick={onExit}
-          className="text-[12px] font-body font-medium text-text-secondary hover:text-text-primary px-3 py-1.5 rounded-md hover:bg-bg-elevated transition-colors"
-        >
-          Exit Compare
-        </button>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={syncScroll}
+              onChange={(e) => setSyncScroll(e.target.checked)}
+              className="accent-accent-amber w-3.5 h-3.5"
+            />
+            <span className="text-[11px] font-body text-text-secondary">Sync scroll</span>
+          </label>
+          <button
+            onClick={onExit}
+            className="text-[12px] font-body font-medium text-text-secondary hover:text-text-primary px-3 py-1.5 rounded-md hover:bg-bg-elevated transition-colors"
+          >
+            Exit Compare
+          </button>
+        </div>
       </div>
 
       {/* Side-by-side panels */}
       <div className="flex flex-1 min-h-0">
-        {/* Left panel — old revision */}
+        {/* Left panel */}
         <div
           ref={leftPanelRef}
           className="w-1/2 overflow-y-auto border-r border-border-subtle"
         >
-          <div className="px-3 py-2 border-b border-border-subtle bg-bg-surface sticky top-0 z-10">
-            <span className="text-[11px] font-body font-medium text-accent-red">
-              Round {oldRevision}
-            </span>
-          </div>
           <div className="max-w-[720px] mx-auto px-6 pt-8 pb-32">
             <ComparePanelRenderer
+              key={`left-${leftRev}`}
               ref={oldRef}
               sessionId={sessionId}
-              revision={oldRevision}
-              onReady={() => setOldReady(true)}
+              revision={leftRev}
+              onReady={() => { const g = diffGen.current; requestAnimationFrame(() => { if (g === diffGen.current) setLeftReady(true); }); }}
             />
           </div>
         </div>
 
-        {/* Right panel — new revision */}
+        {/* Right panel */}
         <div
           ref={rightPanelRef}
           className="w-1/2 overflow-y-auto"
         >
-          <div className="px-3 py-2 border-b border-border-subtle bg-bg-surface sticky top-0 z-10">
-            <span className="text-[11px] font-body font-medium text-accent-green">
-              Round {newRevision}
-            </span>
-          </div>
           <div className="max-w-[720px] mx-auto px-6 pt-8 pb-32">
             <ComparePanelRenderer
+              key={`right-${rightRev}`}
               ref={newRef}
               sessionId={sessionId}
-              revision={newRevision}
-              onReady={() => setNewReady(true)}
+              revision={rightRev}
+              onReady={() => { const g = diffGen.current; requestAnimationFrame(() => { if (g === diffGen.current) setRightReady(true); }); }}
             />
           </div>
         </div>
@@ -164,7 +185,6 @@ const ComparePanelRenderer = React.forwardRef<HTMLDivElement, ComparePanelRender
         });
     }, [sessionId, revision]);
 
-    // Signal ready after component mounts and paints
     useEffect(() => {
       if (!PlanComponent) return;
       requestAnimationFrame(() => {

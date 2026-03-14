@@ -10,12 +10,14 @@ import { FileViewer } from "./FileViewer";
 import { SessionSwitcher } from "./SessionSwitcher";
 import { exportCanvasToMarkdown } from "./exportMarkdown";
 import { CompareView } from "./CompareView";
+import { RevisionSelect } from "./RevisionSelect";
 
 export type ActiveView = { type: "plan" } | { type: "file"; path: string };
 
 export interface RevisionInfo {
   revision: number;
   label?: string;
+  sourceFile?: string;
   createdAt: string;
   hasFeedback: boolean;
 }
@@ -38,8 +40,8 @@ export const RevisionContext = createContext<{
   revisions: RevisionInfo[];
   setSelectedRevision: (rev: number) => void;
   isReadOnly: boolean;
-  compareRevision: number | null;
-  setCompareRevision: (rev: number | null) => void;
+  compareRevision: { left: number; right: number } | null;
+  setCompareRevision: (rev: { left: number; right: number } | null) => void;
 }>({
   currentRevision: 1,
   selectedRevision: 1,
@@ -89,75 +91,42 @@ function ThemeSwitcher() {
 
 function RevisionSelector() {
   const { currentRevision, selectedRevision, revisions, setSelectedRevision, setCompareRevision } = React.useContext(RevisionContext);
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const roundLabel = (r: RevisionInfo) => r.label || `Round ${r.revision}`;
 
   if (revisions.length <= 1) {
     const only = revisions[0];
-    return <span className="text-[11px] text-text-tertiary font-body">{only ? roundLabel(only) : `Round ${currentRevision}`}</span>;
+    const label = only?.label || `Round ${currentRevision}`;
+    return <span className="text-[11px] text-text-tertiary font-body">{label}</span>;
   }
 
-  const selected = revisions.find((r) => r.revision === selectedRevision);
   const isLatest = selectedRevision === currentRevision;
 
   return (
-    <div className="relative flex items-center gap-1.5" ref={ref}>
+    <div className="flex items-center gap-1.5">
+      <RevisionSelect
+        value={selectedRevision}
+        onChange={setSelectedRevision}
+        accent={isLatest ? "default" : "amber"}
+      />
       <button
-        onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1.5 text-[12px] font-body font-medium px-2 py-1 rounded-md transition-colors ${
-          isLatest ? "text-text-secondary hover:text-text-primary" : "text-accent-amber bg-highlight-selected"
-        }`}
+        onClick={() => {
+          const current = revisions.find((r) => r.revision === selectedRevision);
+          const sourceFile = current?.sourceFile;
+          let left: number;
+          if (selectedRevision === currentRevision) {
+            // Find previous revision with same sourceFile
+            const prev = [...revisions]
+              .reverse()
+              .find((r) => r.revision < currentRevision && (!sourceFile || r.sourceFile === sourceFile));
+            left = prev?.revision ?? Math.max(1, currentRevision - 1);
+          } else {
+            left = selectedRevision;
+          }
+          setCompareRevision({ left, right: currentRevision });
+        }}
+        className="text-[11px] font-body font-medium px-2 py-0.5 rounded-md text-accent-blue hover:bg-accent-blue-muted transition-colors"
       >
-        {selected ? roundLabel(selected) : `Round ${selectedRevision}`}
-        {!isLatest && <span className="text-[10px] opacity-70">(old)</span>}
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`text-text-tertiary transition-transform duration-200 ${open ? "rotate-180" : ""}`}>
-          <path d="M2.5 4l2.5 2.5L7.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
+        Compare
       </button>
-
-      {!isLatest && (
-        <button
-          onClick={() => setCompareRevision(selectedRevision)}
-          className="text-[11px] font-body font-medium px-2 py-0.5 rounded-md text-accent-blue hover:bg-accent-blue-muted transition-colors"
-          title={`Compare Round ${selectedRevision} with Round ${currentRevision}`}
-        >
-          Compare
-        </button>
-      )}
-
-      {open && (
-        <div className="absolute top-full left-0 mt-1 w-56 bg-bg-elevated border border-border-hover rounded-lg shadow-lg z-50 py-1 overflow-hidden max-h-80 overflow-y-auto">
-          {[...revisions].reverse().map((r) => (
-            <button
-              key={r.revision}
-              onClick={() => { setSelectedRevision(r.revision); setOpen(false); }}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] font-body transition-colors ${
-                r.revision === selectedRevision
-                  ? "bg-bg-surface text-text-primary"
-                  : "text-text-secondary hover:bg-bg-surface hover:text-text-primary"
-              }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                r.revision === currentRevision ? "bg-accent-green" : r.hasFeedback ? "bg-accent-amber" : "bg-border-hover"
-              }`} />
-              <span className="flex-1 text-left truncate">{roundLabel(r)}</span>
-              {r.revision === currentRevision && <span className="text-[10px] text-text-tertiary flex-shrink-0">current</span>}
-              {r.hasFeedback && r.revision !== currentRevision && <span className="text-[10px] text-accent-amber flex-shrink-0">sent</span>}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -167,7 +136,7 @@ function App() {
   const [currentRevision, setCurrentRevision] = useState(1);
   const [selectedRevision, setSelectedRevision] = useState(1);
   const [revisions, setRevisions] = useState<RevisionInfo[]>([]);
-  const [compareRevision, setCompareRevision] = useState<number | null>(null);
+  const [compareRevision, setCompareRevision] = useState<{ left: number; right: number } | null>(null);
   const [connected, setConnected] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [activeView, setActiveViewRaw] = useState<ActiveView>({ type: "plan" });
@@ -269,8 +238,8 @@ function App() {
               {compareRevision !== null ? (
                 <div className={`${leftCollapsed ? "lg:ml-0" : "lg:ml-60"} transition-[margin] duration-200`}>
                   <CompareView
-                    oldRevision={compareRevision}
-                    newRevision={currentRevision}
+                    initialLeft={compareRevision.left}
+                    initialRight={compareRevision.right}
                     sessionId={sessionId}
                     onExit={() => setCompareRevision(null)}
                   />

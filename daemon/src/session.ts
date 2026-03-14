@@ -5,6 +5,7 @@ import { SESSIONS_DIR } from "./paths";
 export interface RevisionInfo {
   revision: number;
   label?: string;
+  sourceFile?: string;
   createdAt: string;
   hasFeedback: boolean;
 }
@@ -154,12 +155,12 @@ export class SessionManager {
     }
   }
 
-  upsert(id: string, jsx: string, projectRoot: string, label?: string): SessionData {
+  upsert(id: string, jsx: string, projectRoot: string, label?: string, sourceFile?: string): SessionData {
     const existing = this.sessions.get(id);
     const now = new Date().toISOString();
     const revision = existing ? existing.currentRevision + 1 : 1;
 
-    const revInfo: RevisionInfo = { revision, createdAt: now, hasFeedback: false, ...(label ? { label } : {}) };
+    const revInfo: RevisionInfo = { revision, createdAt: now, hasFeedback: false, ...(label ? { label } : {}), ...(sourceFile ? { sourceFile } : {}) };
     const revisions = existing ? [...existing.revisions, revInfo] : [revInfo];
 
     const session: SessionData = {

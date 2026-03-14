@@ -208,11 +208,11 @@ const server = Bun.serve<WSData>({
 async function handlePlanPost(req: Request, sessionId: string): Promise<Response> {
   try {
     const body = await req.json();
-    const { jsx, projectRoot, label } = body;
+    const { jsx, projectRoot, label, sourceFile } = body;
     if (!jsx) return jsonResponse({ error: "Missing jsx" }, 400);
 
     const isNew = !sessionManager.get(sessionId);
-    const session = sessionManager.upsert(sessionId, jsx, projectRoot || process.cwd(), label);
+    const session = sessionManager.upsert(sessionId, jsx, projectRoot || process.cwd(), label, sourceFile);
 
     const result = await compilePlan(jsx, session.projectRoot);
     if (result.ok) {
