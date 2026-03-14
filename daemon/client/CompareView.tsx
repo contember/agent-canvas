@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { RevisionSelect } from "./RevisionSelect";
 import { runDomDiff } from "./domDiff";
+import { extractBlockTree, matchBlocks, buildUnifiedDom } from "./unifiedDiff";
 
 interface CompareViewProps {
   initialLeft: number;
@@ -9,83 +10,14 @@ interface CompareViewProps {
   onExit: () => void;
 }
 
+type CompareMode = "unified" | "side-by-side";
+
 export function CompareView({ initialLeft, initialRight, sessionId, onExit }: CompareViewProps) {
   const [leftRev, setLeftRev] = useState(initialLeft);
   const [rightRev, setRightRev] = useState(initialRight);
-
-  const oldRef = useRef<HTMLDivElement>(null);
-  const newRef = useRef<HTMLDivElement>(null);
-  const diffGen = useRef(0);
-  const [diffDone, setDiffDone] = useState(false);
+  const [mode, setMode] = useState<CompareMode>("unified");
   const [hasChanges, setHasChanges] = useState(true);
-  const [syncScroll, setSyncScroll] = useState(true);
-  const [leftReady, setLeftReady] = useState(false);
-  const [rightReady, setRightReady] = useState(false);
-
-  // Only reset the flag for the panel whose revision actually changed
-  const prevLeft = useRef(leftRev);
-  const prevRight = useRef(rightRev);
-  if (prevLeft.current !== leftRev || prevRight.current !== rightRev) {
-    diffGen.current++;
-    setDiffDone(false);
-    setHasChanges(true);
-    if (prevLeft.current !== leftRev) setLeftReady(false);
-    if (prevRight.current !== rightRev) setRightReady(false);
-    prevLeft.current = leftRev;
-    prevRight.current = rightRev;
-  }
-
-  // Run diff once both panels are ready
-  useEffect(() => {
-    if (!leftReady || !rightReady || diffDone) return;
-    if (!oldRef.current || !newRef.current) return;
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!oldRef.current || !newRef.current) return;
-        const changed = runDomDiff(oldRef.current, newRef.current);
-        setHasChanges(changed);
-        setDiffDone(true);
-      });
-    });
-  }, [leftReady, rightReady, diffDone]);
-
-  // Synchronized scrolling
-  const isSyncing = useRef(false);
-  const leftPanelRef = useRef<HTMLDivElement>(null);
-  const rightPanelRef = useRef<HTMLDivElement>(null);
-
-  const handleSyncScroll = useCallback((source: HTMLDivElement, target: HTMLDivElement) => {
-    if (!syncScroll || isSyncing.current) return;
-    isSyncing.current = true;
-
-    const sourceMax = source.scrollHeight - source.clientHeight;
-    const targetMax = target.scrollHeight - target.clientHeight;
-    if (sourceMax > 0 && targetMax > 0) {
-      const ratio = source.scrollTop / sourceMax;
-      target.scrollTop = ratio * targetMax;
-    }
-
-    requestAnimationFrame(() => {
-      isSyncing.current = false;
-    });
-  }, [syncScroll]);
-
-  useEffect(() => {
-    const left = leftPanelRef.current;
-    const right = rightPanelRef.current;
-    if (!left || !right) return;
-
-    const onLeftScroll = () => handleSyncScroll(left, right);
-    const onRightScroll = () => handleSyncScroll(right, left);
-
-    left.addEventListener("scroll", onLeftScroll);
-    right.addEventListener("scroll", onRightScroll);
-    return () => {
-      left.removeEventListener("scroll", onLeftScroll);
-      right.removeEventListener("scroll", onRightScroll);
-    };
-  }, [handleSyncScroll]);
+  const [diffDone, setDiffDone] = useState(false);
 
   return (
     <div className="flex flex-col h-screen">
@@ -103,15 +35,33 @@ export function CompareView({ initialLeft, initialRight, sessionId, onExit }: Co
           )}
         </div>
         <div className="flex items-center gap-4">
-          <label className="flex items-center gap-1.5 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={syncScroll}
-              onChange={(e) => setSyncScroll(e.target.checked)}
-              className="accent-accent-amber w-3.5 h-3.5"
-            />
-            <span className="text-[11px] font-body text-text-secondary">Sync scroll</span>
-          </label>
+          {/* Mode toggle */}
+          <div className="flex items-center bg-bg-elevated rounded-md p-0.5">
+            <button
+              onClick={() => setMode("unified")}
+              className={`text-[11px] font-body px-2.5 py-1 rounded transition-colors ${
+                mode === "unified"
+                  ? "bg-bg-surface text-text-primary font-medium shadow-sm"
+                  : "text-text-tertiary hover:text-text-secondary"
+              }`}
+            >
+              Unified
+            </button>
+            <button
+              onClick={() => setMode("side-by-side")}
+              className={`text-[11px] font-body px-2.5 py-1 rounded transition-colors ${
+                mode === "side-by-side"
+                  ? "bg-bg-surface text-text-primary font-medium shadow-sm"
+                  : "text-text-tertiary hover:text-text-secondary"
+              }`}
+            >
+              Side-by-side
+            </button>
+          </div>
+
+          {/* Sync scroll — only in side-by-side mode */}
+          {mode === "side-by-side" && <SyncScrollCheckbox />}
+
           <button
             onClick={onExit}
             className="text-[12px] font-body font-medium text-text-secondary hover:text-text-primary px-3 py-1.5 rounded-md hover:bg-bg-elevated transition-colors"
@@ -121,43 +71,202 @@ export function CompareView({ initialLeft, initialRight, sessionId, onExit }: Co
         </div>
       </div>
 
-      {/* Side-by-side panels */}
-      <div className="flex flex-1 min-h-0">
-        {/* Left panel */}
-        <div
-          ref={leftPanelRef}
-          className="w-1/2 overflow-y-auto border-r border-border-subtle"
-        >
-          <div className="max-w-[720px] mx-auto px-6 pt-8 pb-32">
-            <ComparePanelRenderer
-              key={`left-${leftRev}`}
-              ref={oldRef}
-              sessionId={sessionId}
-              revision={leftRev}
-              onReady={() => { const g = diffGen.current; requestAnimationFrame(() => { if (g === diffGen.current) setLeftReady(true); }); }}
-            />
-          </div>
-        </div>
+      {mode === "unified" ? (
+        <UnifiedView
+          key={`unified-${leftRev}-${rightRev}`}
+          sessionId={sessionId}
+          leftRev={leftRev}
+          rightRev={rightRev}
+          onDiffResult={(done, changes) => { setDiffDone(done); setHasChanges(changes); }}
+        />
+      ) : (
+        <SideBySideView
+          key={`sbs-${leftRev}-${rightRev}`}
+          sessionId={sessionId}
+          leftRev={leftRev}
+          rightRev={rightRev}
+          onDiffResult={(done, changes) => { setDiffDone(done); setHasChanges(changes); }}
+        />
+      )}
+    </div>
+  );
+}
 
-        {/* Right panel */}
-        <div
-          ref={rightPanelRef}
-          className="w-1/2 overflow-y-auto"
-        >
-          <div className="max-w-[720px] mx-auto px-6 pt-8 pb-32">
-            <ComparePanelRenderer
-              key={`right-${rightRev}`}
-              ref={newRef}
-              sessionId={sessionId}
-              revision={rightRev}
-              onReady={() => { const g = diffGen.current; requestAnimationFrame(() => { if (g === diffGen.current) setRightReady(true); }); }}
-            />
+/* ── Sync scroll checkbox (lifted out to avoid re-render issues) ── */
+
+function SyncScrollCheckbox() {
+  const [checked, setChecked] = useState(true);
+  // Store in a ref accessible to SideBySideView via DOM attribute
+  useEffect(() => {
+    document.documentElement.dataset.syncScroll = checked ? "1" : "0";
+    return () => { delete document.documentElement.dataset.syncScroll; };
+  }, [checked]);
+
+  return (
+    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => setChecked(e.target.checked)}
+        className="accent-accent-amber w-3.5 h-3.5"
+      />
+      <span className="text-[11px] font-body text-text-secondary">Sync scroll</span>
+    </label>
+  );
+}
+
+/* ── Unified view ── */
+
+interface ViewProps {
+  sessionId: string;
+  leftRev: number;
+  rightRev: number;
+  onDiffResult: (done: boolean, hasChanges: boolean) => void;
+}
+
+function UnifiedView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProps) {
+  const oldRef = useRef<HTMLDivElement>(null);
+  const newRef = useRef<HTMLDivElement>(null);
+  const unifiedRef = useRef<HTMLDivElement>(null);
+  const [leftReady, setLeftReady] = useState(false);
+  const [rightReady, setRightReady] = useState(false);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (!leftReady || !rightReady || done) return;
+    if (!oldRef.current || !newRef.current) return;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!oldRef.current || !newRef.current || !unifiedRef.current) return;
+
+        const oldTree = extractBlockTree(oldRef.current);
+        const newTree = extractBlockTree(newRef.current);
+        const matches = matchBlocks(oldTree, newTree);
+        const { fragment, hasChanges } = buildUnifiedDom(matches);
+
+        unifiedRef.current.innerHTML = "";
+        unifiedRef.current.appendChild(fragment);
+        setDone(true);
+        onDiffResult(true, hasChanges);
+      });
+    });
+  }, [leftReady, rightReady, done]);
+
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto">
+      {/* Offscreen source panels */}
+      <div style={{ position: "absolute", left: -9999, visibility: "hidden" as const, pointerEvents: "none" as const, width: 720 }}>
+        <ComparePanelRenderer
+          ref={oldRef}
+          sessionId={sessionId}
+          revision={leftRev}
+          onReady={() => setLeftReady(true)}
+        />
+        <ComparePanelRenderer
+          ref={newRef}
+          sessionId={sessionId}
+          revision={rightRev}
+          onReady={() => setRightReady(true)}
+        />
+      </div>
+
+      {/* Visible output */}
+      <div className="max-w-[720px] mx-auto px-6 pt-8 pb-32">
+        {!done && (
+          <div className="flex items-center justify-center h-64 text-text-tertiary font-body text-body">
+            Loading...
           </div>
+        )}
+        <div ref={unifiedRef} />
+      </div>
+    </div>
+  );
+}
+
+/* ── Side-by-side view ── */
+
+function SideBySideView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProps) {
+  const oldRef = useRef<HTMLDivElement>(null);
+  const newRef = useRef<HTMLDivElement>(null);
+  const [leftReady, setLeftReady] = useState(false);
+  const [rightReady, setRightReady] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const leftPanelRef = useRef<HTMLDivElement>(null);
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+  const isSyncing = useRef(false);
+
+  // Run diff
+  useEffect(() => {
+    if (!leftReady || !rightReady || done) return;
+    if (!oldRef.current || !newRef.current) return;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!oldRef.current || !newRef.current) return;
+        const changed = runDomDiff(oldRef.current, newRef.current);
+        setDone(true);
+        onDiffResult(true, changed);
+      });
+    });
+  }, [leftReady, rightReady, done]);
+
+  // Sync scroll
+  useEffect(() => {
+    const left = leftPanelRef.current;
+    const right = rightPanelRef.current;
+    if (!left || !right) return;
+
+    const handleSync = (source: HTMLDivElement, target: HTMLDivElement) => {
+      if (document.documentElement.dataset.syncScroll === "0") return;
+      if (isSyncing.current) return;
+      isSyncing.current = true;
+      const sourceMax = source.scrollHeight - source.clientHeight;
+      const targetMax = target.scrollHeight - target.clientHeight;
+      if (sourceMax > 0 && targetMax > 0) {
+        target.scrollTop = (source.scrollTop / sourceMax) * targetMax;
+      }
+      requestAnimationFrame(() => { isSyncing.current = false; });
+    };
+
+    const onLeft = () => handleSync(left, right);
+    const onRight = () => handleSync(right, left);
+    left.addEventListener("scroll", onLeft);
+    right.addEventListener("scroll", onRight);
+    return () => {
+      left.removeEventListener("scroll", onLeft);
+      right.removeEventListener("scroll", onRight);
+    };
+  }, []);
+
+  return (
+    <div className="flex flex-1 min-h-0">
+      <div ref={leftPanelRef} className="w-1/2 overflow-y-auto border-r border-border-subtle">
+        <div className="max-w-[720px] mx-auto px-6 pt-8 pb-32">
+          <ComparePanelRenderer
+            ref={oldRef}
+            sessionId={sessionId}
+            revision={leftRev}
+            onReady={() => setLeftReady(true)}
+          />
+        </div>
+      </div>
+      <div ref={rightPanelRef} className="w-1/2 overflow-y-auto">
+        <div className="max-w-[720px] mx-auto px-6 pt-8 pb-32">
+          <ComparePanelRenderer
+            ref={newRef}
+            sessionId={sessionId}
+            revision={rightRev}
+            onReady={() => setRightReady(true)}
+          />
         </div>
       </div>
     </div>
   );
 }
+
+/* ── Panel renderer ── */
 
 interface ComparePanelRendererProps {
   sessionId: string;
@@ -192,7 +301,7 @@ const ComparePanelRenderer = React.forwardRef<HTMLDivElement, ComparePanelRender
           onReady();
         });
       });
-    }, [PlanComponent, onReady]);
+    }, [PlanComponent]);
 
     if (loading) {
       return (

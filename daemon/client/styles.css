@@ -186,6 +186,15 @@ button, a, [role="button"] {
 .diff-row-added td {
   background: color-mix(in srgb, var(--color-accent-green) 10%, transparent);
 }
+.diff-item-removed {
+  background: color-mix(in srgb, var(--color-accent-red) 10%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: var(--color-accent-red);
+  opacity: 0.6;
+}
+.diff-item-added {
+  background: color-mix(in srgb, var(--color-accent-green) 10%, transparent);
+}
 .diff-block-label {
   position: absolute;
   top: 4px;
