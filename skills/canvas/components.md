@@ -100,6 +100,15 @@ Inline code block with syntax highlighting. For code that's part of the narrativ
 **Props:**
 - `language` (string) — syntax highlighting language
 
+### `<ImageView src="string">`
+
+Displays an image from the project directory.
+
+```jsx
+<ImageView src="docs/architecture.png" />
+<ImageView src="screenshots/before.png" alt="Before refactor" caption="Current state" width={600} />
+```
+
 ### `<Diff before="string" after="string">`
 
 Shows a diff view between two code snippets.
