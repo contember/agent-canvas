@@ -250,6 +250,11 @@ export default function Plan() {
         </Task>
       </Section>
 
+      <Section title="Key Files">
+        <FilePreview path="daemon/src/server.ts" lines={[1, 30]} />
+        <FilePreview path="daemon/client/components/Section.tsx" />
+      </Section>
+
       <Section title="Component Library">
         Available presentation components for plan JSX.
 

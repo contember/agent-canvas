@@ -4,17 +4,31 @@ import { SessionContext } from "#canvas/runtime";
 interface FilePreviewProps {
   path: string;
   lines?: [number, number];
+  /** Injected by compiler at build time — skip runtime fetch when present */
+  __content?: string;
 }
 
-export function FilePreview({ path, lines }: FilePreviewProps) {
+const EXT_TO_LANG: Record<string, string> = {
+  ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
+  py: "python", rs: "rust", go: "go", rb: "ruby", java: "java",
+  json: "json", yaml: "yaml", yml: "yaml", md: "markdown",
+  css: "css", html: "html", sh: "bash", bash: "bash", toml: "toml",
+  sql: "sql", xml: "xml", c: "c", cpp: "cpp", h: "c",
+};
+
+export function FilePreview({ path, lines, __content }: FilePreviewProps) {
   const sessionId = useContext(SessionContext);
-  const [content, setContent] = useState<string | null>(null);
-  const [language, setLanguage] = useState("text");
+  const [content, setContent] = useState<string | null>(__content ?? null);
+  const [language, setLanguage] = useState(() => {
+    const ext = path.split(".").pop() || "";
+    return EXT_TO_LANG[ext] || "text";
+  });
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!__content);
   const codeRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    if (__content !== undefined) return; // already resolved at compile time
     setLoading(true);
     setError(null);
     fetch(`/api/file?session=${sessionId}&path=${encodeURIComponent(path)}`)
@@ -34,7 +48,7 @@ export function FilePreview({ path, lines }: FilePreviewProps) {
       })
       .catch(() => setError("Failed to fetch file"))
       .finally(() => setLoading(false));
-  }, [sessionId, path, lines?.[0], lines?.[1]]);
+  }, [sessionId, path, lines?.[0], lines?.[1], __content]);
 
   // Highlight after content loads
   useEffect(() => {

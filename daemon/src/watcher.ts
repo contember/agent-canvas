@@ -31,7 +31,7 @@ export function watchSession(
     debounceTimer = setTimeout(async () => {
       try {
         const jsx = readFileSync(planPath, "utf-8");
-        const result = await compilePlan(jsx);
+        const result = await compilePlan(jsx, session.projectRoot);
         if (result.ok) {
           sessionManager.saveCompiled(sessionId, result.js, rev);
           broadcast(sessionId);

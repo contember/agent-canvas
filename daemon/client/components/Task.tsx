@@ -37,7 +37,7 @@ const badgeStyles: Record<BadgeVariant, string> = {
 export function Item({ id, label, status, badge, badgeVariant = "neutral", children }: ItemProps) {
   return (
     <div
-      className="group/task relative -mx-2 px-2 py-3 rounded-lg transition-colors duration-150 hover:bg-bg-input"
+      className="group/task relative -mx-4 px-4 py-3 rounded-md transition-colors duration-150 hover:bg-bg-input"
       data-task-id={id}
       data-md="item"
       data-md-label={label}

@@ -214,7 +214,7 @@ async function handlePlanPost(req: Request, sessionId: string): Promise<Response
     const isNew = !sessionManager.get(sessionId);
     const session = sessionManager.upsert(sessionId, jsx, projectRoot || process.cwd(), label);
 
-    const result = await compilePlan(jsx);
+    const result = await compilePlan(jsx, session.projectRoot);
     if (result.ok) {
       sessionManager.saveCompiled(sessionId, result.js, session.currentRevision);
       broadcastPlanUpdate(sessionId);
@@ -245,7 +245,7 @@ async function handlePlanJs(sessionId: string, rev?: number): Promise<Response> 
     if (session) {
       const jsx = readRevisionJsx(sessionId, rev);
       if (jsx) {
-        const result = await compilePlan(jsx);
+        const result = await compilePlan(jsx, session.projectRoot);
         if (result.ok) {
           sessionManager.saveCompiled(sessionId, result.js, rev);
           compiled = result.js;
