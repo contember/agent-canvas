@@ -13,7 +13,7 @@ export function Checklist({ items }: ChecklistProps) {
   return (
     <ul className="space-y-1 mt-3" data-md="checklist">
       {items.map((item, i) => (
-        <li key={i} data-md="checklist-item" data-md-label={item.label} className="flex items-start gap-2.5 py-1">
+        <li key={i} data-md="checklist-item" data-md-label={item.label} className="relative flex items-start gap-2.5 py-1">
           <span className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 transition-all ${
             item.checked
               ? "bg-accent-green"

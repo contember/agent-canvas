@@ -6,7 +6,10 @@ import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, rest
 import { extractContext } from "./annotationContext";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 
+/** All navigable blocks (keyboard arrows) */
 const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='choice-option'], [data-md='multichoice-option'], [data-md='userinput'], [data-md='rangeinput']";
+/** Blocks eligible for annotation comment icons (excludes interactive controls) */
+const ANNOTATABLE_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item']";
 
 interface PlanRendererProps {
   revision: number;
@@ -129,14 +132,19 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
       // Ignore events on the block comment button itself
       if (target.closest("[data-block-comment-btn]")) return;
       setKeyboardNav(false);
-      const block = target.closest(BLOCK_SELECTOR) as HTMLElement | null;
-      if (block && container.contains(block)) {
-        // Track mouse position for keyboard nav continuity
+      // Track keyboard nav position on any navigable block
+      const navBlock = target.closest(BLOCK_SELECTOR) as HTMLElement | null;
+      if (navBlock && container.contains(navBlock)) {
         const blocks = getOrderedBlocks(container);
-        const idx = blocks.indexOf(block);
+        const idx = blocks.indexOf(navBlock);
         setFocusedBlockIndex(idx >= 0 ? idx : null);
+      } else {
+        setFocusedBlockIndex(null);
+      }
+      // Only show comment icons on annotatable blocks
+      const block = target.closest(ANNOTATABLE_SELECTOR) as HTMLElement | null;
+      if (block && container.contains(block)) {
         setHoveredBlock(block);
-        // Activate annotation in sidebar if this block has one
         const snippet = getBlockSnippet(block);
         const annId = snippet ? blockAnnotationMap.get(snippet) : undefined;
         if (annId && annId !== activeAnnotationId) {
@@ -216,15 +224,37 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
         const md = block.getAttribute("data-md");
         if (md === "choice-option" || md === "multichoice-option") {
           e.preventDefault();
-          block.click();
+          block.dispatchEvent(new CustomEvent("kb-select", { bubbles: true }));
         } else if (md === "userinput") {
           e.preventDefault();
           const textarea = block.querySelector("textarea");
-          if (textarea) textarea.focus();
+          if (textarea) {
+            textarea.focus();
+            const exitHandler = (te: KeyboardEvent) => {
+              if (te.key === "Escape") {
+                te.preventDefault();
+                textarea.blur();
+                setKeyboardNav(true);
+              }
+            };
+            textarea.addEventListener("keydown", exitHandler);
+            textarea.addEventListener("blur", () => textarea.removeEventListener("keydown", exitHandler), { once: true });
+          }
         } else if (md === "rangeinput") {
           e.preventDefault();
           const input = block.querySelector("input[type='range']") as HTMLInputElement | null;
-          if (input) input.focus();
+          if (input) {
+            input.focus();
+            const exitHandler = (re: KeyboardEvent) => {
+              if (re.key === "Escape" || re.key === "ArrowUp" || re.key === "ArrowDown") {
+                re.preventDefault();
+                input.blur();
+                setKeyboardNav(true);
+              }
+            };
+            input.addEventListener("keydown", exitHandler);
+            input.addEventListener("blur", () => input.removeEventListener("keydown", exitHandler), { once: true });
+          }
         }
       } else if (e.key === "Escape") {
         setFocusedBlockIndex(null);
@@ -490,7 +520,7 @@ function BlockCommentButtons({
     const container = containerRef.current;
     if (!container || blockAnnotationMap.size === 0) { setAnnotatedBlocks([]); return; }
     const blocks: HTMLElement[] = [];
-    for (const el of container.querySelectorAll(BLOCK_SELECTOR)) {
+    for (const el of container.querySelectorAll(ANNOTATABLE_SELECTOR)) {
       const snippet = getBlockSnippet(el as HTMLElement);
       if (snippet && blockAnnotationMap.has(snippet)) {
         blocks.push(el as HTMLElement);
@@ -525,11 +555,13 @@ function BlockCommentButtons({
     };
   }, [activeBlock]);
 
-  // Resolve keyboard-focused block element
+  // Resolve keyboard-focused block element (only annotatable blocks get comment icons)
   const focusedBlock = useMemo(() => {
     if (focusedBlockIndex === null || !containerRef.current) return null;
-    const blocks = getOrderedBlocks(containerRef.current);
-    return blocks[focusedBlockIndex] ?? null;
+    const block = getOrderedBlocks(containerRef.current)[focusedBlockIndex];
+    if (!block) return null;
+    // Only show comment icon on annotatable blocks, not interactive controls
+    return block.matches(ANNOTATABLE_SELECTOR) ? block : null;
   }, [focusedBlockIndex, containerRef.current]);
 
   // Collect all blocks that need a button: annotated + hovered + focused + popover target

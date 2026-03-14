@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAnnotations } from "#canvas/runtime";
 import { ResponseNote } from "./ResponseNote";
 
@@ -16,6 +16,7 @@ export function Choice({ id, label, options, required }: ChoiceProps) {
   const selected = current?.value as string | undefined;
   const note = current?.note || "";
   const [showNote, setShowNote] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!responses.has(id)) {
@@ -27,10 +28,23 @@ export function Choice({ id, label, options, required }: ChoiceProps) {
     setResponse(id, { ...current!, value: opt });
   };
 
+  // Keyboard selection via custom event from PlanRenderer
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const handler = (e: Event) => {
+      const target = (e.target as HTMLElement).closest("[data-md-label]");
+      const opt = target?.getAttribute("data-md-label");
+      if (opt && options.includes(opt)) handleSelect(opt);
+    };
+    el.addEventListener("kb-select", handler);
+    return () => el.removeEventListener("kb-select", handler);
+  });
+
   const showError = current?.required && !selected;
 
   return (
-    <div data-md="choice" data-md-label={label} className="-mx-4 px-4 py-3 my-1 rounded-lg transition-colors duration-150 hover:bg-bg-input">
+    <div ref={wrapperRef} data-md="choice" data-md-label={label} className="-mx-4 px-4 py-3 my-1 rounded-lg transition-colors duration-150 hover:bg-bg-input">
       <div className="flex items-baseline gap-2 mb-2">
         <span className="text-[13px] font-body font-medium text-text-primary">{label}</span>
         {required && <span className="text-[10px] text-accent-red font-body">*</span>}
@@ -79,6 +93,7 @@ export function MultiChoice({ id, label, options, required }: MultiChoiceProps) 
   const selected: string[] = (current?.value as string[]) || [];
   const note = current?.note || "";
   const [showNote, setShowNote] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!responses.has(id)) {
@@ -91,10 +106,23 @@ export function MultiChoice({ id, label, options, required }: MultiChoiceProps) 
     setResponse(id, { ...current!, value: next });
   };
 
+  // Keyboard selection via custom event from PlanRenderer
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const handler = (e: Event) => {
+      const target = (e.target as HTMLElement).closest("[data-md-label]");
+      const opt = target?.getAttribute("data-md-label");
+      if (opt && options.includes(opt)) toggle(opt);
+    };
+    el.addEventListener("kb-select", handler);
+    return () => el.removeEventListener("kb-select", handler);
+  });
+
   const showError = current?.required && selected.length === 0;
 
   return (
-    <div data-md="multichoice" data-md-label={label} className="-mx-4 px-4 py-3 my-1 rounded-lg transition-colors duration-150 hover:bg-bg-input">
+    <div ref={wrapperRef} data-md="multichoice" data-md-label={label} className="-mx-4 px-4 py-3 my-1 rounded-lg transition-colors duration-150 hover:bg-bg-input">
       <div className="flex items-baseline gap-2 mb-2">
         <span className="text-[13px] font-body font-medium text-text-primary">{label}</span>
         {required && <span className="text-[10px] text-accent-red font-body">*</span>}
