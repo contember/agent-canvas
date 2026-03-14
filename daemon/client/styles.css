@@ -25,12 +25,12 @@
 
 [data-theme="light"] {
   /* Override Tailwind theme vars */
-  --color-bg-base: #faf6ef;
-  --color-bg-surface: #f3ede4;
-  --color-bg-elevated: #ebe5db;
-  --color-bg-code: #f0ebe2;
-  --color-bg-input: rgba(80, 60, 30, 0.04);
-  --color-bg-elevated-half: rgba(235, 229, 219, 0.5);
+  --color-bg-base: #faf5e6;
+  --color-bg-surface: #f3edd8;
+  --color-bg-elevated: #ebe4ce;
+  --color-bg-code: #f0ebd5;
+  --color-bg-input: rgba(80, 60, 10, 0.05);
+  --color-bg-elevated-half: rgba(235, 228, 206, 0.5);
 
   --color-text-primary: #2a2520;
   --color-text-secondary: #5a5550;
@@ -165,6 +165,37 @@ button, a, [role="button"] {
   padding-block: 1px;
   text-decoration: line-through;
   text-decoration-color: var(--color-accent-red);
+}
+
+/* Block-level diff highlights for unified compare view */
+.diff-block-removed {
+  background: color-mix(in srgb, var(--color-accent-red) 8%, transparent);
+  border-left: 3px solid var(--color-accent-red);
+  opacity: 0.7;
+}
+.diff-block-added {
+  background: color-mix(in srgb, var(--color-accent-green) 8%, transparent);
+  border-left: 3px solid var(--color-accent-green);
+}
+.diff-row-removed td {
+  background: color-mix(in srgb, var(--color-accent-red) 10%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: var(--color-accent-red);
+  opacity: 0.6;
+}
+.diff-row-added td {
+  background: color-mix(in srgb, var(--color-accent-green) 10%, transparent);
+}
+.diff-block-label {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 3px;
+  pointer-events: none;
 }
 
 /* Plan update flash */

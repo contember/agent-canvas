@@ -1,11 +1,11 @@
 @theme {
   /* Colors — initial values, overridden by [data-theme] in styles.css */
-  --color-bg-base: #1a1a1a;
-  --color-bg-surface: #1e1e1e;
-  --color-bg-elevated: #242424;
-  --color-bg-code: #1c1c1c;
-  --color-bg-input: rgba(255, 248, 240, 0.03);
-  --color-bg-elevated-half: rgba(36, 36, 36, 0.5);
+  --color-bg-base: #1a1915;
+  --color-bg-surface: #1f1e18;
+  --color-bg-elevated: #25241d;
+  --color-bg-code: #1c1b16;
+  --color-bg-input: rgba(255, 248, 220, 0.03);
+  --color-bg-elevated-half: rgba(37, 36, 29, 0.5);
 
   --color-text-primary: #e8e4df;
   --color-text-secondary: #a09a92;
