@@ -242,7 +242,7 @@ function App() {
   return (
     <SessionContext.Provider value={sessionId}>
       <RevisionContext.Provider value={{ currentRevision, selectedRevision, revisions, setSelectedRevision, isReadOnly, compareRevision, setCompareRevision }}>
-        <AnnotationProvider sessionId={sessionId} revision={selectedRevision} isReadOnly={isReadOnly}>
+        <AnnotationProvider key={`${sessionId}:${selectedRevision}`} sessionId={sessionId} revision={selectedRevision} isReadOnly={isReadOnly}>
           <ActiveViewContext.Provider value={{ activeView, setActiveView, openFiles, closeFile }}>
           <ActiveViewCtx.Provider value={{ setActiveView }}>
             <div className="min-h-screen bg-bg-base">
