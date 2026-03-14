@@ -102,7 +102,6 @@ async function handleInstall(args: string[]) {
 
   // Install hooks
   const hooksTarget = join(targetBase, "settings.json");
-  const hookScript = join(PACKAGE_ROOT, "hooks", "inject-session-id.sh");
 
   // Read existing settings or create new
   let settings: any = {};
@@ -139,9 +138,6 @@ async function handleInstall(args: string[]) {
   }
 
   console.error(`\nInstalled! The /canvas command is now available in Claude Code.`);
-  if (mode === "local") {
-    console.error(`Add .claude/commands/ to .gitignore if you haven't already.`);
-  }
 }
 
 // ── push ──
