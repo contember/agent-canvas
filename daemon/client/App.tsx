@@ -46,12 +46,12 @@ export const RevisionContext = createContext<{
 });
 
 function ThemeSwitcher() {
-  const [theme, setTheme] = useState(() => localStorage.getItem("planner-theme") || document.documentElement.dataset.theme || "dark");
+  const [theme, setTheme] = useState(() => localStorage.getItem("canvas-theme") || document.documentElement.dataset.theme || "dark");
 
   const toggle = () => {
     const next = theme === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
-    localStorage.setItem("planner-theme", next);
+    localStorage.setItem("canvas-theme", next);
     setTheme(next);
   };
 
@@ -333,7 +333,7 @@ function LeftPanel({ sessionId, connected, onMobileSidebar }: { sessionId: strin
 
 function ResizableSidebar({ children }: { children: React.ReactNode }) {
   const [width, setWidth] = useState(() => {
-    const saved = localStorage.getItem("planner-sidebar-width");
+    const saved = localStorage.getItem("canvas-sidebar-width");
     return saved ? parseInt(saved, 10) : 320;
   });
   const dragging = useRef(false);
@@ -358,7 +358,7 @@ function ResizableSidebar({ children }: { children: React.ReactNode }) {
     };
     const onMouseUp = () => {
       dragging.current = false;
-      localStorage.setItem("planner-sidebar-width", String(widthRef.current));
+      localStorage.setItem("canvas-sidebar-width", String(widthRef.current));
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
       document.body.style.cursor = "";

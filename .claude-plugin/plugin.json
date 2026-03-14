@@ -1,5 +1,5 @@
 {
-  "name": "planner",
-  "description": "Interactive visual plan review with annotation-based feedback",
+  "name": "agent-canvas",
+  "description": "Interactive visual canvas for structured communication between agent and user",
   "version": "0.1.0"
 }

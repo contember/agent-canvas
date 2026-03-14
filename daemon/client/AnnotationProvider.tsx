@@ -20,7 +20,7 @@ interface PersistedState {
 }
 
 function storageKey(sessionId: string, revision: number): string {
-  return `planner:${sessionId}:rev:${revision}`;
+  return `canvas:${sessionId}:rev:${revision}`;
 }
 
 function loadPersisted(sessionId: string, revision: number): PersistedState | null {

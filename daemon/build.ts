@@ -6,7 +6,7 @@ const ROOT = dirname(import.meta.path);
 const DIST = join(ROOT, "dist");
 
 async function build() {
-  console.log("Building planner client...");
+  console.log("Building canvas client...");
 
   mkdirSync(DIST, { recursive: true });
 
@@ -75,7 +75,7 @@ async function build() {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Planner</title>
-  <script>document.documentElement.dataset.theme = localStorage.getItem('planner-theme') || 'dark';</script>
+  <script>document.documentElement.dataset.theme = localStorage.getItem('canvas-theme') || 'dark';</script>
   <link rel="stylesheet" href="/assets/client.css" />
   <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark-dimmed.min.css" />
 </head>
