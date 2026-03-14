@@ -202,7 +202,7 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
       </div>
 
       {/* Annotation list */}
-      <div ref={listRef} className="flex-1 overflow-y-auto px-1">
+      <div ref={listRef} className="flex-1 overflow-y-auto">
         {annotations.length === 0 && (
           <p className="text-[12px] text-text-tertiary px-3 py-4 leading-relaxed font-body">
             Select text in the plan or in files to add annotations.
