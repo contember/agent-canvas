@@ -1,6 +1,38 @@
 {
-  "name": "planner",
+  "name": "agent-canvas",
   "version": "0.1.0",
-  "private": true,
-  "workspaces": ["daemon", "cli"]
+  "description": "Interactive visual canvas for Claude Code — rich annotatable documents in the browser",
+  "bin": {
+    "agent-canvas": "./bin/agent-canvas.ts"
+  },
+  "files": [
+    "bin/",
+    "cli/",
+    "daemon/src/",
+    "daemon/client/",
+    "daemon/dist/",
+    "daemon/build.ts",
+    "daemon/package.json",
+    "daemon/tailwind.config.js",
+    "daemon/postcss.config.js",
+    "skills/",
+    "hooks/"
+  ],
+  "scripts": {
+    "build": "bun daemon/build.ts",
+    "prepublishOnly": "bun daemon/build.ts"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.17",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49"
+  },
+  "license": "MIT",
+  "keywords": ["claude-code", "canvas", "planner", "interactive", "annotations"]
 }

@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'INPUT=$(cat); SESSION_ID=$(echo \"$INPUT\" | grep -o '\"session_id\":\"[^\"]*\"' | cut -d\\\" -f4); CWD=$(echo \"$INPUT\" | grep -o '\"cwd\":\"[^\"]*\"' | cut -d\\\" -f4); if [ -n \"$SESSION_ID\" ] && [ -n \"$CLAUDE_ENV_FILE\" ]; then echo \"export CANVAS_SESSION_ID=$SESSION_ID\" >> \"$CLAUDE_ENV_FILE\"; echo \"export CANVAS_PROJECT_ROOT=$CWD\" >> \"$CLAUDE_ENV_FILE\"; fi'"
+          }
+        ]
+      }
+    ]
+  }
+}
