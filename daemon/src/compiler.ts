@@ -9,6 +9,7 @@ type CompileResult =
 
 const COMPONENT_IMPORTS = `import React from 'react';
 import * as C from '#canvas/components';
+import { useFeedback } from '#canvas/runtime';
 const { Section, Item, Task, FilePreview, CodeBlock, Callout,
         Mermaid, Table, Priority, Checklist, Note, Diff,
         Choice, MultiChoice, UserInput, RangeInput } = C;

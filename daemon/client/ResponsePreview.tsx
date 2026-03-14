@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useAnnotations } from "./AnnotationProvider";
-import { generateMarkdown, getMissingRequired } from "./generateMarkdown";
+import { generateMarkdown, getMissingRequired, getMissingRequiredFeedback } from "./generateMarkdown";
 
 interface ResponsePreviewProps {
   open: boolean;
@@ -9,7 +9,7 @@ interface ResponsePreviewProps {
 }
 
 export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProps) {
-  const { annotations, generalNote, responses } = useAnnotations();
+  const { annotations, generalNote, responses, feedbackEntries } = useAnnotations();
   const [text, setText] = useState("");
   const [manuallyEdited, setManuallyEdited] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -19,8 +19,8 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
   useEffect(() => {
     if (!open) { setManuallyEdited(false); setEditMode(false); setValidationError(null); return; }
     if (manuallyEdited) return;
-    setText(generateMarkdown(annotations, generalNote, responses));
-  }, [annotations, generalNote, responses, manuallyEdited, open]);
+    setText(generateMarkdown(annotations, generalNote, responses, feedbackEntries));
+  }, [annotations, generalNote, responses, feedbackEntries, manuallyEdited, open]);
 
   useEffect(() => {
     if (open && editMode && textareaRef.current) {
@@ -88,8 +88,17 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
 
         {/* Actions */}
         {validationError && (
-          <div className="px-5 py-2 text-[12px] text-accent-red font-body border-t border-border-subtle flex-shrink-0">
-            {validationError}
+          <div className="px-5 py-2 text-[12px] text-accent-red font-body border-t border-border-subtle flex-shrink-0 flex items-center justify-between gap-2">
+            <span>{validationError}</span>
+            <button
+              onClick={() => {
+                setValidationError(null);
+                onSubmit(text);
+              }}
+              className="text-[11px] text-text-tertiary hover:text-text-secondary font-body whitespace-nowrap underline"
+            >
+              Submit anyway
+            </button>
           </div>
         )}
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-border-subtle flex-shrink-0">
@@ -101,9 +110,14 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
           </button>
           <button
             onClick={() => {
-              const missing = getMissingRequired(responses);
-              if (missing.length > 0) {
-                setValidationError(`Please answer: ${missing.map((r) => r.label).join(", ")}`);
+              const missingResponses = getMissingRequired(responses);
+              const missingFeedback = getMissingRequiredFeedback(feedbackEntries);
+              const allMissing = [
+                ...missingResponses.map((r) => r.label),
+                ...missingFeedback.map((e) => e.label || e.id),
+              ];
+              if (allMissing.length > 0) {
+                setValidationError(`Please answer: ${allMissing.join(", ")}`);
                 return;
               }
               setValidationError(null);

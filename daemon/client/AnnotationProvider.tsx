@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { AnnotationCtx } from "#canvas/runtime";
-import type { Annotation, AnnotationContext, PlanResponse, AnnotationContextValue } from "#canvas/runtime";
+import type { Annotation, AnnotationContext, PlanResponse, FeedbackEntry, AnnotationContextValue } from "#canvas/runtime";
 
 // Re-export types for convenience
-export type { Annotation, AnnotationContext, PlanResponse, AnnotationContextValue };
+export type { Annotation, AnnotationContext, PlanResponse, FeedbackEntry, AnnotationContextValue };
 export { useAnnotations } from "#canvas/runtime";
 
 interface AnnotationProviderProps {
@@ -17,6 +17,7 @@ interface PersistedState {
   annotations: Annotation[];
   generalNote: string;
   responses: [string, PlanResponse][];
+  feedbackEntries?: [string, FeedbackEntry][];
 }
 
 function storageKey(sessionId: string, revision: number): string {
@@ -60,6 +61,10 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
     const saved = loadPersisted(sessionId, revision);
     return saved?.responses ? new Map(saved.responses) : new Map();
   });
+  const [feedbackEntries, setFeedbackEntries] = useState<Map<string, FeedbackEntry>>(() => {
+    const saved = loadPersisted(sessionId, revision);
+    return saved?.feedbackEntries ? new Map(saved.feedbackEntries) : new Map();
+  });
 
   // Reset state when session/revision changes
   useEffect(() => {
@@ -71,6 +76,7 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
     setAnnotations(saved?.annotations ?? []);
     setGeneralNote(saved?.generalNote ?? "");
     setResponses(saved?.responses ? new Map(saved.responses) : new Map());
+    setFeedbackEntries(saved?.feedbackEntries ? new Map(saved.feedbackEntries) : new Map());
     setActiveAnnotationId(null);
   }, [sessionId, revision]);
 
@@ -84,10 +90,11 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
         annotations,
         generalNote,
         responses: Array.from(responses.entries()),
+        feedbackEntries: Array.from(feedbackEntries.entries()),
       });
     }, 300);
     return () => { if (persistTimerRef.current) clearTimeout(persistTimerRef.current); };
-  }, [annotations, generalNote, responses, sessionId, revision, isReadOnly]);
+  }, [annotations, generalNote, responses, feedbackEntries, sessionId, revision, isReadOnly]);
 
   const addAnnotationWithId = useCallback((id: string, snippet: string, note: string, filePath?: string, context?: AnnotationContext) => {
     setAnnotations((prev) => [...prev, { id, snippet, note, createdAt: new Date().toISOString(), filePath, context }]);
@@ -116,6 +123,22 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
     });
   }, []);
 
+  const setFeedbackEntry = useCallback((id: string, entry: FeedbackEntry) => {
+    setFeedbackEntries((prev) => {
+      const next = new Map(prev);
+      next.set(id, entry);
+      return next;
+    });
+  }, []);
+
+  const removeFeedbackEntry = useCallback((id: string) => {
+    setFeedbackEntries((prev) => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
   const clearAll = useCallback(() => {
     for (const mark of document.querySelectorAll("[data-annotation-id]")) {
       unwrapMark(mark as HTMLElement);
@@ -124,6 +147,7 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
     setGeneralNote("");
     setActiveAnnotationId(null);
     setResponses(new Map());
+    setFeedbackEntries(new Map());
     clearPersisted(sessionId, revision);
   }, [sessionId, revision]);
 
@@ -134,6 +158,7 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
         generalNote, setGeneralNote, clearAll,
         activeAnnotationId, setActiveAnnotationId,
         responses, setResponse,
+        feedbackEntries, setFeedbackEntry, removeFeedbackEntry,
       }}
     >
       {children}

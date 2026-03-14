@@ -1,4 +1,4 @@
-import type { Annotation, PlanResponse } from "./AnnotationProvider";
+import type { Annotation, PlanResponse, FeedbackEntry } from "./AnnotationProvider";
 import { formatSnippetInContext } from "./annotationContext";
 
 /**
@@ -8,18 +8,27 @@ export function generateMarkdown(
   annotations: Annotation[],
   generalNote: string,
   responses?: Map<string, PlanResponse>,
+  feedbackEntries?: Map<string, FeedbackEntry>,
 ): string {
   const parts: string[] = [];
   const planAnns = annotations.filter((a) => !a.filePath);
   const fileAnns = annotations.filter((a) => a.filePath);
   const resps = responses ? Array.from(responses.values()).filter((r) => hasValue(r)) : [];
+  const fbEntries = feedbackEntries
+    ? Array.from(feedbackEntries.values()).filter((e) => e.markdown.trim())
+    : [];
 
   // Responses section
-  if (resps.length > 0) {
+  const hasResponseSection = resps.length > 0 || fbEntries.length > 0;
+  if (hasResponseSection) {
     parts.push("## Responses");
     parts.push("");
     for (const r of resps) {
       parts.push(renderResponse(r));
+    }
+    for (const entry of fbEntries) {
+      parts.push(entry.markdown.trim());
+      parts.push("");
     }
   }
 
@@ -76,6 +85,16 @@ export function getMissingRequired(responses: Map<string, PlanResponse>): PlanRe
     if (r.value === null || r.value === undefined) { missing.push(r); continue; }
     if (r.type === "text" && !(r.value as string).trim()) { missing.push(r); continue; }
     if (r.type === "checkbox" && (r.value as string[]).length === 0) { missing.push(r); continue; }
+  }
+  return missing;
+}
+
+export function getMissingRequiredFeedback(entries: Map<string, FeedbackEntry>): FeedbackEntry[] {
+  const missing: FeedbackEntry[] = [];
+  for (const entry of entries.values()) {
+    if (entry.required && !entry.markdown.trim()) {
+      missing.push(entry);
+    }
   }
   return missing;
 }

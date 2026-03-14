@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState, useContext } from "react";
 import { useAnnotations, Annotation } from "./AnnotationProvider";
 import { setMarkActive } from "./highlightRange";
-import { generateMarkdown, hasValue, getMissingRequired } from "./generateMarkdown";
+import { generateMarkdown, hasValue, getMissingRequired, getMissingRequiredFeedback } from "./generateMarkdown";
 import { RevisionContext, ActiveViewContext } from "./App";
 import { SessionContext } from "#canvas/runtime";
 import { MarkdownPreview } from "./ResponsePreview";
@@ -73,7 +73,7 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
     annotations, updateAnnotation, removeAnnotation,
     generalNote, setGeneralNote,
     activeAnnotationId, setActiveAnnotationId,
-    responses,
+    responses, feedbackEntries,
   } = useAnnotations();
   const { setActiveView } = React.useContext(ActiveViewContext);
 
@@ -98,20 +98,20 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
     }
   }, [activeAnnotationId]);
 
-  // Hover on sidebar card → highlight inline mark + scroll to it
+  // Hover on sidebar card → highlight inline mark + block + scroll to it
   const handleMouseEnter = useCallback((annId: string) => {
+    setActiveAnnotationId(annId);
     setMarkActive(annId, true);
     // Scroll inline mark into view
     const mark = document.querySelector(`[data-annotation-id="${annId}"]`) as HTMLElement | null;
     if (mark) {
       mark.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
-  }, []);
+  }, [setActiveAnnotationId]);
 
   const handleMouseLeave = useCallback((annId: string) => {
-    if (annId !== activeAnnotationId) {
-      setMarkActive(annId, false);
-    }
+    setActiveAnnotationId(null);
+    setMarkActive(annId, false);
   }, [activeAnnotationId]);
 
   const hasResponses = Array.from(responses.values()).some(hasValue);
@@ -122,7 +122,7 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
     <div
       key={ann.id}
       ref={(el) => { if (el) annRefs.current.set(ann.id, el); else annRefs.current.delete(ann.id); }}
-      className={`group/ann rounded-md px-3 py-2.5 mb-1 transition-colors duration-150 ${
+      className={`group/ann relative rounded-md px-3 py-2.5 mb-1 transition-colors duration-150 ${
         activeAnnotationId === ann.id
           ? "bg-highlight-selected"
           : "hover:bg-bg-input"
@@ -171,13 +171,17 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
         }}
       />
 
-      {/* Delete — on hover */}
-      <div className="flex mt-1 opacity-0 group-hover/ann:opacity-100 transition-opacity duration-100">
+      {/* Delete — top right on hover */}
+      <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/ann:opacity-100 transition-opacity duration-100">
         <button
           onClick={(e) => { e.stopPropagation(); removeAnnotation(ann.id); }}
-          className="text-[11px] text-text-tertiary hover:text-accent-red font-body transition-colors"
+          className="w-5 h-5 flex items-center justify-center rounded text-text-tertiary hover:text-accent-red hover:bg-accent-red-muted transition-colors"
+          title="Delete annotation"
         >
-          Delete
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+          </svg>
         </button>
       </div>
     </div>
@@ -247,8 +251,18 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
 
       {/* Validation error */}
       {validationError && (
-        <div className="px-4 py-2 text-[12px] text-accent-red font-body border-t border-border-subtle flex-shrink-0">
-          {validationError}
+        <div className="px-4 py-2 text-[12px] text-accent-red font-body border-t border-border-subtle flex-shrink-0 flex items-center justify-between gap-2">
+          <span>{validationError}</span>
+          <button
+            onClick={() => {
+              setValidationError(null);
+              const md = generateMarkdown(annotations, generalNote, responses, feedbackEntries);
+              onSubmit(md);
+            }}
+            className="text-[11px] text-text-tertiary hover:text-text-secondary font-body whitespace-nowrap underline"
+          >
+            Submit anyway
+          </button>
         </div>
       )}
 
@@ -264,13 +278,18 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
             </button>
             <button
               onClick={() => {
-                const missing = getMissingRequired(responses);
-                if (missing.length > 0) {
-                  setValidationError(`Please answer: ${missing.map((r) => r.label).join(", ")}`);
+                const missingResponses = getMissingRequired(responses);
+                const missingFeedback = getMissingRequiredFeedback(feedbackEntries);
+                const allMissing = [
+                  ...missingResponses.map((r) => r.label),
+                  ...missingFeedback.map((e) => e.label || e.id),
+                ];
+                if (allMissing.length > 0) {
+                  setValidationError(`Please answer: ${allMissing.join(", ")}`);
                   return;
                 }
                 setValidationError(null);
-                const md = generateMarkdown(annotations, generalNote, responses);
+                const md = generateMarkdown(annotations, generalNote, responses, feedbackEntries);
                 onSubmit(md);
               }}
               className="flex-1 py-2 rounded-lg font-body text-[13px] font-medium transition-all bg-btn-primary text-btn-primary-text hover:opacity-90 hover:-translate-y-px shadow-sm"

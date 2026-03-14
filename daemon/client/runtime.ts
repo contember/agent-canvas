@@ -2,7 +2,7 @@
 // The React.createContext call MUST live here (not in AnnotationProvider)
 // so that both bundles reference the same context object.
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, useEffect } from "react";
 
 export interface AnnotationContext {
   before: string;
@@ -29,6 +29,13 @@ export interface PlanResponse {
   note?: string;
 }
 
+export interface FeedbackEntry {
+  id: string;
+  markdown: string;
+  label?: string;
+  required?: boolean;
+}
+
 export interface AnnotationContextValue {
   annotations: Annotation[];
   addAnnotation: (snippet: string, note: string, filePath?: string) => void;
@@ -42,12 +49,32 @@ export interface AnnotationContextValue {
   setActiveAnnotationId: (id: string | null) => void;
   responses: Map<string, PlanResponse>;
   setResponse: (id: string, response: PlanResponse) => void;
+  feedbackEntries: Map<string, FeedbackEntry>;
+  setFeedbackEntry: (id: string, entry: FeedbackEntry) => void;
+  removeFeedbackEntry: (id: string) => void;
 }
 
 export const AnnotationCtx = createContext<AnnotationContextValue>(null!);
 
 export function useAnnotations(): AnnotationContextValue {
   return useContext(AnnotationCtx);
+}
+
+export function useFeedback(
+  id: string,
+  markdown: string,
+  options?: { label?: string; required?: boolean },
+): void {
+  const { setFeedbackEntry, removeFeedbackEntry } = useAnnotations();
+  useEffect(() => {
+    setFeedbackEntry(id, {
+      id,
+      markdown,
+      label: options?.label,
+      required: options?.required,
+    });
+    return () => removeFeedbackEntry(id);
+  }, [id, markdown, options?.label, options?.required]);
 }
 
 export { SessionContext } from "./SessionContext";
