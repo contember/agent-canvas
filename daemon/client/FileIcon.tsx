@@ -9,21 +9,21 @@ interface FileIconProps {
 
 const extColors: Record<string, string> = {
   // TypeScript / JavaScript
-  ts: "#3178c6", tsx: "#3178c6", js: "#f0db4f", jsx: "#61dafb",
+  ts: "#3178c6", tsx: "#3178c6", js: "#e8a32e", jsx: "#4ba0c8",
   // Web
   html: "#e34c26", css: "#264de4", scss: "#c69",
   // Data
-  json: "#a09a92", yaml: "#cb171e", yml: "#cb171e", toml: "#9c4221",
+  json: "#7a7568", yaml: "#cb171e", yml: "#cb171e", toml: "#9c4221",
   // Systems
-  rs: "#dea584", go: "#00add8", c: "#555", cpp: "#f34b7d", h: "#555",
+  rs: "#dea584", go: "#00add8", c: "#6a6a6a", cpp: "#f34b7d", h: "#6a6a6a",
   // Scripting
-  py: "#3572a5", rb: "#cc342d", sh: "#89e051", bash: "#89e051",
+  py: "#3572a5", rb: "#cc342d", sh: "#5a8c3c", bash: "#5a8c3c",
   // Markup / docs
-  md: "#083fa1", txt: "#6b6560",
+  md: "#3573b5", txt: "#6b6560",
   // Config
   lock: "#6b6560", gitignore: "#6b6560",
   // Images
-  svg: "#ffb13b", png: "#a4c639", jpg: "#a4c639", gif: "#a4c639",
+  svg: "#d9952e", png: "#6a9c2e", jpg: "#6a9c2e", gif: "#6a9c2e",
 };
 
 const extLabels: Record<string, string> = {
@@ -53,28 +53,24 @@ export function FileIcon({ name, type, expanded, className = "" }: FileIconProps
   const color = extColors[ext] || "#6b6560";
   const label = extLabels[ext];
 
-  if (label) {
-    return (
-      <span
-        className={`flex-shrink-0 inline-flex items-center justify-center font-mono font-medium ${className}`}
-        style={{
-          width: "14px",
-          height: "14px",
-          fontSize: "7px",
-          lineHeight: 1,
-          color,
-          opacity: 0.8,
-        }}
-      >
-        {label}
-      </span>
-    );
-  }
-
-  // Generic file dot
   return (
-    <span className={`flex-shrink-0 ${className}`} style={{ width: "14px", height: "14px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-      <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: color, opacity: 0.5 }} />
-    </span>
+    <svg width="14" height="14" viewBox="0 0 16 16" className={`flex-shrink-0 ${className}`}>
+      {/* File shape with folded corner */}
+      <path d="M2 1.5h8l3.5 3.5v9.5a1 1 0 01-1 1H3a1 1 0 01-1-1v-12a1 1 0 011-1z" fill={color} opacity="0.85" />
+      <path d="M10 1.5v2.5a1 1 0 001 1h2.5" fill="none" stroke="white" strokeWidth="0.5" opacity="0.5" />
+      {label && (
+        <text
+          x="8"
+          y="11.5"
+          textAnchor="middle"
+          fill="white"
+          fontSize="5.5"
+          fontFamily="monospace"
+          fontWeight="600"
+        >
+          {label}
+        </text>
+      )}
+    </svg>
   );
 }

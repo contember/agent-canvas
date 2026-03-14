@@ -20,7 +20,7 @@ export function Table({ headers, rows }: TableProps) {
         </thead>
         <tbody>
           {rows.map((row, ri) => (
-            <tr key={ri} className="border-b border-border-subtle last:border-b-0 transition-colors hover:bg-bg-elevated">
+            <tr key={ri} className={`border-b border-border-subtle last:border-b-0 transition-colors hover:bg-bg-surface/50 ${ri % 2 === 1 ? "bg-bg-surface/30" : ""}`}>
               {row.map((cell, ci) => (
                 <td key={ci} className="px-4 py-2.5 text-text-secondary font-body">
                   {cell}
