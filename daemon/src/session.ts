@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, renameSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { SESSIONS_DIR } from "./paths";
 
 export interface RevisionInfo {
   revision: number;
@@ -35,7 +35,6 @@ interface LegacyMeta {
   version: number;
 }
 
-export const SESSIONS_DIR = join(homedir(), ".planner", "sessions");
 const STALE_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export class SessionManager {

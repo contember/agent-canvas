@@ -1,14 +1,11 @@
-import { mkdirSync, writeFileSync, unlinkSync } from "fs";
+import { writeFileSync, unlinkSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
 import { randomUUID } from "crypto";
+import { COMPILE_TEMP_DIR } from "./paths";
 
 type CompileResult =
   | { ok: true; js: string }
   | { ok: false; error: string };
-
-const TEMP_DIR = join(homedir(), ".planner", "tmp");
-mkdirSync(TEMP_DIR, { recursive: true });
 
 const COMPONENT_IMPORTS = `import React from 'react';
 import * as C from '#canvas/components';
@@ -24,7 +21,7 @@ export async function compilePlan(jsx: string): Promise<CompileResult> {
     ? `${COMPONENT_IMPORTS}\n${jsx}`
     : `${COMPONENT_IMPORTS}\nexport default function Plan() {\n  return (<>${jsx}</>);\n}\n`;
 
-  const tmpFile = join(TEMP_DIR, `plan-${randomUUID()}.jsx`);
+  const tmpFile = join(COMPILE_TEMP_DIR, `plan-${randomUUID()}.jsx`);
 
   try {
     writeFileSync(tmpFile, source);

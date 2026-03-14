@@ -1,6 +1,6 @@
 import { join, resolve, dirname } from "path";
 import { readdir } from "fs/promises";
-import { homedir } from "os";
+import { DATA_DIR } from "./paths";
 import { SessionManager } from "./session";
 import { compilePlan } from "./compiler";
 import { watchSession } from "./watcher";
@@ -367,7 +367,7 @@ async function getDistDir(): Promise<string> {
   if (await Bun.file(join(localDist, "index.html")).exists()) {
     cachedDistDir = localDist;
   } else {
-    cachedDistDir = join(homedir(), ".planner", "daemon");
+    cachedDistDir = join(DATA_DIR, "daemon");
   }
   return cachedDistDir;
 }

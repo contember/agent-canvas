@@ -3,15 +3,17 @@
 import { spawn } from "child_process";
 import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync, cpSync } from "fs";
 import { join, resolve, dirname } from "path";
-import { homedir } from "os";
+import { homedir, tmpdir } from "os";
 import { randomUUID } from "crypto";
 
 const PACKAGE_ROOT = resolve(join(dirname(import.meta.path), ".."));
+const DATA_DIR = join(homedir(), ".claude", "agent-canvas");
+const TEMP_DIR = join(tmpdir(), "agent-canvas");
 const DAEMON_PORT = parseInt(process.env.CANVAS_PORT || process.env.PLANNER_PORT || "19400", 10);
 const BASE_URL = `http://localhost:${DAEMON_PORT}`;
 const WS_URL = `ws://localhost:${DAEMON_PORT}`;
 const TIMEOUT_MS = parseInt(process.env.CANVAS_TIMEOUT || String(60 * 60 * 1000), 10);
-const PID_FILE = join(homedir(), ".planner", "daemon.pid");
+const PID_FILE = join(TEMP_DIR, "daemon.pid");
 
 function getSessionId(): string {
   return process.env.CANVAS_SESSION_ID || process.env.PLANNER_SESSION_ID || (() => {
@@ -266,7 +268,7 @@ async function ensureDaemon(): Promise<void> {
   if (await isDaemonRunning()) return;
 
   console.error("Starting canvas daemon...");
-  mkdirSync(join(homedir(), ".planner"), { recursive: true });
+  mkdirSync(TEMP_DIR, { recursive: true });
 
   const daemonScript = join(PACKAGE_ROOT, "daemon", "src", "server.ts");
 
