@@ -128,8 +128,8 @@ function AnnotationSidebarInner({ onPreview, onSubmit }: AnnotationSidebarProps)
       onClick={() => setActiveAnnotationId(ann.id === activeAnnotationId ? null : ann.id)}
     >
       {/* Snippet quote */}
-      <div className="text-[11px] text-text-tertiary italic line-clamp-2 mb-1 leading-snug font-body">
-        "{ann.snippet.length > 80 ? ann.snippet.slice(0, 80) + "..." : ann.snippet}"
+      <div className="text-[11px] text-text-tertiary italic line-clamp-2 mb-1.5 leading-snug font-body border-l-2 border-border-medium pl-2">
+        {ann.snippet.length > 80 ? ann.snippet.slice(0, 80) + "..." : ann.snippet}
       </div>
 
       {/* Seamless editable note */}
@@ -205,7 +205,7 @@ function AnnotationSidebarInner({ onPreview, onSubmit }: AnnotationSidebarProps)
         <textarea
           value={generalNote}
           onChange={(e) => setGeneralNote(e.target.value)}
-          className="w-full bg-transparent text-[13px] font-body text-text-primary resize-none focus:outline-none leading-relaxed p-0 border-none placeholder:text-text-disabled min-h-[40px]"
+          className="w-full bg-transparent text-[13px] font-body text-text-primary resize-none leading-relaxed p-0 border-none ring-0 shadow-none outline-none focus:outline-none focus:ring-0 focus:border-none placeholder:text-text-disabled min-h-[40px]"
           placeholder="General notes..."
           onInput={(e) => {
             const t = e.target as HTMLTextAreaElement;
@@ -262,6 +262,16 @@ function AnnotationSidebarInner({ onPreview, onSubmit }: AnnotationSidebarProps)
           Submit
         </button>
       </div>
+      {!hasContent && (
+        <div className="px-4 pb-3 flex-shrink-0">
+          <button
+            onClick={() => onSubmit("No feedback — looks good.")}
+            className="w-full py-2 rounded-lg font-body text-[12px] text-text-tertiary hover:text-text-secondary hover:bg-bg-input transition-all"
+          >
+            Submit without feedback
+          </button>
+        </div>
+      )}
     </div>
   );
 }

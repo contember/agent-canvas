@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useContext, useCallback } from "react";
 import { SessionContext } from "#canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
-import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks } from "./highlightRange";
+import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, restoreMarks } from "./highlightRange";
 import { extractContext } from "./annotationContext";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 
@@ -29,6 +29,18 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
       .then((mod) => { setPlanComponent(() => mod.default); setLoading(false); })
       .catch((e) => { setError(e.message); setLoading(false); });
   }, [sessionId, revision]);
+
+  // Restore persisted annotation marks after plan renders
+  useEffect(() => {
+    if (!PlanComponent || !containerRef.current) return;
+    // Small delay to ensure the plan DOM is fully rendered
+    const timer = setTimeout(() => {
+      if (containerRef.current) {
+        restoreMarks(containerRef.current, annotations);
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [PlanComponent]);
 
   // Update mark active states when activeAnnotationId changes
   useEffect(() => {

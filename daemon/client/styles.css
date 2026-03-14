@@ -190,6 +190,10 @@ code, pre, .font-mono {
   border-radius: 4px;
 }
 
+textarea:focus-visible {
+  outline: none;
+}
+
 /* Transitions */
 button, a, [role="button"] {
   transition: all 150ms ease;

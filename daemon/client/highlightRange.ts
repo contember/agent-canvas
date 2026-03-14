@@ -120,6 +120,103 @@ export function renameMarkId(oldId: string, newId: string) {
 }
 
 /**
+ * Restore marks for persisted annotations by finding their snippet text in the DOM.
+ * Uses before/after context for disambiguation when the same text appears multiple times.
+ */
+export function restoreMarks(
+  container: HTMLElement,
+  annotations: { id: string; snippet: string; filePath?: string; context?: { before: string; after: string; hierarchy: string[] } }[]
+) {
+  // Only restore plan annotations (no filePath), skip already-marked ones
+  const toRestore = annotations.filter(
+    (a) => !a.filePath && !document.querySelector(`[data-annotation-id="${a.id}"]`)
+  );
+  if (!toRestore.length) return;
+
+  // Build full text content + mapping from text offset to (textNode, offsetInNode)
+  const textNodes: { node: Text; start: number }[] = [];
+  let fullText = "";
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let tn: Text | null;
+  while ((tn = walker.nextNode() as Text | null)) {
+    if (tn.parentElement?.classList.contains("select-none")) continue;
+    textNodes.push({ node: tn, start: fullText.length });
+    fullText += tn.textContent || "";
+  }
+
+  for (const ann of toRestore) {
+    const snippet = ann.snippet;
+    if (!snippet) continue;
+
+    // Find all occurrences of the snippet in the full text
+    const occurrences: number[] = [];
+    let searchFrom = 0;
+    while (true) {
+      const idx = fullText.indexOf(snippet, searchFrom);
+      if (idx === -1) break;
+      occurrences.push(idx);
+      searchFrom = idx + 1;
+    }
+
+    if (occurrences.length === 0) continue;
+
+    // Pick the best occurrence using context
+    let bestIdx = occurrences[0];
+    if (occurrences.length > 1 && ann.context) {
+      let bestScore = -1;
+      for (const idx of occurrences) {
+        let score = 0;
+        if (ann.context.before) {
+          const preceding = fullText.slice(Math.max(0, idx - 80), idx);
+          if (preceding.includes(ann.context.before)) score += 2;
+          else if (ann.context.before.length > 10 && preceding.includes(ann.context.before.slice(-10))) score += 1;
+        }
+        if (ann.context.after) {
+          const following = fullText.slice(idx + snippet.length, idx + snippet.length + 80);
+          if (following.includes(ann.context.after)) score += 2;
+          else if (ann.context.after.length > 10 && following.includes(ann.context.after.slice(0, 10))) score += 1;
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          bestIdx = idx;
+        }
+      }
+    }
+
+    // Map text offsets to DOM positions
+    const startOffset = bestIdx;
+    const endOffset = bestIdx + snippet.length;
+
+    const startPos = offsetToNode(textNodes, startOffset);
+    const endPos = offsetToNode(textNodes, endOffset);
+    if (!startPos || !endPos) continue;
+
+    try {
+      const range = document.createRange();
+      range.setStart(startPos.node, startPos.offset);
+      range.setEnd(endPos.node, endPos.offset);
+      wrapRangeWithMark(range, ann.id);
+    } catch {}
+  }
+}
+
+function offsetToNode(
+  textNodes: { node: Text; start: number }[],
+  offset: number
+): { node: Text; offset: number } | null {
+  for (let i = textNodes.length - 1; i >= 0; i--) {
+    if (textNodes[i].start <= offset) {
+      const localOffset = offset - textNodes[i].start;
+      const nodeLen = textNodes[i].node.textContent?.length ?? 0;
+      if (localOffset <= nodeLen) {
+        return { node: textNodes[i].node, offset: localOffset };
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Remove marks for a given annotation ID, restoring the original text nodes.
  */
 export function unwrapMarks(annotationId: string) {
