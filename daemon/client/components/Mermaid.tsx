@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { useAnnotations } from "#canvas/runtime";
+import { useAnnotations, Annotation } from "#canvas/runtime";
 import { AnnotationCreatePopover } from "../Popover";
 
 interface MermaidProps {
@@ -16,12 +16,24 @@ export function Mermaid({ children }: MermaidProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const source = typeof children === "string" ? children : String(children ?? "");
-  const { addAnnotationWithId } = useAnnotations();
+  const { annotations, addAnnotationWithId, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
   const [nodePopover, setNodePopover] = useState<NodePopoverState | null>(null);
 
-  const showPopoverRef = useRef((anchorEl: HTMLElement, snippet: string, prefix: string) => {
-    setNodePopover({ anchorEl, snippet, prefix });
-  });
+  const annotationsRef = useRef(annotations);
+  annotationsRef.current = annotations;
+
+  const handleNodeClick = useCallback((anchorEl: HTMLElement, snippet: string, prefix: string) => {
+    const diagramSnippet = `[Diagram ${prefix.toLowerCase()}] ${snippet}`;
+    const existing = annotationsRef.current.find((a) => a.snippet === diagramSnippet);
+    if (existing) {
+      setActiveAnnotationId(existing.id);
+    } else {
+      setNodePopover({ anchorEl, snippet, prefix });
+    }
+  }, [setActiveAnnotationId]);
+
+  const handleNodeClickRef = useRef(handleNodeClick);
+  handleNodeClickRef.current = handleNodeClick;
 
   useEffect(() => {
     let cancelled = false;
@@ -35,7 +47,8 @@ export function Mermaid({ children }: MermaidProps) {
         const { svg } = await mermaid.render(id, source.trim());
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
-          setupNodeAnnotations(containerRef.current, showPopoverRef.current);
+          setupNodeAnnotations(containerRef.current, (el, snippet, prefix) => handleNodeClickRef.current(el, snippet, prefix));
+          highlightAnnotatedNodes(containerRef.current, annotationsRef.current);
         }
         setError(null);
       } catch (e: any) {
@@ -53,7 +66,14 @@ export function Mermaid({ children }: MermaidProps) {
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
     return () => { cancelled = true; observer.disconnect(); };
-  }, [source, addAnnotationWithId]);
+  }, [source]);
+
+  // Update visual highlights when annotations change
+  useEffect(() => {
+    if (containerRef.current) {
+      highlightAnnotatedNodes(containerRef.current, annotations, activeAnnotationId);
+    }
+  }, [annotations, activeAnnotationId]);
 
   if (error) {
     return (
@@ -149,5 +169,55 @@ function setupNodeAnnotations(
     const text = label.textContent?.trim();
     if (!text) continue;
     makeClickable(label as SVGElement, () => text, "Edge");
+  }
+}
+
+function highlightAnnotatedNodes(container: HTMLElement, annotations: Annotation[], activeId?: string | null) {
+  // Collect annotated diagram snippets
+  const annotatedSnippets = new Map<string, string>();
+  for (const ann of annotations) {
+    const match = ann.snippet.match(/^\[Diagram (?:node|edge)\] (.+)$/);
+    if (match) annotatedSnippets.set(match[1], ann.id);
+  }
+
+  // Reset all node outlines
+  for (const el of container.querySelectorAll("[data-annotated]")) {
+    (el as SVGElement).style.outline = "";
+    (el as SVGElement).style.outlineOffset = "";
+    (el as SVGElement).style.borderRadius = "";
+    el.removeAttribute("data-annotated");
+  }
+
+  if (annotatedSnippets.size === 0) return;
+
+  // Highlight nodes
+  for (const node of container.querySelectorAll(".node")) {
+    const labelEl = node.querySelector(".nodeLabel") || node.querySelector("foreignObject span") || node.querySelector("text");
+    const text = labelEl?.textContent?.trim();
+    if (!text || !annotatedSnippets.has(text)) continue;
+    const annId = annotatedSnippets.get(text)!;
+    const el = node as SVGElement;
+    el.setAttribute("data-annotated", annId);
+    const isActive = annId === activeId;
+    el.style.outline = isActive
+      ? "2px solid var(--color-highlight-border)"
+      : "2px solid var(--color-highlight-annotation)";
+    el.style.outlineOffset = "2px";
+    el.style.borderRadius = "4px";
+  }
+
+  // Highlight edge labels
+  for (const label of container.querySelectorAll(".edgeLabel")) {
+    const text = label.textContent?.trim();
+    if (!text || !annotatedSnippets.has(text)) continue;
+    const annId = annotatedSnippets.get(text)!;
+    const el = label as SVGElement;
+    el.setAttribute("data-annotated", annId);
+    const isActive = annId === activeId;
+    el.style.outline = isActive
+      ? "2px solid var(--color-highlight-border)"
+      : "2px solid var(--color-highlight-annotation)";
+    el.style.outlineOffset = "2px";
+    el.style.borderRadius = "4px";
   }
 }
