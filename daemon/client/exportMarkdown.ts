@@ -9,8 +9,13 @@ export function exportCanvasToMarkdown(container: HTMLElement): string {
 }
 
 function walkChildren(el: HTMLElement, lines: string[], depth: number) {
-  for (const child of el.children) {
-    walkNode(child as HTMLElement, lines, depth);
+  for (const child of el.childNodes) {
+    if (child.nodeType === Node.ELEMENT_NODE) {
+      walkNode(child as HTMLElement, lines, depth);
+    } else if (child.nodeType === Node.TEXT_NODE) {
+      const text = child.textContent?.trim();
+      if (text) lines.push(text, "");
+    }
   }
 }
 
@@ -28,6 +33,13 @@ function walkNode(el: HTMLElement, lines: string[], depth: number) {
       case "checklist": return handleChecklist(el, lines);
       case "diff": return handleDiff(el, lines);
       case "mermaid": return handleMermaid(el, lines);
+      case "choice": return handleChoice(el, lines);
+      case "multichoice": return handleMultiChoice(el, lines);
+      case "choice-option":
+      case "multichoice-option": return; // handled by parent
+      case "userinput": return handleUserInput(el, lines);
+      case "rangeinput": return handleRangeInput(el, lines);
+      case "checklist-item": return; // handled by parent (checklist)
     }
   }
 
@@ -65,11 +77,15 @@ function handleItem(el: HTMLElement, lines: string[]) {
   if (badge) line += ` \`${badge}\``;
   lines.push(line);
 
-  // Extract children text (description)
-  const desc = el.querySelector(".text-text-secondary");
-  if (desc) {
-    const text = desc.textContent?.trim();
-    if (text) lines.push(`  ${text}`);
+  // Walk children content (description, nested CodeBlock, Callout, Priority, etc.)
+  const childrenDiv = el.querySelector(".text-text-secondary");
+  if (childrenDiv) {
+    const childLines: string[] = [];
+    walkChildren(childrenDiv as HTMLElement, childLines, 0);
+    // Indent child content under the list item
+    for (const cl of childLines) {
+      lines.push(cl ? `  ${cl}` : "");
+    }
   }
   lines.push("");
 }
@@ -142,6 +158,43 @@ function handleMermaid(el: HTMLElement, lines: string[]) {
   if (source) {
     lines.push("```mermaid", source, "```", "");
   }
+}
+
+function handleChoice(el: HTMLElement, lines: string[]) {
+  const label = el.getAttribute("data-md-label") || "";
+  lines.push(`**${label}:**`);
+  for (const opt of el.querySelectorAll("[data-md='choice-option']")) {
+    const optLabel = opt.getAttribute("data-md-label") || opt.textContent?.trim() || "";
+    const selected = opt.querySelector(".bg-accent-amber") !== null;
+    lines.push(`- ${selected ? "(x)" : "( )"} ${optLabel}`);
+  }
+  lines.push("");
+}
+
+function handleMultiChoice(el: HTMLElement, lines: string[]) {
+  const label = el.getAttribute("data-md-label") || "";
+  lines.push(`**${label}:**`);
+  for (const opt of el.querySelectorAll("[data-md='multichoice-option']")) {
+    const optLabel = opt.getAttribute("data-md-label") || opt.textContent?.trim() || "";
+    const checked = opt.querySelector(".bg-accent-amber") !== null;
+    lines.push(`- [${checked ? "x" : " "}] ${optLabel}`);
+  }
+  lines.push("");
+}
+
+function handleUserInput(el: HTMLElement, lines: string[]) {
+  const label = el.getAttribute("data-md-label") || "";
+  const textarea = el.querySelector("textarea") as HTMLTextAreaElement | null;
+  const value = textarea?.value?.trim() || "";
+  lines.push(`**${label}:** ${value || "_empty_"}`, "");
+}
+
+function handleRangeInput(el: HTMLElement, lines: string[]) {
+  const label = el.getAttribute("data-md-label") || "";
+  const input = el.querySelector("input[type='range']") as HTMLInputElement | null;
+  const display = el.querySelector(".font-mono");
+  const value = display?.textContent?.trim() || input?.value || "—";
+  lines.push(`**${label}:** ${value}`, "");
 }
 
 function extractText(el: HTMLElement): string {

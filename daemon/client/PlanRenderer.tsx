@@ -623,7 +623,7 @@ function BlockCommentIcon({
             : "text-accent-amber opacity-60 hover:opacity-100"
           : isHovered
             ? "text-text-disabled hover:text-text-tertiary opacity-50 hover:opacity-100"
-            : "opacity-0 pointer-events-none"
+            : "text-text-disabled opacity-0 group-hover/section:opacity-20 hover:!opacity-80"
       }`}
       title={hasAnnotation ? "Edit annotation" : "Add annotation"}
     >

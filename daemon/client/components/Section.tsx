@@ -9,13 +9,13 @@ export function Section({ title, children }: SectionProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="relative mb-12 p-2 group/section" data-md="section" data-md-title={title}>
-      <div className="mb-2 flex items-center gap-1 -ml-5">
+    <div className="relative mb-12 p-4 group/section" data-md="section" data-md-title={title}>
+      <div className="relative mb-2">
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className={`text-text-tertiary opacity-0 group-hover/section:opacity-50 hover:!opacity-100 transition-all duration-150 flex-shrink-0 p-0.5 ${collapsed ? "-rotate-90" : ""}`}
+          className={`absolute -left-8 top-1/2 -translate-y-1/2 text-text-tertiary opacity-0 group-hover/section:opacity-50 hover:!opacity-100 transition-all duration-150 p-0.5 ${collapsed ? "-rotate-90" : ""}`}
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
             <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
@@ -26,9 +26,7 @@ export function Section({ title, children }: SectionProps) {
           {title}
         </h2>
       </div>
-      {!collapsed && (
-        <div className="mt-6">{children}</div>
-      )}
+      <div className={collapsed ? "mt-6 hidden" : "mt-6"}>{children}</div>
     </div>
   );
 }
