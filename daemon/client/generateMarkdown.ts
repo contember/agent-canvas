@@ -93,13 +93,6 @@ function renderResponse(r: PlanResponse): string {
       for (const v of r.value as string[]) {
         lines.push(`- [x] ${v}`);
       }
-      if (r.options) {
-        for (const opt of r.options) {
-          if (!(r.value as string[]).includes(opt)) {
-            lines.push(`- [ ] ${opt}`);
-          }
-        }
-      }
       break;
     case "text":
       lines.push("");
