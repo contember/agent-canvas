@@ -9,14 +9,14 @@ import { randomUUID } from "crypto";
 const PACKAGE_ROOT = resolve(join(dirname(import.meta.path), ".."));
 const DATA_DIR = join(homedir(), ".claude", "agent-canvas");
 const TEMP_DIR = join(tmpdir(), "agent-canvas");
-const DAEMON_PORT = parseInt(process.env.CANVAS_PORT || process.env.PLANNER_PORT || "19400", 10);
+const DAEMON_PORT = parseInt(process.env.CANVAS_PORT || "19400", 10);
 const BASE_URL = `http://localhost:${DAEMON_PORT}`;
 const WS_URL = `ws://localhost:${DAEMON_PORT}`;
 const TIMEOUT_MS = parseInt(process.env.CANVAS_TIMEOUT || String(60 * 60 * 1000), 10);
 const PID_FILE = join(TEMP_DIR, "daemon.pid");
 
 function getSessionId(): string {
-  return process.env.CANVAS_SESSION_ID || process.env.PLANNER_SESSION_ID || (() => {
+  return process.env.CANVAS_SESSION_ID || (() => {
     const id = randomUUID();
     console.error(`Warning: CANVAS_SESSION_ID not set, using generated ID: ${id}`);
     return id;
@@ -100,22 +100,24 @@ async function handleInstall(args: string[]) {
 
   console.error(`  Skill installed to ${skillTarget}`);
 
-  // Install hooks
-  const hooksTarget = join(targetBase, "settings.json");
+  // Install hook script
+  const hooksDir = join(targetBase, "agent-canvas");
+  mkdirSync(hooksDir, { recursive: true });
+  const hookSrc = join(PACKAGE_ROOT, "hooks", "session-start.sh");
+  const hookDest = join(hooksDir, "session-start.sh");
+  cpSync(hookSrc, hookDest);
+  try { require("fs").chmodSync(hookDest, 0o755); } catch {}
+  console.error(`  Hook script installed to ${hookDest}`);
 
-  // Read existing settings or create new
+  // Register hook in settings.json
+  const settingsPath = join(targetBase, "settings.json");
   let settings: any = {};
-  if (existsSync(hooksTarget)) {
-    try {
-      settings = JSON.parse(readFileSync(hooksTarget, "utf-8"));
-    } catch {}
+  if (existsSync(settingsPath)) {
+    try { settings = JSON.parse(readFileSync(settingsPath, "utf-8")); } catch {}
   }
 
   if (!settings.hooks) settings.hooks = {};
   if (!settings.hooks.SessionStart) settings.hooks.SessionStart = [];
-
-  // Check if our hook is already there
-  const hookCommand = `bash -c 'INPUT=$(cat); SESSION_ID=$(echo "$INPUT" | grep -o \'"session_id":"[^"]*"\' | cut -d\\" -f4); CWD=$(echo "$INPUT" | grep -o \'"cwd":"[^"]*"\' | cut -d\\" -f4); if [ -n "$SESSION_ID" ] && [ -n "$CLAUDE_ENV_FILE" ]; then echo "export CANVAS_SESSION_ID=$SESSION_ID" >> "$CLAUDE_ENV_FILE"; echo "export CANVAS_PROJECT_ROOT=$CWD" >> "$CLAUDE_ENV_FILE"; fi'`;
 
   const hasHook = settings.hooks.SessionStart.some((h: any) =>
     h.hooks?.some((hh: any) => hh.command?.includes("CANVAS_SESSION_ID"))
@@ -126,15 +128,15 @@ async function handleInstall(args: string[]) {
       matcher: "*",
       hooks: [{
         type: "command",
-        command: hookCommand,
+        command: `bash "${hookDest}"`,
       }],
     });
 
-    mkdirSync(dirname(hooksTarget), { recursive: true });
-    writeFileSync(hooksTarget, JSON.stringify(settings, null, 2));
-    console.error(`  Hook added to ${hooksTarget}`);
+    mkdirSync(dirname(settingsPath), { recursive: true });
+    writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    console.error(`  Hook registered in ${settingsPath}`);
   } else {
-    console.error(`  Hook already present in ${hooksTarget}`);
+    console.error(`  Hook already registered in ${settingsPath}`);
   }
 
   console.error(`\nInstalled! The /canvas command is now available in Claude Code.`);
@@ -164,7 +166,7 @@ async function handlePush(args: string[]) {
   }
 
   const sessionId = getSessionId();
-  const projectRoot = process.env.CANVAS_PROJECT_ROOT || process.env.PLANNER_PROJECT_ROOT || process.cwd();
+  const projectRoot = process.env.CANVAS_PROJECT_ROOT || process.cwd();
 
   // Extract --label flag
   const labelIdx = args.indexOf("--label");

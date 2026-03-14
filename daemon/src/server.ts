@@ -5,7 +5,7 @@ import { SessionManager } from "./session";
 import { compilePlan } from "./compiler";
 import { watchSession } from "./watcher";
 
-const PORT = parseInt(process.env.PLANNER_PORT || "19400", 10);
+const PORT = parseInt(process.env.CANVAS_PORT || "19400", 10);
 const LANG_MAP: Record<string, string> = {
   ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
   py: "python", rs: "rust", go: "go", rb: "ruby", java: "java",
