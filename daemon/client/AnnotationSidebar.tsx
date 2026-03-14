@@ -123,10 +123,10 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
     <div
       key={ann.id}
       ref={(el) => { if (el) annRefs.current.set(ann.id, el); else annRefs.current.delete(ann.id); }}
-      className={`group/ann relative rounded-md px-3 py-2.5 mb-1 transition-colors duration-150 ${
+      className={`group/ann relative px-3 py-2.5 transition-colors duration-150 ${
         activeAnnotationId === ann.id
           ? "bg-highlight-selected"
-          : "hover:bg-bg-input"
+          : "odd:bg-bg-elevated-half hover:bg-bg-input"
       }`}
       onMouseEnter={() => handleMouseEnter(ann.id)}
       onMouseLeave={() => handleMouseLeave(ann.id)}
