@@ -1,8 +1,17 @@
+import { join, resolve, dirname } from "path";
+import { readdir } from "fs/promises";
+import { homedir } from "os";
 import { SessionManager } from "./session";
 import { compilePlan } from "./compiler";
 import { watchSession } from "./watcher";
 
 const PORT = parseInt(process.env.PLANNER_PORT || "19400", 10);
+const LANG_MAP: Record<string, string> = {
+  ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
+  py: "python", rs: "rust", go: "go", rb: "ruby", java: "java",
+  json: "json", yaml: "yaml", yml: "yaml", md: "markdown",
+  css: "css", html: "html", sh: "bash", bash: "bash",
+};
 const sessionManager = new SessionManager();
 
 function jsonResponse(data: unknown, status = 200): Response {
@@ -231,7 +240,6 @@ async function handleFileServe(url: URL): Promise<Response> {
   const session = sessionManager.get(sessionId);
   if (!session) return jsonResponse({ error: "Session not found" }, 404);
 
-  const { resolve, join } = await import("path");
   const fullPath = resolve(join(session.projectRoot, relPath));
   if (!fullPath.startsWith(resolve(session.projectRoot))) {
     return jsonResponse({ error: "Path traversal rejected" }, 403);
@@ -245,13 +253,7 @@ async function handleFileServe(url: URL): Promise<Response> {
 
     const content = await file.text();
     const ext = relPath.split(".").pop() || "";
-    const langMap: Record<string, string> = {
-      ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
-      py: "python", rs: "rust", go: "go", rb: "ruby", java: "java",
-      json: "json", yaml: "yaml", yml: "yaml", md: "markdown",
-      css: "css", html: "html", sh: "bash", bash: "bash",
-    };
-    return jsonResponse({ content, language: langMap[ext] || "text" });
+    return jsonResponse({ content, language: LANG_MAP[ext] || "text" });
   } catch {
     return jsonResponse({ error: "Failed to read file" }, 500);
   }
@@ -265,13 +267,10 @@ async function handleTreeServe(url: URL): Promise<Response> {
   const session = sessionManager.get(sessionId);
   if (!session) return jsonResponse({ error: "Session not found" }, 404);
 
-  const { resolve, join } = await import("path");
   const fullPath = resolve(join(session.projectRoot, relPath));
   if (!fullPath.startsWith(resolve(session.projectRoot))) {
     return jsonResponse({ error: "Path traversal rejected" }, 403);
   }
-
-  const { readdir } = await import("fs/promises");
   const ignoreDirs = new Set([".git", "node_modules", ".next", "__pycache__", "dist", ".cache"]);
 
   try {
@@ -292,17 +291,19 @@ async function handleTreeServe(url: URL): Promise<Response> {
   }
 }
 
+let cachedDistDir: string | null = null;
 async function getDistDir(): Promise<string> {
-  const { join, dirname } = await import("path");
-  // Try local dist first (dev), then ~/.planner/daemon (installed)
+  if (cachedDistDir) return cachedDistDir;
   const localDist = join(dirname(import.meta.dir), "dist");
-  if (await Bun.file(join(localDist, "index.html")).exists()) return localDist;
-  const homedir = (await import("os")).homedir();
-  return join(homedir, ".planner", "daemon");
+  if (await Bun.file(join(localDist, "index.html")).exists()) {
+    cachedDistDir = localDist;
+  } else {
+    cachedDistDir = join(homedir(), ".planner", "daemon");
+  }
+  return cachedDistDir;
 }
 
 async function serveSessionPage(_sessionId: string): Promise<Response> {
-  const { join } = await import("path");
   const distDir = await getDistDir();
   const file = Bun.file(join(distDir, "index.html"));
   if (await file.exists()) {
@@ -312,7 +313,6 @@ async function serveSessionPage(_sessionId: string): Promise<Response> {
 }
 
 async function serveStaticAsset(path: string): Promise<Response> {
-  const { join } = await import("path");
   const distDir = await getDistDir();
   const assetPath = join(distDir, path.replace("/assets/", ""));
   const file = Bun.file(assetPath);
@@ -333,5 +333,8 @@ async function serveStaticAsset(path: string): Promise<Response> {
 
 // Export for file watcher to use
 export { broadcastPlanUpdate, sessionManager, server };
+
+// Periodically clean up stale sessions (every hour)
+setInterval(() => sessionManager.cleanupStale(), 60 * 60 * 1000);
 
 console.log(`Planner daemon listening on http://localhost:${PORT}`);

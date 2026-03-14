@@ -1,10 +1,7 @@
-import { watch, existsSync } from "fs";
-import { readFileSync } from "fs";
+import { watch, existsSync, readFileSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
 import { compilePlan } from "./compiler";
-
-const SESSIONS_DIR = join(homedir(), ".planner", "sessions");
+import { SESSIONS_DIR } from "./session";
 
 type BroadcastFn = (sessionId: string) => void;
 type SaveCompiledFn = (sessionId: string, js: string) => void;

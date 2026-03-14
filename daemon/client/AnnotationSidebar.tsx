@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback } from "react";
 import { useAnnotations, Annotation } from "./AnnotationProvider";
 import { setMarkActive } from "./highlightRange";
-import { generateMarkdown } from "./generateMarkdown";
+import { generateMarkdown, hasValue } from "./generateMarkdown";
 
 interface AnnotationSidebarProps {
   onPreview: () => void;
@@ -53,12 +53,7 @@ export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProp
     }
   }, [activeAnnotationId]);
 
-  const hasResponses = Array.from(responses.values()).some((r) => {
-    if (r.value === null || r.value === undefined) return false;
-    if (r.type === "text" && !(r.value as string).trim()) return false;
-    if (r.type === "checkbox" && (r.value as string[]).length === 0) return false;
-    return true;
-  });
+  const hasResponses = Array.from(responses.values()).some(hasValue);
   const hasContent = annotations.length > 0 || generalNote.trim().length > 0 || hasResponses;
 
   const renderAnnotation = (ann: Annotation) => (

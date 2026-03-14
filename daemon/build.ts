@@ -60,23 +60,14 @@ async function build() {
     process.exit(1);
   }
 
-  // 3. Build Tailwind CSS
+  // 4. Build Tailwind CSS
   console.log("  Building CSS...");
   await $`cd ${ROOT} && npx tailwindcss -i client/styles.css -o dist/client.css --minify`.quiet();
 
-  // 4. Create React shims for import maps
+  // 5. Create React shims for import maps
   // These re-export from the global React loaded via UMD
   console.log("  Creating React shims...");
 
-  // Build React as a standalone bundle for the browser
-  // We'll use CDN URLs in the import map instead — simpler and more reliable
-  const reactShim = `
-import * as React from "https://esm.sh/react@18.3.1";
-export default React;
-export const {useState, useEffect, useRef, useCallback, useContext, useMemo, useReducer, createContext, createElement, Fragment, Children, cloneElement, isValidElement, memo, forwardRef, lazy, Suspense, startTransition, useTransition, useDeferredValue, useId, useSyncExternalStore, useInsertionEffect, useImperativeHandle, useLayoutEffect, useDebugValue} = React;
-`;
-
-  // Simpler approach: use UMD react from CDN and expose as ESM
   // Write the index.html to use CDN React
   const indexHtml = `<!DOCTYPE html>
 <html lang="en">

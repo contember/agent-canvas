@@ -15,7 +15,11 @@ export function FileBrowser() {
   const [dirs, setDirs] = useState<Record<string, DirState>>({});
 
   const fileAnnotations = annotations.filter((a) => a.filePath);
-  const annotatedFiles = [...new Set(fileAnnotations.map((a) => a.filePath!))];
+  const annCountMap = new Map<string, number>();
+  for (const a of fileAnnotations) {
+    annCountMap.set(a.filePath!, (annCountMap.get(a.filePath!) || 0) + 1);
+  }
+  const annotatedFiles = [...annCountMap.keys()];
 
   const loadDir = async (path: string) => {
     const res = await fetch(`/api/tree?session=${sessionId}&path=${encodeURIComponent(path)}`);
@@ -53,15 +57,14 @@ export function FileBrowser() {
       const data = await res.json() as any;
       if (data.entries) entries = data.entries;
     }
-    for (const entry of entries) {
-      if (entry.type === "file") {
-        const fullPath = path ? `${path}/${entry.name}` : entry.name;
-        await addWholeFile(fullPath);
-      }
-    }
+    await Promise.all(
+      entries
+        .filter((entry) => entry.type === "file")
+        .map((entry) => addWholeFile(path ? `${path}/${entry.name}` : entry.name))
+    );
   };
 
-  const getAnnCount = (path: string) => fileAnnotations.filter((a) => a.filePath === path).length;
+  const getAnnCount = (path: string) => annCountMap.get(path) || 0;
 
   const renderTree = (basePath: string, depth: number = 0): React.ReactNode => {
     const dir = dirs[basePath];

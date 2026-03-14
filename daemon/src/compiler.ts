@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, writeFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { randomUUID } from "crypto";
@@ -46,9 +46,6 @@ export default function Plan() {
   } catch (e: any) {
     return { ok: false, error: e.message };
   } finally {
-    try {
-      const { unlinkSync } = await import("fs");
-      unlinkSync(tmpFile);
-    } catch {}
+    try { unlinkSync(tmpFile); } catch {}
   }
 }

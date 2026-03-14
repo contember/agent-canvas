@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { spawn } from "child_process";
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
+import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync } from "fs";
 import { join, resolve } from "path";
 import { homedir } from "os";
 import { randomUUID } from "crypto";
@@ -216,10 +216,7 @@ async function handleDaemon(args: string[]) {
       } catch {
         console.log("Daemon was not running (stale PID file).");
       }
-      try {
-        const { unlinkSync } = await import("fs");
-        unlinkSync(PID_FILE);
-      } catch {}
+      try { unlinkSync(PID_FILE); } catch {}
     } else {
       console.log("No daemon PID file found.");
     }

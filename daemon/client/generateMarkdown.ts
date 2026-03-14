@@ -65,7 +65,7 @@ export function generateMarkdown(
   return parts.join("\n");
 }
 
-function hasValue(r: PlanResponse): boolean {
+export function hasValue(r: PlanResponse): boolean {
   if (r.value === null || r.value === undefined) return false;
   if (r.type === "text" && !(r.value as string).trim()) return false;
   if (r.type === "checkbox" && (r.value as string[]).length === 0) return false;

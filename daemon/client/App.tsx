@@ -46,12 +46,13 @@ function App() {
 
   useEffect(() => {
     if (!sessionId) return;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     const connect = () => {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const ws = new WebSocket(`${protocol}//${window.location.host}/ws/session/${sessionId}`);
       wsRef.current = ws;
       ws.onopen = () => setConnected(true);
-      ws.onclose = () => { setConnected(false); setTimeout(connect, 2000); };
+      ws.onclose = () => { setConnected(false); reconnectTimer = setTimeout(connect, 2000); };
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -60,7 +61,7 @@ function App() {
       };
     };
     connect();
-    return () => { wsRef.current?.close(); };
+    return () => { if (reconnectTimer) clearTimeout(reconnectTimer); wsRef.current?.close(); };
   }, [sessionId]);
 
   const handleSubmit = useCallback((feedback: string) => {

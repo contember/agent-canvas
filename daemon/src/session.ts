@@ -18,7 +18,7 @@ interface SessionMeta {
   version: number;
 }
 
-const SESSIONS_DIR = join(homedir(), ".planner", "sessions");
+export const SESSIONS_DIR = join(homedir(), ".planner", "sessions");
 const STALE_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export class SessionManager {
@@ -72,23 +72,19 @@ export class SessionManager {
     };
 
     this.sessions.set(id, session);
-    this.persistToDisk(session, existing?.version);
+    this.persistToDisk(session, existing);
     return session;
   }
 
-  private persistToDisk(session: SessionData, previousVersion?: number) {
+  private persistToDisk(session: SessionData, previous?: SessionData) {
     const dir = this.sessionDir(session.id);
     const historyDir = join(dir, "history");
     mkdirSync(historyDir, { recursive: true });
 
     // Save history of previous version
-    if (previousVersion) {
-      const histNum = String(previousVersion).padStart(3, "0");
-      const prevJsxPath = join(dir, "plan.jsx");
-      if (existsSync(prevJsxPath)) {
-        const prevJsx = readFileSync(prevJsxPath, "utf-8");
-        writeFileSync(join(historyDir, `${histNum}.jsx`), prevJsx);
-      }
+    if (previous) {
+      const histNum = String(previous.version).padStart(3, "0");
+      writeFileSync(join(historyDir, `${histNum}.jsx`), previous.jsx);
     }
 
     // Write current
@@ -118,23 +114,19 @@ export class SessionManager {
 
   remove(id: string) {
     this.sessions.delete(id);
-    const dir = this.sessionDir(id);
-    if (existsSync(dir)) {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    rmSync(this.sessionDir(id), { recursive: true, force: true });
   }
 
   saveCompiled(id: string, js: string) {
-    const dir = this.sessionDir(id);
-    if (existsSync(dir)) {
-      writeFileSync(join(dir, "plan.compiled.js"), js);
-    }
+    writeFileSync(join(this.sessionDir(id), "plan.compiled.js"), js);
   }
 
   getCompiled(id: string): string | null {
-    const path = join(this.sessionDir(id), "plan.compiled.js");
-    if (!existsSync(path)) return null;
-    return readFileSync(path, "utf-8");
+    try {
+      return readFileSync(join(this.sessionDir(id), "plan.compiled.js"), "utf-8");
+    } catch {
+      return null;
+    }
   }
 
   cleanupStale(maxAge = STALE_TIMEOUT_MS) {
