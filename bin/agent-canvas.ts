@@ -75,10 +75,10 @@ async function handleInstall(args: string[]) {
 
   if (!mode) {
     // Interactive prompt
-    process.stderr.write("Install canvas skill and hooks for Claude Code.\n\n");
-    process.stderr.write("  local  — install to .claude/ in current project\n");
-    process.stderr.write("  global — install to ~/.claude/ for all projects\n\n");
-    process.stderr.write("Choose [local/global]: ");
+    process.stdout.write("Install canvas skill and hooks for Claude Code.\n\n");
+    process.stdout.write("  local  — install to .claude/ in current project\n");
+    process.stdout.write("  global — install to ~/.claude/ for all projects\n\n");
+    process.stdout.write("Choose [local/global]: ");
 
     const input = await readLine();
     mode = input.trim().toLowerCase() as "local" | "global";
@@ -105,7 +105,7 @@ async function handleInstall(args: string[]) {
     }
   }
 
-  console.error(`  Skill installed to ${skillTarget}`);
+  console.log(`  Skill installed to ${skillTarget}`);
 
   // Install hook script
   const hooksDir = join(targetBase, "agent-canvas");
@@ -114,7 +114,7 @@ async function handleInstall(args: string[]) {
   const hookDest = join(hooksDir, "session-start.sh");
   cpSync(hookSrc, hookDest);
   try { require("fs").chmodSync(hookDest, 0o755); } catch {}
-  console.error(`  Hook script installed to ${hookDest}`);
+  console.log(`  Hook script installed to ${hookDest}`);
 
   // Register hook in settings.json
   const settingsPath = join(targetBase, "settings.json");
@@ -141,12 +141,12 @@ async function handleInstall(args: string[]) {
 
     mkdirSync(dirname(settingsPath), { recursive: true });
     writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-    console.error(`  Hook registered in ${settingsPath}`);
+    console.log(`  Hook registered in ${settingsPath}`);
   } else {
-    console.error(`  Hook already registered in ${settingsPath}`);
+    console.log(`  Hook already registered in ${settingsPath}`);
   }
 
-  console.error(`\nInstalled! The /canvas command is now available in Claude Code.`);
+  console.log(`\nInstalled! The /canvas command is now available in Claude Code.`);
 }
 
 // ── push ──
