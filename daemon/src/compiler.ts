@@ -1,4 +1,4 @@
-import { writeFileSync, unlinkSync, readFileSync, existsSync } from "fs";
+import { writeFileSync, unlinkSync, readFileSync } from "fs";
 import { join } from "path";
 import { randomUUID } from "crypto";
 import { COMPILE_TEMP_DIR } from "./paths";
@@ -69,8 +69,6 @@ function resolveFilePreviews(jsx: string, projectRoot: string): string {
 
       const filePath = pathMatch[1];
       const absPath = join(projectRoot, filePath);
-
-      if (!existsSync(absPath)) return match;
 
       try {
         let content = readFileSync(absPath, "utf-8");

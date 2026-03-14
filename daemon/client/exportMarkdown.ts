@@ -2,6 +2,7 @@
  * Export the rendered plan canvas to markdown.
  * Reads data-md attributes from known components, falls back to text extraction for unknown elements.
  */
+import { LANG_MAP } from "../langMap";
 export function exportCanvasToMarkdown(container: HTMLElement): string {
   const lines: string[] = [];
   walkChildren(container, lines, 0);
@@ -250,13 +251,7 @@ function handleFilePreview(el: HTMLElement, lines: string[]) {
   const code = el.querySelector("code");
   const text = code?.textContent || "";
   const ext = path.split(".").pop() || "";
-  const langMap: Record<string, string> = {
-    ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
-    py: "python", rs: "rust", go: "go", rb: "ruby", java: "java",
-    json: "json", yaml: "yaml", yml: "yaml", md: "markdown",
-    css: "css", html: "html", sh: "bash", bash: "bash",
-  };
-  const lang = langMap[ext] || "";
+  const lang = LANG_MAP[ext] || "";
   const header = linesAttr ? `${path} (L${linesAttr})` : path;
   lines.push(header, "", `\`\`\`${lang}`, text, "```", "");
 }

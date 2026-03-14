@@ -4,14 +4,9 @@ import { DATA_DIR } from "./paths";
 import { SessionManager } from "./session";
 import { compilePlan } from "./compiler";
 import { watchSession } from "./watcher";
+import { LANG_MAP } from "../langMap";
 
 const PORT = parseInt(process.env.CANVAS_PORT || "19400", 10);
-const LANG_MAP: Record<string, string> = {
-  ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
-  py: "python", rs: "rust", go: "go", rb: "ruby", java: "java",
-  json: "json", yaml: "yaml", yml: "yaml", md: "markdown",
-  css: "css", html: "html", sh: "bash", bash: "bash",
-};
 const sessionManager = new SessionManager();
 
 function jsonResponse(data: unknown, status = 200): Response {

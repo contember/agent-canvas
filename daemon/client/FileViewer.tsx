@@ -3,6 +3,7 @@ import { SessionContext } from "#canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
 import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, restoreMarks } from "./highlightRange";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
+import { LANG_MAP } from "../langMap";
 
 interface FileViewerProps {
   path: string;
@@ -127,14 +128,7 @@ export function FileViewer({ path }: FileViewerProps) {
     const hljs = (window as any).hljs;
     if (!hljs) return null;
     const ext = path.split(".").pop() || "";
-    const langMap: Record<string, string> = {
-      ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
-      py: "python", rs: "rust", go: "go", rb: "ruby", java: "java",
-      json: "json", yaml: "yaml", yml: "yaml", md: "markdown",
-      css: "css", html: "html", sh: "bash", bash: "bash", toml: "toml",
-      sql: "sql", xml: "xml", c: "c", cpp: "cpp", h: "c",
-    };
-    const lang = langMap[ext];
+    const lang = LANG_MAP[ext];
     try {
       const result = lang ? hljs.highlight(content, { language: lang }) : hljs.highlightAuto(content);
       return result.value.split("\n");
