@@ -15,7 +15,14 @@ const WS_URL = `ws://localhost:${DAEMON_PORT}`;
 const TIMEOUT_MS = parseInt(process.env.CANVAS_TIMEOUT || String(60 * 60 * 1000), 10);
 const PID_FILE = join(TEMP_DIR, "daemon.pid");
 
-function getSessionId(): string {
+function getSessionId(args?: string[]): string {
+  // Check --session flag first
+  if (args) {
+    const idx = args.indexOf("--session");
+    if (idx !== -1 && args[idx + 1]) {
+      return args[idx + 1];
+    }
+  }
   return process.env.CANVAS_SESSION_ID || (() => {
     const id = randomUUID();
     console.error(`Warning: CANVAS_SESSION_ID not set, using generated ID: ${id}`);
@@ -51,7 +58,7 @@ function printUsage() {
 Commands:
   agent-canvas install [local|global]  Install skill & hooks for Claude Code
   agent-canvas push <file.jsx>         Push a canvas, open browser
-  agent-canvas wait                    Wait for user feedback (prints to stdout)
+  agent-canvas wait [--session <id>]   Wait for user feedback (prints to stdout)
   agent-canvas daemon status           Show daemon status
   agent-canvas daemon stop             Stop the daemon
 
@@ -165,7 +172,7 @@ async function handlePush(args: string[]) {
     jsx = readFileSync(filePath, "utf-8");
   }
 
-  const sessionId = getSessionId();
+  const sessionId = getSessionId(args);
   const projectRoot = process.env.CANVAS_PROJECT_ROOT || process.cwd();
 
   // Extract --label flag
@@ -203,7 +210,7 @@ async function handlePush(args: string[]) {
 // ── wait ──
 
 async function handleWait(args: string[]) {
-  const sessionId = getSessionId();
+  const sessionId = getSessionId(args);
 
   await ensureDaemon();
 

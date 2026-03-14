@@ -23,10 +23,10 @@ Canvas opens a rich, annotatable document in the user's browser. You write JSX, 
 
 ### Writing a Canvas
 
-Use the **Write** tool to create a `.jsx` file in `.claude/canvas/`:
+Use the **Write** tool to create a `.jsx` file in `.claude/agent-canvas/`:
 
 ```jsx
-// Write to: .claude/canvas/plan.jsx
+// Write to: .claude/agent-canvas/plan.jsx
 
 <Section title="Authentication Redesign">
   A proposal to replace session-based auth with JWT tokens.
@@ -50,10 +50,10 @@ Components are auto-available — no imports needed. The file is a JSX fragment 
 After writing the file, push it to open the canvas in the browser:
 
 ```bash
-bunx agent-canvas push .claude/canvas/plan.jsx --label "Implementation Plan"
+bunx agent-canvas push .claude/agent-canvas/plan.jsx --label "Implementation Plan"
 ```
 
-This opens the canvas in the user's browser (first time) and exits immediately. The round label defaults to the filename if `--label` is omitted.
+This opens the canvas in the user's browser (first time) and exits immediately. The round label defaults to the filename if `--label` is omitted. **Always show the `browserUrl` from the push output to the user** so they can open the canvas manually if auto-open didn't work.
 
 ### Waiting for feedback
 
@@ -65,12 +65,14 @@ bunx agent-canvas wait
 
 This **blocks until the user submits feedback**, then prints feedback markdown to stdout. If feedback was already submitted (e.g. retrying after a disconnect), it returns immediately with the existing feedback.
 
+> **Note:** If `push` outputs a warning "CANVAS_SESSION_ID not set, using generated ID: ...", you must pass that ID to wait: `bunx agent-canvas wait --session <id>`
+
 ### Iterating
 
 Use the **Edit** tool to modify the existing JSX based on feedback — targeted edits, not full rewrites. Then push and wait again:
 
 ```bash
-bunx agent-canvas push .claude/canvas/plan.jsx --label "Implementation Plan (revised)"
+bunx agent-canvas push .claude/agent-canvas/plan.jsx --label "Implementation Plan (revised)"
 bunx agent-canvas wait
 ```
 
@@ -81,19 +83,19 @@ Each push creates a new **round** — the user sees previous rounds and their fe
 Maintain separate files for different phases:
 
 ```bash
-bunx agent-canvas push .claude/canvas/discovery.jsx --label "Discovery"
+bunx agent-canvas push .claude/agent-canvas/discovery.jsx --label "Discovery"
 bunx agent-canvas wait
 # ... process feedback ...
-bunx agent-canvas push .claude/canvas/requirements.jsx --label "Requirements"
+bunx agent-canvas push .claude/agent-canvas/requirements.jsx --label "Requirements"
 bunx agent-canvas wait
 # ... process feedback ...
-bunx agent-canvas push .claude/canvas/plan.jsx --label "Implementation Plan"
+bunx agent-canvas push .claude/agent-canvas/plan.jsx --label "Implementation Plan"
 bunx agent-canvas wait
 ```
 
 ### File Location
 
-All canvas files go in `.claude/canvas/` within the project root. Add `.claude/canvas/` to `.gitignore` — these are ephemeral working files.
+All canvas files go in `.claude/agent-canvas/` within the project root. Add `.claude/agent-canvas/` to `.gitignore` — these are ephemeral working files.
 
 ## Choosing a Flow
 
@@ -127,8 +129,8 @@ User wants to make a decision?
 
 1. **Determine flow** from user intent
 2. **Announce** briefly: "I'll start with discovery, then create a detailed plan."
-3. **Write canvas JSX** with the Write tool to `.claude/canvas/<name>.jsx`
-4. **Push**: `bunx agent-canvas push .claude/canvas/<name>.jsx --label "<Label>"`
+3. **Write canvas JSX** with the Write tool to `.claude/agent-canvas/<name>.jsx`
+4. **Push**: `bunx agent-canvas push .claude/agent-canvas/<name>.jsx --label "<Label>"`
 5. **Tell the user** the canvas is ready for review (they see it in their browser)
 6. **Wait**: `bunx agent-canvas wait` — this blocks until the user submits feedback
 7. **Read feedback** — check for annotations, answers, added context files, approval
@@ -163,7 +165,7 @@ Then interview deeply in each selected area across subsequent rounds. Or ask in 
 
 ## Important Rules
 
-- **Write** canvas files to `.claude/canvas/` using the Write tool. Never use bash heredocs or cat.
+- **Write** canvas files to `.claude/agent-canvas/` using the Write tool. Never use bash heredocs or cat.
 - **Edit** canvas files using the Edit tool. Never rewrite entire files — make targeted edits.
 - JSX can be a fragment (just tags) or a full module with `export default function Canvas()`.
 - Every `<Item>` and interactive component needs a unique `id`.
