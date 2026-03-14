@@ -28,6 +28,15 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
     }
   }, [open, editMode]);
 
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const hasContent = text.trim().length > 0;

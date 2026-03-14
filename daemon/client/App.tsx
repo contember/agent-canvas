@@ -147,6 +147,18 @@ function App() {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
 
+  // Dynamic document title
+  useEffect(() => {
+    const parts = ["Agent Canvas"];
+    if (sessionId) parts.push(sessionId);
+    if (activeView.type === "file") {
+      parts.push(activeView.path.split("/").pop() || activeView.path);
+    } else if (compareRevision) {
+      parts.push("Compare");
+    }
+    document.title = parts.join(" — ");
+  }, [sessionId, activeView, compareRevision]);
+
   // Scroll position restore per view
   const scrollPositions = useRef<Map<string, number>>(new Map());
 

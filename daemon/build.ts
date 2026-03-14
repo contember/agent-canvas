@@ -77,7 +77,7 @@ async function build() {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Planner</title>
+  <title>Agent Canvas</title>
   <script>document.documentElement.dataset.theme = localStorage.getItem('canvas-theme') || 'dark';</script>
   <link rel="stylesheet" href="/assets/client.css" />
   <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark-dimmed.min.css" />
