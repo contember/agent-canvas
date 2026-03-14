@@ -170,6 +170,24 @@ function setupNodeAnnotations(
     if (!text) continue;
     makeClickable(label as SVGElement, () => text, "Edge");
   }
+
+  // Sequence diagram: actors (participants)
+  for (const actor of container.querySelectorAll(".actor")) {
+    const textEl = actor.closest("g")?.querySelector("text") || actor.parentElement?.querySelector("text");
+    if (!textEl) continue;
+    // The actor rect and text are siblings in a <g> — make the whole <g> clickable
+    const group = actor.closest("g") as SVGElement | null;
+    if (!group || group.hasAttribute("data-clickable")) continue;
+    group.setAttribute("data-clickable", "true");
+    makeClickable(group, () => textEl.textContent?.trim() || "Participant", "Node");
+  }
+
+  // Sequence diagram: message labels
+  for (const msgText of container.querySelectorAll(".messageText")) {
+    const text = msgText.textContent?.trim();
+    if (!text) continue;
+    makeClickable(msgText as SVGElement, () => text, "Edge");
+  }
 }
 
 function highlightAnnotatedNodes(container: HTMLElement, annotations: Annotation[], activeId?: string | null) {
@@ -212,6 +230,42 @@ function highlightAnnotatedNodes(container: HTMLElement, annotations: Annotation
     if (!text || !annotatedSnippets.has(text)) continue;
     const annId = annotatedSnippets.get(text)!;
     const el = label as SVGElement;
+    el.setAttribute("data-annotated", annId);
+    const isActive = annId === activeId;
+    el.style.outline = isActive
+      ? "2px solid var(--color-highlight-border)"
+      : "2px solid var(--color-highlight-annotation)";
+    el.style.outlineOffset = "2px";
+    el.style.borderRadius = "4px";
+  }
+
+  // Highlight sequence diagram actors
+  for (const actor of container.querySelectorAll(".actor")) {
+    const group = actor.closest("g") as SVGElement | null;
+    if (!group) continue;
+    const textEl = group.querySelector("text");
+    const text = textEl?.textContent?.trim();
+    if (!text || !annotatedSnippets.has(text)) continue;
+    if (group.hasAttribute("data-annotated")) continue;
+    const annId = annotatedSnippets.get(text)!;
+    group.setAttribute("data-annotated", annId);
+    const isActive = annId === activeId;
+    const rect = group.querySelector("rect");
+    if (rect) {
+      rect.style.outline = isActive
+        ? "2px solid var(--color-highlight-border)"
+        : "2px solid var(--color-highlight-annotation)";
+      rect.style.outlineOffset = "2px";
+      rect.style.borderRadius = "4px";
+    }
+  }
+
+  // Highlight sequence diagram message labels
+  for (const msgText of container.querySelectorAll(".messageText")) {
+    const text = msgText.textContent?.trim();
+    if (!text || !annotatedSnippets.has(text)) continue;
+    const annId = annotatedSnippets.get(text)!;
+    const el = msgText as SVGElement;
     el.setAttribute("data-annotated", annId);
     const isActive = annId === activeId;
     el.style.outline = isActive
