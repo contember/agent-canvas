@@ -127,7 +127,7 @@ export function restoreMarks(
   container: HTMLElement,
   annotations: { id: string; snippet: string; filePath?: string; context?: { before: string; after: string; hierarchy: string[] } }[]
 ) {
-  // Only restore plan annotations (no filePath), skip already-marked ones
+  // Skip annotations that already have marks in the DOM
   const toRestore = annotations.filter(
     (a) => !document.querySelector(`[data-annotation-id="${a.id}"]`)
   );

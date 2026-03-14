@@ -38,6 +38,26 @@ No test runner or linter is configured.
 - **Adding a new component:** create in `daemon/client/components/`, export from `index.ts`, add to `COMPONENT_IMPORTS` in `daemon/src/compiler.ts`, rebuild
 - **Bun's `spawn` throws synchronously** on missing executables — always check with `which` before spawning
 
+## Testing with Demo
+
+A demo JSX file lives at `plan.jsx` in the project root. To test UI changes:
+
+```bash
+# 1. Start daemon (if not running)
+bun bin/agent-canvas.ts daemon start
+
+# 2. Build client assets (use --watch for live reload)
+bun daemon/build.ts --watch
+
+# 3. Push the demo plan
+CANVAS_SESSION_ID=planner-demo bun bin/agent-canvas.ts push plan.jsx --label "Demo"
+
+# 4. Open in browser
+#    http://localhost:19400/s/planner-demo
+```
+
+The CLI blocks waiting for feedback after push — press Ctrl+C to exit without submitting. Each push creates a new revision visible in the browser's revision selector.
+
 ## Environment Variables
 
 - `CANVAS_SESSION_ID` — current session (set by SessionStart hook)

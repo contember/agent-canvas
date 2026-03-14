@@ -32,11 +32,10 @@ export function FileViewer({ path }: FileViewerProps) {
     fetch(`/api/file?session=${sessionId}&path=${encodeURIComponent(path)}`)
       .then((r) => r.json())
       .then((data: any) => {
-        if (data.error) setError(data.error);
-        else { setContent(data.content); setLanguage(data.language || "text"); }
+        if (data.error) { setError(data.error); setLoading(false); }
+        else { setContent(data.content); setLanguage(data.language || "text"); setLoading(false); }
       })
-      .catch(() => setError("Failed to fetch file"))
-      .finally(() => setLoading(false));
+      .catch(() => { setError("Failed to fetch file"); setLoading(false); });
   }, [sessionId, path]);
 
   // Restore persisted annotation marks after file content renders
