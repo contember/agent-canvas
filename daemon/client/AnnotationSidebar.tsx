@@ -115,7 +115,8 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
   }, [activeAnnotationId]);
 
   const hasResponses = Array.from(responses.values()).some(hasValue);
-  const hasContent = annotations.length > 0 || generalNote.trim().length > 0 || hasResponses;
+  const hasFeedback = feedbackEntries.size > 0;
+  const hasContent = annotations.length > 0 || generalNote.trim().length > 0 || hasResponses || hasFeedback;
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const renderAnnotation = (ann: Annotation) => (
