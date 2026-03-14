@@ -25,7 +25,7 @@ export function Section({ title, children }: SectionProps) {
         </button>
       </div>
       {!collapsed && (
-        <div className="space-y-1 mt-6">{children}</div>
+        <div className="mt-6">{children}</div>
       )}
     </div>
   );

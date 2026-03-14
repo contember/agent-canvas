@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useAnnotations } from "./AnnotationProvider";
-import { generateMarkdown } from "./generateMarkdown";
+import { generateMarkdown, getMissingRequired } from "./generateMarkdown";
 
 interface ResponsePreviewProps {
   open: boolean;
@@ -13,10 +13,11 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
   const [text, setText] = useState("");
   const [manuallyEdited, setManuallyEdited] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (!open) { setManuallyEdited(false); setSubmitted(false); return; }
+    if (!open) { setManuallyEdited(false); setSubmitted(false); setValidationError(null); return; }
     if (manuallyEdited) return;
     setText(generateMarkdown(annotations, generalNote, responses));
   }, [annotations, generalNote, responses, manuallyEdited, open]);
@@ -71,6 +72,11 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
         />
 
         {/* Actions */}
+        {validationError && (
+          <div className="px-5 py-2 text-[12px] text-accent-red font-body border-t border-border-subtle flex-shrink-0">
+            {validationError}
+          </div>
+        )}
         <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-border-subtle flex-shrink-0">
           <button
             onClick={onClose}
@@ -79,7 +85,15 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
             Cancel
           </button>
           <button
-            onClick={() => { onSubmit(text); setSubmitted(true); }}
+            onClick={() => {
+              const missing = getMissingRequired(responses);
+              if (missing.length > 0) {
+                setValidationError(`Please answer: ${missing.map((r) => r.label).join(", ")}`);
+                return;
+              }
+              setValidationError(null);
+              onSubmit(text); setSubmitted(true);
+            }}
             disabled={!hasContent}
             className={`px-6 py-2 rounded-lg font-body text-[13px] font-medium transition-all ${
               hasContent

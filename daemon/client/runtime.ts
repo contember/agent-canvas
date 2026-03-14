@@ -25,6 +25,8 @@ export interface PlanResponse {
   label: string;
   value: any;
   options?: string[];
+  required?: boolean;
+  note?: string;
 }
 
 export interface AnnotationContextValue {

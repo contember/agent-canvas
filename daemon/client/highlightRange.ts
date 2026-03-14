@@ -1,6 +1,6 @@
 const MARK_STYLE_INACTIVE = `
-  background: rgba(255,220,100,0.12);
-  border-bottom: 1.5px solid rgba(255,220,100,0.25);
+  background: var(--color-highlight-annotation);
+  border-bottom: 1.5px solid var(--color-highlight-bg);
   border-radius: 2px;
   cursor: pointer;
   transition: background 150ms ease;
@@ -9,8 +9,8 @@ const MARK_STYLE_INACTIVE = `
 `;
 
 const MARK_STYLE_ACTIVE = `
-  background: rgba(255,220,100,0.25);
-  border-bottom: 1.5px solid rgba(255,220,100,0.5);
+  background: var(--color-highlight-bg);
+  border-bottom: 1.5px solid var(--color-highlight-border);
   border-radius: 2px;
   cursor: pointer;
   transition: background 150ms ease;
@@ -106,5 +106,31 @@ export function updateAllMarkStates(activeId: string | null) {
   for (const mark of allMarks) {
     const id = mark.getAttribute("data-annotation-id");
     (mark as HTMLElement).style.cssText = id === activeId ? MARK_STYLE_ACTIVE : MARK_STYLE_INACTIVE;
+  }
+}
+
+/**
+ * Rename annotation ID on existing marks (e.g. temp → real ID).
+ */
+export function renameMarkId(oldId: string, newId: string) {
+  const marks = document.querySelectorAll(`[data-annotation-id="${oldId}"]`);
+  for (const mark of marks) {
+    mark.setAttribute("data-annotation-id", newId);
+  }
+}
+
+/**
+ * Remove marks for a given annotation ID, restoring the original text nodes.
+ */
+export function unwrapMarks(annotationId: string) {
+  const marks = document.querySelectorAll(`[data-annotation-id="${annotationId}"]`);
+  for (const mark of marks) {
+    const parent = mark.parentNode;
+    if (!parent) continue;
+    while (mark.firstChild) {
+      parent.insertBefore(mark.firstChild, mark);
+    }
+    parent.removeChild(mark);
+    parent.normalize();
   }
 }

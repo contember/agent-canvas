@@ -1,34 +1,40 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useAnnotations } from "@planner/runtime";
+import { ResponseNote } from "./ResponseNote";
 
 /** Radio — pick one option */
 interface ChoiceProps {
   id: string;
   label: string;
   options: string[];
-  /** Optional default value */
-  defaultValue?: string;
+  required?: boolean;
 }
 
-export function Choice({ id, label, options, defaultValue }: ChoiceProps) {
+export function Choice({ id, label, options, required }: ChoiceProps) {
   const { responses, setResponse } = useAnnotations();
   const current = responses.get(id);
   const selected = current?.value as string | undefined;
+  const note = current?.note || "";
+  const [showNote, setShowNote] = useState(false);
 
-  // Register with default on mount
   useEffect(() => {
     if (!responses.has(id)) {
-      setResponse(id, { id, type: "radio", label, value: defaultValue || null, options });
+      setResponse(id, { id, type: "radio", label, value: null, options, required });
     }
   }, [id]);
 
   const handleSelect = (opt: string) => {
-    setResponse(id, { id, type: "radio", label, value: opt, options });
+    setResponse(id, { ...current!, value: opt });
   };
 
+  const showError = current?.required && !selected;
+
   return (
-    <div className="my-3">
-      <div className="text-[13px] font-body font-medium text-text-primary mb-2">{label}</div>
+    <div className="-mx-4 px-4 py-3 my-1 rounded-lg transition-colors duration-150 hover:bg-bg-input">
+      <div className="flex items-baseline gap-2 mb-2">
+        <span className="text-[13px] font-body font-medium text-text-primary">{label}</span>
+        {required && <span className="text-[10px] text-accent-red font-body">*</span>}
+      </div>
       <div className="space-y-1">
         {options.map((opt) => (
           <label
@@ -51,6 +57,8 @@ export function Choice({ id, label, options, defaultValue }: ChoiceProps) {
           </label>
         ))}
       </div>
+      <ResponseNote show={showNote} note={note} onToggle={() => setShowNote(!showNote)} onChange={(n) => setResponse(id, { ...current!, note: n })} />
+      {showError && <p className="text-[11px] text-accent-red font-body mt-1">Please select an option.</p>}
     </div>
   );
 }
@@ -60,28 +68,35 @@ interface MultiChoiceProps {
   id: string;
   label: string;
   options: string[];
-  defaultValue?: string[];
+  required?: boolean;
 }
 
-export function MultiChoice({ id, label, options, defaultValue }: MultiChoiceProps) {
+export function MultiChoice({ id, label, options, required }: MultiChoiceProps) {
   const { responses, setResponse } = useAnnotations();
   const current = responses.get(id);
   const selected: string[] = (current?.value as string[]) || [];
+  const note = current?.note || "";
+  const [showNote, setShowNote] = useState(false);
 
   useEffect(() => {
     if (!responses.has(id)) {
-      setResponse(id, { id, type: "checkbox", label, value: defaultValue || [], options });
+      setResponse(id, { id, type: "checkbox", label, value: [], options, required });
     }
   }, [id]);
 
   const toggle = (opt: string) => {
     const next = selected.includes(opt) ? selected.filter((o) => o !== opt) : [...selected, opt];
-    setResponse(id, { id, type: "checkbox", label, value: next, options });
+    setResponse(id, { ...current!, value: next });
   };
 
+  const showError = current?.required && selected.length === 0;
+
   return (
-    <div className="my-3">
-      <div className="text-[13px] font-body font-medium text-text-primary mb-2">{label}</div>
+    <div className="-mx-4 px-4 py-3 my-1 rounded-lg transition-colors duration-150 hover:bg-bg-input">
+      <div className="flex items-baseline gap-2 mb-2">
+        <span className="text-[13px] font-body font-medium text-text-primary">{label}</span>
+        {required && <span className="text-[10px] text-accent-red font-body">*</span>}
+      </div>
       <div className="space-y-1">
         {options.map((opt) => {
           const checked = selected.includes(opt);
@@ -109,6 +124,9 @@ export function MultiChoice({ id, label, options, defaultValue }: MultiChoicePro
           );
         })}
       </div>
+      <ResponseNote show={showNote} note={note} onToggle={() => setShowNote(!showNote)} onChange={(n) => setResponse(id, { ...current!, note: n })} />
+      {showError && <p className="text-[11px] text-accent-red font-body mt-1">Please select at least one option.</p>}
     </div>
   );
 }
+

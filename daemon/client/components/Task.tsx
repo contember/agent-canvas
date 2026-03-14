@@ -22,7 +22,7 @@ const statusLabels = {
 export function Task({ id, label, status = "todo", children }: TaskProps) {
   return (
     <div
-      className="group/task -mx-4 px-4 py-3 rounded-lg transition-colors duration-150 hover:bg-bg-elevated"
+      className="group/task -mx-4 px-4 py-3 rounded-lg transition-colors duration-150 hover:bg-bg-input"
       data-task-id={id}
     >
       <div className="flex items-start gap-3">

@@ -66,10 +66,22 @@ export function generateMarkdown(
 }
 
 export function hasValue(r: PlanResponse): boolean {
+  if (r.note?.trim()) return true;
   if (r.value === null || r.value === undefined) return false;
   if (r.type === "text" && !(r.value as string).trim()) return false;
   if (r.type === "checkbox" && (r.value as string[]).length === 0) return false;
   return true;
+}
+
+export function getMissingRequired(responses: Map<string, PlanResponse>): PlanResponse[] {
+  const missing: PlanResponse[] = [];
+  for (const r of responses.values()) {
+    if (!r.required) continue;
+    if (r.value === null || r.value === undefined) { missing.push(r); continue; }
+    if (r.type === "text" && !(r.value as string).trim()) { missing.push(r); continue; }
+    if (r.type === "checkbox" && (r.value as string[]).length === 0) { missing.push(r); continue; }
+  }
+  return missing;
 }
 
 function renderResponse(r: PlanResponse): string {
@@ -95,6 +107,9 @@ function renderResponse(r: PlanResponse): string {
       break;
   }
 
+  if (r.note?.trim()) {
+    lines.push(`<note>${r.note.trim()}</note>`);
+  }
   lines.push("</response>");
   lines.push("");
   return lines.join("\n");

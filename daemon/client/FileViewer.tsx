@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useContext, useCallback, useRef, useMemo } from "react";
 import { SessionContext } from "@planner/runtime";
 import { useAnnotations } from "./AnnotationProvider";
-import { wrapRangeWithMark, updateAllMarkStates } from "./highlightRange";
+import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks } from "./highlightRange";
+import { getPopoverPosition } from "./popoverPosition";
 
 interface FileViewerProps {
   path: string;
@@ -16,12 +17,8 @@ export function FileViewer({ path }: FileViewerProps) {
   const [error, setError] = useState<string | null>(null);
   const contentRef = useRef<HTMLPreElement>(null);
 
-  const [showPopover, setShowPopover] = useState(false);
-  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
-  const [selectedSnippet, setSelectedSnippet] = useState("");
-  const [savedRange, setSavedRange] = useState<Range | null>(null);
-  const [noteText, setNoteText] = useState("");
-  const noteRef = useRef<HTMLTextAreaElement>(null);
+  const [pendingMarkId, setPendingMarkId] = useState<string | null>(null);
+  const pendingSnippetRef = useRef("");
 
   const fileAnns = annotations.filter((a) => a.filePath === path);
 
@@ -79,12 +76,12 @@ export function FileViewer({ path }: FileViewerProps) {
     const ann = annotations.find((a) => a.id === annId);
     if (!ann) return;
     document.getElementById("ann-inline-popover")?.remove();
-    const rect = anchor.getBoundingClientRect();
+    const scrollContainer = contentRef.current?.closest("#plan-scroll-container") as HTMLElement | null;
+    const { style: posStyle, parent } = getPopoverPosition(anchor, scrollContainer);
     const pop = document.createElement("div");
     pop.id = "ann-inline-popover";
     Object.assign(pop.style, {
-      position: "fixed", zIndex: "60",
-      top: `${rect.bottom + 6}px`, left: `${Math.min(rect.left, window.innerWidth - 300)}px`,
+      ...posStyle, zIndex: "60",
       width: "280px", background: "var(--color-bg-elevated)",
       border: "1px solid var(--color-border-hover)", borderRadius: "8px",
       boxShadow: "0 4px 12px var(--color-shadow)", padding: "10px 12px",
@@ -97,7 +94,7 @@ export function FileViewer({ path }: FileViewerProps) {
         <button id="ann-pop-delete" style="font-size:11px;color:var(--color-text-tertiary);background:none;border:none;cursor:pointer;padding:2px 0;font-family:'Inter',sans-serif;">Delete</button>
       </div>
     `;
-    document.body.appendChild(pop);
+    parent.appendChild(pop);
     const textarea = pop.querySelector("textarea")!;
     textarea.style.height = "auto"; textarea.style.height = textarea.scrollHeight + "px";
     textarea.focus(); textarea.setSelectionRange(textarea.value.length, textarea.value.length);
@@ -121,35 +118,44 @@ export function FileViewer({ path }: FileViewerProps) {
     }, 0);
   };
 
+  useEffect(() => {
+    const handler = () => handleMouseUp();
+    document.addEventListener("mouseup", handler);
+    return () => document.removeEventListener("mouseup", handler);
+  }, []);
+
   const handleMouseUp = useCallback(() => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
     if (!contentRef.current) return;
     const range = sel.getRangeAt(0);
-    if (!contentRef.current.contains(range.commonAncestorContainer)) return;
+    if (!contentRef.current.contains(range.startContainer)) return;
     if ((range.startContainer.parentElement as HTMLElement)?.closest?.("[data-annotation-id]")) return;
     const snippet = sel.toString().trim();
     if (snippet.length < 2) return;
-    const rect = range.getBoundingClientRect();
-    setSelectedSnippet(snippet);
-    setSavedRange(range.cloneRange());
-    setPopoverPos({ top: rect.bottom + 8, left: Math.min(rect.left, window.innerWidth - 300) });
-    setNoteText("");
-    setShowPopover(true);
-    setTimeout(() => noteRef.current?.focus(), 0);
-  }, []);
+    const tempId = `__pending_${Date.now()}`;
+    const cloned = range.cloneRange();
+    try { wrapRangeWithMark(cloned, tempId); } catch {}
+    sel.removeAllRanges();
 
-  const submitAnnotation = () => {
-    const note = noteText.trim();
-    if (note && savedRange) {
+    const marks = document.querySelectorAll(`[data-annotation-id="${tempId}"]`);
+    const lastMark = marks[marks.length - 1] as HTMLElement | undefined;
+    if (!lastMark) return;
+
+    pendingSnippetRef.current = snippet;
+    setPendingMarkId(tempId);
+
+    const scrollContainer = contentRef.current.closest("#plan-scroll-container") as HTMLElement | null;
+    showFileAnnotationPopover(lastMark, tempId, snippet, scrollContainer, (note) => {
       const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      try { wrapRangeWithMark(savedRange, id); } catch {}
-      addAnnotationWithId(id, selectedSnippet, note, path);
-    }
-    setShowPopover(false);
-    setSavedRange(null);
-    window.getSelection()?.removeAllRanges();
-  };
+      renameMarkId(tempId, id);
+      addAnnotationWithId(id, snippet, note, path);
+      setPendingMarkId(null);
+    }, () => {
+      unwrapMarks(tempId);
+      setPendingMarkId(null);
+    });
+  }, []);
 
   // Highlight content
   const highlightedLines = useMemo(() => {
@@ -203,7 +209,7 @@ export function FileViewer({ path }: FileViewerProps) {
       </div>
 
       {/* Code */}
-      <pre ref={contentRef} onMouseUp={handleMouseUp} className="flex-1 overflow-auto text-code font-mono text-text-code bg-bg-base select-text cursor-text py-3 hljs">
+      <pre ref={contentRef} className="flex-1 overflow-auto text-code font-mono text-text-code bg-bg-base select-text cursor-text py-3 hljs">
         {lines.map((line, i) => (
           <div key={i} className="flex hover:bg-bg-elevated-half px-5">
             <span className="text-text-tertiary opacity-40 select-none w-10 text-right pr-4 shrink-0 py-px text-[12px]">{i + 1}</span>
@@ -216,27 +222,64 @@ export function FileViewer({ path }: FileViewerProps) {
         ))}
       </pre>
 
-      {/* New annotation popover */}
-      {showPopover && (
-        <div className="fixed z-50 rounded-lg shadow-md p-3 w-72 bg-bg-elevated border border-border-hover" style={{ top: popoverPos.top, left: popoverPos.left }}>
-          <div className="text-[11px] text-text-tertiary italic line-clamp-2 mb-2 font-body">
-            "{selectedSnippet.length > 100 ? selectedSnippet.slice(0, 100) + "..." : selectedSnippet}"
-          </div>
-          <textarea
-            ref={noteRef} value={noteText} onChange={(e) => setNoteText(e.target.value)}
-            className="w-full bg-transparent border-none text-[13px] font-body text-text-primary resize-vertical focus:outline-none min-h-[60px]"
-            placeholder="Add your note..."
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submitAnnotation();
-              if (e.key === "Escape") { setShowPopover(false); window.getSelection()?.removeAllRanges(); }
-            }}
-          />
-          <div className="flex justify-end gap-2 mt-2">
-            <button onClick={() => { setShowPopover(false); window.getSelection()?.removeAllRanges(); }} className="text-[11px] text-text-tertiary font-body px-3 py-1">Cancel</button>
-            <button onClick={submitAnnotation} className="text-[11px] font-medium font-body px-3 py-1 rounded-md bg-highlight-bg text-text-primary border border-highlight-border">Add</button>
-          </div>
-        </div>
-      )}
     </div>
   );
+}
+
+function showFileAnnotationPopover(
+  anchor: HTMLElement,
+  tempId: string,
+  snippet: string,
+  scrollContainer: HTMLElement | null,
+  onSubmit: (note: string) => void,
+  onCancel: () => void,
+) {
+  const existing = document.getElementById("annotation-popover");
+  if (existing) existing.remove();
+
+  const { style: posStyle, parent } = getPopoverPosition(anchor, scrollContainer);
+  const popover = document.createElement("div");
+  popover.id = "annotation-popover";
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  Object.assign(popover.style, {
+    ...posStyle, zIndex: "50",
+    width: "280px", background: "var(--color-bg-elevated)",
+    border: "1px solid var(--color-border-hover)",
+    borderRadius: "8px", boxShadow: "0 4px 12px var(--color-shadow)",
+    padding: "12px", fontFamily: "'Inter', sans-serif",
+  });
+  const truncated = snippet.length > 100 ? snippet.slice(0, 100) + "..." : snippet;
+  popover.innerHTML = `
+    <div style="font-size:11px;color:var(--color-text-tertiary);font-style:italic;margin-bottom:8px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">"${esc(truncated)}"</div>
+    <textarea id="annotation-note" style="width:100%;min-height:60px;background:transparent;border:none;color:var(--color-text-primary);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;resize:vertical;outline:none;" placeholder="Add your note..."></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
+      <button id="annotation-cancel" style="font-size:11px;color:var(--color-text-tertiary);background:none;border:none;cursor:pointer;padding:4px 12px;font-family:'Inter',sans-serif;">Cancel</button>
+      <button id="annotation-add" style="font-size:11px;font-weight:500;padding:4px 12px;border-radius:6px;background:var(--color-highlight-bg);color:var(--color-text-primary);border:1px solid var(--color-highlight-border);cursor:pointer;font-family:'Inter',sans-serif;">Add</button>
+    </div>
+  `;
+  parent.appendChild(popover);
+  (document.getElementById("annotation-note") as HTMLTextAreaElement).focus();
+
+  const cleanup = (cancelled: boolean) => {
+    popover.remove();
+    window.getSelection()?.removeAllRanges();
+    if (cancelled) onCancel();
+  };
+  const submit = () => {
+    const note = (document.getElementById("annotation-note") as HTMLTextAreaElement).value.trim();
+    if (note) { onSubmit(note); popover.remove(); }
+    else cleanup(true);
+  };
+  document.getElementById("annotation-cancel")!.onclick = () => cleanup(true);
+  document.getElementById("annotation-add")!.onclick = submit;
+  (document.getElementById("annotation-note") as HTMLTextAreaElement).addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit();
+    if (e.key === "Escape") cleanup(true);
+  });
+  setTimeout(() => {
+    const handler = (e: MouseEvent) => {
+      if (!popover.contains(e.target as Node)) { cleanup(true); document.removeEventListener("mousedown", handler); }
+    };
+    document.addEventListener("mousedown", handler);
+  }, 0);
 }

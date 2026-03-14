@@ -1,7 +1,7 @@
-import React, { useRef, useEffect, useCallback } from "react";
+import React, { useRef, useEffect, useCallback, useState } from "react";
 import { useAnnotations, Annotation } from "./AnnotationProvider";
 import { setMarkActive } from "./highlightRange";
-import { generateMarkdown, hasValue } from "./generateMarkdown";
+import { generateMarkdown, hasValue, getMissingRequired } from "./generateMarkdown";
 
 interface AnnotationSidebarProps {
   onPreview: () => void;
@@ -55,6 +55,7 @@ export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProp
 
   const hasResponses = Array.from(responses.values()).some(hasValue);
   const hasContent = annotations.length > 0 || generalNote.trim().length > 0 || hasResponses;
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const renderAnnotation = (ann: Annotation) => (
     <div
@@ -163,6 +164,13 @@ export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProp
         />
       </div>
 
+      {/* Validation error */}
+      {validationError && (
+        <div className="px-4 py-2 text-[12px] text-accent-red font-body border-t border-border-subtle flex-shrink-0">
+          {validationError}
+        </div>
+      )}
+
       {/* Action buttons */}
       <div className="px-4 py-3 border-t border-border-subtle flex gap-2 flex-shrink-0">
         <button
@@ -178,6 +186,12 @@ export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProp
         </button>
         <button
           onClick={() => {
+            const missing = getMissingRequired(responses);
+            if (missing.length > 0) {
+              setValidationError(`Please answer: ${missing.map((r) => r.label).join(", ")}`);
+              return;
+            }
+            setValidationError(null);
             const md = generateMarkdown(annotations, generalNote, responses);
             onSubmit(md);
           }}
