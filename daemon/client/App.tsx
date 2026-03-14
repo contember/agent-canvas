@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef, createContext, useMemo } from "react";
+import React, { useEffect, useLayoutEffect, useState, useCallback, useRef, createContext, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { SessionContext, ActiveViewCtx } from "#canvas/runtime";
 import { AnnotationProvider, useAnnotations } from "./AnnotationProvider";
@@ -147,20 +147,41 @@ function App() {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
 
+  // Scroll position restore per view
+  const scrollPositions = useRef<Map<string, number>>(new Map());
+
   const selectedRevInfo = revisions.find((r) => r.revision === selectedRevision);
   const isReadOnly = selectedRevision !== currentRevision || !!selectedRevInfo?.hasFeedback;
 
   const setActiveView = useCallback((v: ActiveView) => {
+    // Save current scroll position before switching
+    scrollPositions.current.set(
+      activeView.type === "plan" ? "plan" : `file:${activeView.path}`,
+      window.scrollY
+    );
     setActiveViewRaw(v);
     if (v.type === "file") {
       setOpenFiles((prev) => prev.includes(v.path) ? prev : [...prev, v.path]);
     }
-  }, []);
+  }, [activeView]);
 
   const closeFile = useCallback((path: string) => {
+    scrollPositions.current.delete(`file:${path}`);
     setOpenFiles((prev) => prev.filter((p) => p !== path));
-    setActiveViewRaw((prev) => prev.type === "file" && prev.path === path ? { type: "plan" } : prev);
+    setActiveViewRaw((prev) => {
+      if (prev.type === "file" && prev.path === path) {
+        scrollPositions.current.set(`file:${path}`, window.scrollY);
+        return { type: "plan" };
+      }
+      return prev;
+    });
   }, []);
+
+  // Restore scroll synchronously after DOM update (before paint)
+  useLayoutEffect(() => {
+    const key = activeView.type === "plan" ? "plan" : `file:${activeView.path}`;
+    window.scrollTo(0, scrollPositions.current.get(key) || 0);
+  }, [activeView]);
 
   // Fetch initial meta
   useEffect(() => {
@@ -269,7 +290,8 @@ function App() {
                 </div>
 
                 <ContentTabs />
-                {activeView.type === "plan" ? (
+                {/* All views stay mounted; inactive ones are hidden */}
+                <div style={{ display: activeView.type === "plan" ? undefined : "none" }}>
                   <div className="relative max-w-[720px] mx-auto px-6 pt-12 pb-32">
                     <button
                       onClick={() => {
@@ -298,9 +320,12 @@ function App() {
                     </button>
                     <PlanRenderer revision={selectedRevision} />
                   </div>
-                ) : (
-                  <FileViewer path={activeView.path} />
-                )}
+                </div>
+                {openFiles.map((filePath) => (
+                  <div key={filePath} style={{ display: activeView.type === "file" && activeView.path === filePath ? undefined : "none" }}>
+                    <FileViewer path={filePath} />
+                  </div>
+                ))}
               </div>
               )}
 
