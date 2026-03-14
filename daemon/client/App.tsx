@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, createContext, useMemo } from "react";
 import { createRoot } from "react-dom/client";
-import { SessionContext } from "#canvas/runtime";
+import { SessionContext, ActiveViewCtx } from "#canvas/runtime";
 import { AnnotationProvider, useAnnotations } from "./AnnotationProvider";
 import { PlanRenderer } from "./PlanRenderer";
 import { AnnotationSidebar } from "./AnnotationSidebar";
@@ -223,6 +223,7 @@ function App() {
       <RevisionContext.Provider value={{ currentRevision, selectedRevision, revisions, setSelectedRevision, isReadOnly, compareRevision, setCompareRevision }}>
         <AnnotationProvider sessionId={sessionId} revision={selectedRevision} isReadOnly={isReadOnly}>
           <ActiveViewContext.Provider value={{ activeView, setActiveView, openFiles, closeFile }}>
+          <ActiveViewCtx.Provider value={{ setActiveView }}>
             <div className="min-h-screen bg-bg-base">
               {/* Left panel — fixed to viewport */}
               <LeftPanel sessionId={sessionId} connected={connected} onMobileSidebar={() => setMobileSidebar(!mobileSidebar)} collapsed={leftCollapsed} onToggle={() => setLeftCollapsed((c) => !c)} />
@@ -321,6 +322,7 @@ function App() {
 
               <ResponsePreview open={previewOpen} onClose={() => setPreviewOpen(false)} onSubmit={handleSubmit} />
             </div>
+          </ActiveViewCtx.Provider>
           </ActiveViewContext.Provider>
         </AnnotationProvider>
       </RevisionContext.Provider>
