@@ -1,0 +1,186 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: #1a1a1a;
+    color: #e8e4df;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+/* Annotation highlight */
+.annotation-highlight {
+  background: rgba(255, 220, 100, 0.15);
+  border-bottom: 2px solid rgba(255, 220, 100, 0.35);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.annotation-highlight:hover,
+.annotation-highlight.active {
+  background: rgba(255, 220, 100, 0.25);
+}
+
+/* Selection color */
+::selection {
+  background-color: rgba(255, 220, 100, 0.25);
+  color: #e8e4df;
+}
+
+/* Focus ring */
+*:focus-visible {
+  outline: 2px solid #5a8ec4;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Transitions */
+button, a, [role="button"] {
+  transition: all 150ms ease;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 248, 240, 0.06);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 248, 240, 0.12);
+}
+
+/* Plan update flash */
+@keyframes plan-refresh {
+  0%   { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+.plan-updated {
+  animation: plan-refresh 300ms ease;
+}
+
+/* Range input styling */
+input[type="range"] {
+  height: 20px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #c49a3a;
+  cursor: pointer;
+  border: 2px solid #1a1a1a;
+  margin-top: -5px;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #c49a3a;
+  cursor: pointer;
+  border: 2px solid #1a1a1a;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: transparent;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: transparent;
+}
+
+/* highlight.js overrides to blend with our theme */
+.hljs {
+  background: transparent !important;
+  color: #c4beb7 !important;
+}
+
+pre code.hljs {
+  padding: 0 !important;
+}
+
+/* Tone down hljs colors to be more muted */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag {
+  color: #d2a6ff !important;
+}
+
+.hljs-string,
+.hljs-title,
+.hljs-section,
+.hljs-attribute,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type {
+  color: #a8cc8c !important;
+}
+
+.hljs-comment,
+.hljs-quote,
+.hljs-deletion,
+.hljs-meta {
+  color: #847d75 !important;
+}
+
+.hljs-number,
+.hljs-regexp,
+.hljs-addition {
+  color: #e8a87c !important;
+}
+
+.hljs-variable,
+.hljs-attr {
+  color: #7ec8e3 !important;
+}
+
+.hljs-function .hljs-title,
+.hljs-title.function_ {
+  color: #dbc074 !important;
+}
+
+.hljs-params {
+  color: #c4beb7 !important;
+}
+
+.hljs-property {
+  color: #7ec8e3 !important;
+}
+
+.hljs-punctuation {
+  color: #a09a92 !important;
+}

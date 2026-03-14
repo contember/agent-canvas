@@ -1,0 +1,5 @@
+node_modules/
+dist/
+*.compiled.js
+~/.planner/
+.DS_Store

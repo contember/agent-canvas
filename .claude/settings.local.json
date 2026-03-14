@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun:*)",
+      "Bash(lsof:*)",
+      "Bash(curl:*)",
+      "WebFetch(domain:mobbin.com)"
+    ]
+  }
+}
