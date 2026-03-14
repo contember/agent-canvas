@@ -2,8 +2,7 @@ import type { Annotation, PlanResponse } from "./AnnotationProvider";
 import { formatSnippetInContext } from "./annotationContext";
 
 /**
- * Generate structured feedback from annotations and responses.
- * Uses XML-like tags for unambiguous parsing.
+ * Generate human-readable markdown feedback from annotations and responses.
  */
 export function generateMarkdown(
   annotations: Annotation[],
@@ -15,10 +14,7 @@ export function generateMarkdown(
   const fileAnns = annotations.filter((a) => a.filePath);
   const resps = responses ? Array.from(responses.values()).filter((r) => hasValue(r)) : [];
 
-  parts.push("<feedback>");
-  parts.push("");
-
-  // Structured responses from interactive components
+  // Responses section
   if (resps.length > 0) {
     parts.push("## Responses");
     parts.push("");
@@ -29,9 +25,9 @@ export function generateMarkdown(
 
   // Plan annotations grouped by hierarchy
   if (planAnns.length > 0) {
-    const grouped = groupByHierarchy(planAnns);
     parts.push("## Plan annotations");
     parts.push("");
+    const grouped = groupByHierarchy(planAnns);
     parts.push(renderHierarchyGroup(grouped));
   }
 
@@ -43,7 +39,7 @@ export function generateMarkdown(
       if (!groups[key]) groups[key] = [];
       groups[key].push(ann);
     }
-    parts.push("## File references");
+    parts.push("## File annotations");
     parts.push("");
     for (const [filePath, anns] of Object.entries(groups)) {
       parts.push(`### ${filePath}`);
@@ -54,15 +50,15 @@ export function generateMarkdown(
     }
   }
 
+  // General notes
   if (generalNote.trim()) {
-    parts.push("## General");
+    parts.push("## General notes");
     parts.push("");
     parts.push(generalNote.trim());
     parts.push("");
   }
 
-  parts.push("</feedback>");
-  return parts.join("\n");
+  return parts.join("\n").trim() + "\n";
 }
 
 export function hasValue(r: PlanResponse): boolean {
@@ -86,58 +82,65 @@ export function getMissingRequired(responses: Map<string, PlanResponse>): PlanRe
 
 function renderResponse(r: PlanResponse): string {
   const lines: string[] = [];
-  lines.push("<response>");
-  lines.push(`<question>${r.label}</question>`);
+  lines.push(`**${r.label}**`);
 
   switch (r.type) {
     case "radio":
     case "select":
-      lines.push(`<answer>${r.value}</answer>`);
-      if (r.options) lines.push(`<options>${r.options.join(", ")}</options>`);
+      lines.push(`Answer: ${r.value}`);
       break;
     case "checkbox":
-      lines.push(`<answer>${(r.value as string[]).join(", ")}</answer>`);
-      if (r.options) lines.push(`<options>${r.options.join(", ")}</options>`);
+      for (const v of r.value as string[]) {
+        lines.push(`- [x] ${v}`);
+      }
+      if (r.options) {
+        for (const opt of r.options) {
+          if (!(r.value as string[]).includes(opt)) {
+            lines.push(`- [ ] ${opt}`);
+          }
+        }
+      }
       break;
     case "text":
-      lines.push(`<answer>${(r.value as string).trim()}</answer>`);
+      lines.push("");
+      lines.push((r.value as string).trim());
       break;
     case "range":
-      lines.push(`<answer>${r.value}</answer>`);
+      lines.push(`Answer: ${r.value}`);
       break;
   }
 
   if (r.note?.trim()) {
-    lines.push(`<note>${r.note.trim()}</note>`);
+    lines.push("");
+    lines.push(`Note: ${r.note.trim()}`);
   }
-  lines.push("</response>");
+
   lines.push("");
   return lines.join("\n");
 }
 
 function renderAnnotation(ann: Annotation): string {
   const lines: string[] = [];
-  lines.push("<annotation>");
+  const snippet = ann.snippet.trim();
+  const context = formatSnippetInContext(ann);
 
-  const fullContext = formatSnippetInContext(ann);
-  if (fullContext !== ann.snippet.trim()) {
-    lines.push(`<context>${fullContext}</context>`);
-  }
-
-  const selectedLines = ann.snippet.trim().split("\n");
-  if (selectedLines.length === 1) {
-    lines.push(`<selected>${selectedLines[0]}</selected>`);
+  // Show selected text as a quote
+  if (snippet.split("\n").length <= 3) {
+    lines.push(`> ${context.split("\n").join("\n> ")}`);
   } else {
-    lines.push("<selected>");
-    for (const l of selectedLines) lines.push(l);
-    lines.push("</selected>");
+    // Longer selections — just first/last line
+    const snippetLines = snippet.split("\n");
+    lines.push(`> ${snippetLines[0]}`);
+    lines.push(`> ... (${snippetLines.length} lines)`);
+    lines.push(`> ${snippetLines[snippetLines.length - 1]}`);
   }
 
+  // Comment
   if (ann.note.trim()) {
-    lines.push(`<comment>${ann.note.trim()}</comment>`);
+    lines.push("");
+    lines.push(ann.note.trim());
   }
 
-  lines.push("</annotation>");
   lines.push("");
   return lines.join("\n");
 }
