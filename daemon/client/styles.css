@@ -153,13 +153,15 @@ button, a, [role="button"] {
 
 /* Diff highlights for compare view */
 .diff-added {
-  background-color: var(--color-accent-green-muted);
+  background-color: color-mix(in srgb, var(--color-accent-green) 25%, transparent);
   border-radius: 2px;
+  padding-inline: 1px;
   padding-block: 1px;
 }
 .diff-removed {
-  background-color: var(--color-accent-red-muted);
+  background-color: color-mix(in srgb, var(--color-accent-red) 25%, transparent);
   border-radius: 2px;
+  padding-inline: 1px;
   padding-block: 1px;
   text-decoration: line-through;
   text-decoration-color: var(--color-accent-red);

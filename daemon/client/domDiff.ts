@@ -60,11 +60,9 @@ export function computeWordDiff(
   oldWords: string[],
   newWords: string[]
 ): { oldOps: DiffOp[]; newOps: DiffOp[] } {
-  // If either side is very large, chunk by paragraph boundaries
   if (oldWords.length > 10000 || newWords.length > 10000) {
     return chunkedDiff(oldWords, newWords);
   }
-
   return directDiff(oldWords, newWords);
 }
 
@@ -136,7 +134,6 @@ function chunkedDiff(
   oldWords: string[],
   newWords: string[]
 ): { oldOps: DiffOp[]; newOps: DiffOp[] } {
-  // Find paragraph boundaries (runs of newline tokens)
   const splitIntoParagraphs = (words: string[]) => {
     const paragraphs: { start: number; end: number; text: string }[] = [];
     let start = 0;
@@ -155,7 +152,6 @@ function chunkedDiff(
   const oldParas = splitIntoParagraphs(oldWords);
   const newParas = splitIntoParagraphs(newWords);
 
-  // Diff at paragraph level first
   const oldTexts = oldParas.map((p) => p.text);
   const newTexts = newParas.map((p) => p.text);
   const paraLCS = computeLCS(oldTexts, newTexts);
@@ -173,7 +169,6 @@ function chunkedDiff(
       oldTexts[opi] === paraLCS[pli] &&
       newTexts[npi] === paraLCS[pli]
     ) {
-      // Same paragraph — all words are "same"
       for (let i = oldParas[opi].start; i < oldParas[opi].end; i++)
         oldOps.push({ type: "same", index: i });
       for (let i = newParas[npi].start; i < newParas[npi].end; i++)
@@ -182,13 +177,10 @@ function chunkedDiff(
       npi++;
       pli++;
     } else if (opi < oldParas.length && (pli >= paraLCS.length || oldTexts[opi] !== paraLCS[pli])) {
-      // Changed/removed paragraph — diff within it if we can pair with a new paragraph
-      // For simplicity, mark as removed
       if (
         npi < newParas.length &&
         (pli >= paraLCS.length || newTexts[npi] !== paraLCS[pli])
       ) {
-        // Both changed — do word-level diff within
         const sub = directDiff(
           oldWords.slice(oldParas[opi].start, oldParas[opi].end),
           newWords.slice(newParas[npi].start, newParas[npi].end)
@@ -215,68 +207,77 @@ function chunkedDiff(
 }
 
 /**
- * Inject highlight spans into the DOM based on diff ops.
+ * Apply highlights by grouping changed tokens per text node,
+ * then rebuilding each affected text node in a single pass.
  *
- * Walks ops and map in parallel. For changed ops, splits text nodes
- * and wraps the range in a <span> with the given CSS class.
+ * This avoids the stale-reference bug where wrapping one token
+ * removes the text node and breaks subsequent tokens from the same node.
  */
-export function applyHighlights(
+function applyHighlightsByNode(
   ops: DiffOp[],
   map: WordEntry[],
-  words: string[],
   cssClass: string
 ): void {
-  // Group consecutive changed ops for efficiency
-  for (let i = 0; i < ops.length; i++) {
-    const op = ops[i];
-    if (op.type === "same") continue;
+  // Collect changed indices grouped by source text node
+  const nodeGroups = new Map<Text, { offset: number; length: number }[]>();
 
-    // Find the run of consecutive changed ops in the same text node
+  for (const op of ops) {
+    if (op.type === "same") continue;
     const entry = map[op.index];
     if (!entry || !entry.node.parentNode) continue;
 
-    // Wrap this single token
-    wrapToken(entry, cssClass);
-  }
-}
-
-function wrapToken(entry: WordEntry, cssClass: string): void {
-  const { node, offset, text } = entry;
-  if (!node.parentNode) return;
-
-  const content = node.nodeValue || "";
-  // Validate offset
-  if (offset > content.length) return;
-
-  const span = document.createElement("span");
-  span.className = cssClass;
-
-  // Split: before | token | after
-  const before = content.slice(0, offset);
-  const token = content.slice(offset, offset + text.length);
-  const after = content.slice(offset + text.length);
-
-  // Only wrap if the token matches what we expect
-  if (token !== text) return;
-
-  const parent = node.parentNode;
-
-  if (before) {
-    parent.insertBefore(document.createTextNode(before), node);
+    let group = nodeGroups.get(entry.node);
+    if (!group) {
+      group = [];
+      nodeGroups.set(entry.node, group);
+    }
+    group.push({ offset: entry.offset, length: entry.text.length });
   }
 
-  span.textContent = token;
-  parent.insertBefore(span, node);
+  // For each text node, rebuild it with highlight spans
+  for (const [textNode, ranges] of nodeGroups) {
+    if (!textNode.parentNode) continue;
+    const content = textNode.nodeValue || "";
 
-  if (after) {
-    parent.insertBefore(document.createTextNode(after), node);
+    // Sort ranges by offset
+    ranges.sort((a, b) => a.offset - b.offset);
+
+    // Merge overlapping/adjacent ranges
+    const merged: { offset: number; length: number }[] = [];
+    for (const r of ranges) {
+      const last = merged[merged.length - 1];
+      if (last && r.offset <= last.offset + last.length) {
+        last.length = Math.max(last.length, r.offset + r.length - last.offset);
+      } else {
+        merged.push({ ...r });
+      }
+    }
+
+    // Build replacement nodes: alternating text and highlighted spans
+    const parent = textNode.parentNode;
+    const frag = document.createDocumentFragment();
+    let pos = 0;
+
+    for (const r of merged) {
+      // Text before this highlight
+      if (r.offset > pos) {
+        frag.appendChild(document.createTextNode(content.slice(pos, r.offset)));
+      }
+      // Highlighted span
+      const span = document.createElement("span");
+      span.className = cssClass;
+      span.textContent = content.slice(r.offset, r.offset + r.length);
+      frag.appendChild(span);
+      pos = r.offset + r.length;
+    }
+
+    // Remaining text after last highlight
+    if (pos < content.length) {
+      frag.appendChild(document.createTextNode(content.slice(pos)));
+    }
+
+    parent.replaceChild(frag, textNode);
   }
-
-  parent.removeChild(node);
-
-  // Update all subsequent map entries that reference the same node
-  // Since we removed the original node, they need updated references
-  // We handle this by pre-processing: work backwards through the ops
 }
 
 /**
@@ -295,34 +296,8 @@ export function runDomDiff(
   const hasChanges =
     oldOps.some((op) => op.type === "removed") || newOps.some((op) => op.type === "added");
 
-  // Apply highlights working backwards to avoid offset invalidation
-  applyHighlightsReverse(oldOps, oldExtract.map, "diff-removed");
-  applyHighlightsReverse(newOps, newExtract.map, "diff-added");
+  applyHighlightsByNode(oldOps, oldExtract.map, "diff-removed");
+  applyHighlightsByNode(newOps, newExtract.map, "diff-added");
 
   return hasChanges;
-}
-
-/**
- * Apply highlights in reverse order so DOM mutations don't invalidate
- * subsequent text node offsets.
- */
-function applyHighlightsReverse(
-  ops: DiffOp[],
-  map: WordEntry[],
-  cssClass: string
-): void {
-  // Collect indices of changed ops
-  const changed: number[] = [];
-  for (let i = 0; i < ops.length; i++) {
-    if (ops[i].type !== "same") changed.push(i);
-  }
-
-  // Process in reverse to preserve offsets
-  for (let ci = changed.length - 1; ci >= 0; ci--) {
-    const opIdx = changed[ci];
-    const op = ops[opIdx];
-    const entry = map[op.index];
-    if (!entry || !entry.node.parentNode) continue;
-    wrapToken(entry, cssClass);
-  }
 }
