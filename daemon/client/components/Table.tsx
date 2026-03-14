@@ -7,7 +7,7 @@ interface TableProps {
 
 export function Table({ headers, rows }: TableProps) {
   return (
-    <div className="overflow-x-auto mt-3">
+    <div className="overflow-x-auto mt-3" data-md="table">
       <table className="w-full text-body">
         <thead>
           <tr className="border-b border-border-subtle">

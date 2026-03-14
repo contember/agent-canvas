@@ -21,7 +21,7 @@ export function CodeBlock({ language, children }: CodeBlockProps) {
   }, [code, language]);
 
   return (
-    <div className="relative mt-3 group/code">
+    <div className="relative mt-3 group/code" data-md="codeblock" data-md-language={language || ""}>
       {language && (
         <span className="absolute top-2 right-3 text-tiny text-text-tertiary opacity-0 group-hover/code:opacity-60 transition-opacity duration-150 z-10 font-mono">
           {language}

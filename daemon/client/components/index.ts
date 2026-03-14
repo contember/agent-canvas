@@ -1,5 +1,5 @@
 export { Section } from "./Section";
-export { Task } from "./Task";
+export { Item, Task } from "./Task";
 export { CodeBlock } from "./CodeBlock";
 export { Callout } from "./Callout";
 export { Note } from "./Note";

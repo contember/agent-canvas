@@ -25,7 +25,7 @@ export function Diff({ before, after, language }: DiffProps) {
   }
 
   return (
-    <div className="mt-3 bg-bg-code rounded-md overflow-hidden group/diff">
+    <div className="mt-3 bg-bg-code rounded-md overflow-hidden group/diff" data-md="diff" data-md-language={language || ""}>
       {language && (
         <div className="px-4 py-2 text-meta font-mono text-text-tertiary opacity-0 group-hover/diff:opacity-60 transition-opacity">
           diff ({language})
