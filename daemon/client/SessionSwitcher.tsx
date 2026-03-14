@@ -2,15 +2,25 @@ import React, { useEffect, useState, useRef } from "react";
 
 interface SessionInfo {
   id: string;
-  version: number;
+  projectRoot?: string;
+  currentRevision: number;
   updatedAt: string;
+}
+
+function sessionDisplayName(id: string, projectRoot?: string): string {
+  if (projectRoot) {
+    const parts = projectRoot.replace(/\/+$/, "").split("/");
+    return parts[parts.length - 1] || id;
+  }
+  return id.length > 30 ? id.slice(0, 30) + "..." : id;
 }
 
 interface SessionSwitcherProps {
   currentSessionId: string;
+  projectRoot?: string;
 }
 
-export function SessionSwitcher({ currentSessionId }: SessionSwitcherProps) {
+export function SessionSwitcher({ currentSessionId, projectRoot }: SessionSwitcherProps) {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -37,7 +47,7 @@ export function SessionSwitcher({ currentSessionId }: SessionSwitcherProps) {
   }, [open]);
 
   const otherSessions = sessions.filter((s) => s.id !== currentSessionId);
-  const displayName = currentSessionId.length > 30 ? currentSessionId.slice(0, 30) + "..." : currentSessionId;
+  const displayName = sessionDisplayName(currentSessionId, projectRoot);
 
   return (
     <div className="relative" ref={ref}>
@@ -62,7 +72,7 @@ export function SessionSwitcher({ currentSessionId }: SessionSwitcherProps) {
               className="flex items-center gap-2.5 px-4 py-2.5 text-body font-body text-text-secondary hover:bg-bg-surface hover:text-text-primary transition-colors"
             >
               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.currentRevision > 0 ? "bg-accent-green" : "bg-border-hover"}`} />
-              <span className="truncate">{s.id}</span>
+              <span className="truncate">{sessionDisplayName(s.id, s.projectRoot)}</span>
             </a>
           ))}
         </div>

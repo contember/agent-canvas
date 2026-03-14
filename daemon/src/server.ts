@@ -1,5 +1,7 @@
 import { join, resolve, dirname } from "path";
 import { readdir } from "fs/promises";
+import { writeFileSync, mkdirSync } from "fs";
+import { tmpdir } from "os";
 import { DATA_DIR } from "./paths";
 import { SessionManager } from "./session";
 import { compilePlan } from "./compiler";
@@ -7,6 +9,11 @@ import { watchSession } from "./watcher";
 import { LANG_MAP } from "../langMap";
 
 const PORT = parseInt(process.env.CANVAS_PORT || "19400", 10);
+
+// Write PID file so CLI can find and stop us
+const pidDir = join(tmpdir(), "agent-canvas");
+mkdirSync(pidDir, { recursive: true });
+writeFileSync(join(pidDir, "daemon.pid"), String(process.pid));
 const sessionManager = new SessionManager();
 
 function jsonResponse(data: unknown, status = 200): Response {
@@ -26,8 +33,9 @@ function corsHeaders(headers: Record<string, string> = {}): Record<string, strin
 }
 
 // WebSocket connections
-const browserSockets = new Map<string, Set<ServerWebSocket<{ type: string; sessionId: string }>>>();
-const waitSockets = new Map<string, Set<ServerWebSocket<{ type: string; sessionId: string }>>>();
+type WS<T = undefined> = import("bun").ServerWebSocket<T>;
+const browserSockets = new Map<string, Set<WS<{ type: string; sessionId: string }>>>();
+const waitSockets = new Map<string, Set<WS<{ type: string; sessionId: string }>>>();
 
 type WSData = { type: "browser" | "wait"; sessionId: string };
 
@@ -94,6 +102,7 @@ const server = Bun.serve<WSData>({
     if (path === "/api/sessions" && req.method === "GET") {
       return jsonResponse(sessionManager.list().map((s) => ({
         id: s.id,
+        projectRoot: s.projectRoot,
         currentRevision: s.currentRevision,
         updatedAt: s.updatedAt,
       })));

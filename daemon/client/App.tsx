@@ -143,6 +143,7 @@ function App() {
   const [openFiles, setOpenFiles] = useState<string[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
 
+  const [projectRoot, setProjectRoot] = useState<string | undefined>();
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -150,14 +151,19 @@ function App() {
   // Dynamic document title
   useEffect(() => {
     const parts = ["Agent Canvas"];
-    if (sessionId) parts.push(sessionId);
+    if (projectRoot) {
+      const segments = projectRoot.replace(/\/+$/, "").split("/");
+      parts.push(segments[segments.length - 1] || sessionId);
+    } else if (sessionId) {
+      parts.push(sessionId);
+    }
     if (activeView.type === "file") {
       parts.push(activeView.path.split("/").pop() || activeView.path);
     } else if (compareRevision) {
       parts.push("Compare");
     }
     document.title = parts.join(" — ");
-  }, [sessionId, activeView, compareRevision]);
+  }, [sessionId, projectRoot, activeView, compareRevision]);
 
   // Scroll position restore per view
   const scrollPositions = useRef<Map<string, number>>(new Map());
@@ -206,6 +212,7 @@ function App() {
           setSelectedRevision(data.currentRevision);
           setRevisions(data.revisions || []);
         }
+        if (data.projectRoot) setProjectRoot(data.projectRoot);
       })
       .catch(() => {});
   }, [sessionId]);
@@ -259,7 +266,7 @@ function App() {
           <ActiveViewCtx.Provider value={{ setActiveView }}>
             <div className="min-h-screen bg-bg-base">
               {/* Left panel — fixed to viewport */}
-              <LeftPanel sessionId={sessionId} connected={connected} onMobileSidebar={() => setMobileSidebar(!mobileSidebar)} collapsed={leftCollapsed} onToggle={() => setLeftCollapsed((c) => !c)} />
+              <LeftPanel sessionId={sessionId} projectRoot={projectRoot} connected={connected} onMobileSidebar={() => setMobileSidebar(!mobileSidebar)} collapsed={leftCollapsed} onToggle={() => setLeftCollapsed((c) => !c)} />
 
               {/* Right panel — fixed to viewport, resizable (hidden in compare mode) */}
               {compareRevision === null && (
@@ -283,7 +290,7 @@ function App() {
                 {/* Mobile top bar — only visible < lg */}
                 <div className="lg:hidden sticky top-0 z-20 flex items-center justify-between px-4 py-2 border-b border-border-subtle bg-bg-surface">
                   <div className="flex items-center gap-2">
-                    <SessionSwitcher currentSessionId={sessionId} />
+                    <SessionSwitcher currentSessionId={sessionId} projectRoot={projectRoot} />
                     <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-accent-green" : "bg-accent-red"}`} />
                   </div>
                   <div className="flex items-center gap-1">
@@ -367,7 +374,7 @@ function App() {
   );
 }
 
-function LeftPanel({ sessionId, connected, onMobileSidebar, collapsed, onToggle }: { sessionId: string; connected: boolean; onMobileSidebar: () => void; collapsed: boolean; onToggle: () => void }) {
+function LeftPanel({ sessionId, projectRoot, connected, onMobileSidebar, collapsed, onToggle }: { sessionId: string; projectRoot?: string; connected: boolean; onMobileSidebar: () => void; collapsed: boolean; onToggle: () => void }) {
   return (
     <>
       {/* Collapsed toggle button */}
@@ -390,7 +397,7 @@ function LeftPanel({ sessionId, connected, onMobileSidebar, collapsed, onToggle 
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-text-tertiary flex-shrink-0">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            <SessionSwitcher currentSessionId={sessionId} />
+            <SessionSwitcher currentSessionId={sessionId} projectRoot={projectRoot} />
             <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${connected ? "bg-accent-green" : "bg-accent-red"}`} />
             <button
               onClick={onToggle}

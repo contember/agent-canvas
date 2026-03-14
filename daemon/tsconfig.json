@@ -7,9 +7,13 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "outDir": "dist",
+    "noEmit": true,
     "rootDir": ".",
-    "types": ["bun-types"]
+    "types": ["@types/bun"],
+    "paths": {
+      "#canvas/runtime": ["./client/runtime.ts"],
+      "#canvas/components": ["./client/components/index.ts"]
+    }
   },
   "include": ["src/**/*", "client/**/*"]
 }

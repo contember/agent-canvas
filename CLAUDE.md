@@ -28,7 +28,13 @@ bun daemon/build.ts --watch  # watch mode with debounced rebuild
 
 The build produces three bundles (runtime.js, components.js, client.js) plus Tailwind CSS. React is loaded from CDN, not bundled. Import maps route `#canvas/components` and `#canvas/runtime` to the local bundles.
 
-No test runner or linter is configured.
+## Typecheck
+
+```bash
+bun run typecheck          # runs tsc --noEmit on both root (bin/) and daemon (client/ + src/)
+```
+
+Two separate tsconfig files: `tsconfig.json` (root, covers `bin/`) and `daemon/tsconfig.json` (covers `daemon/src/` and `daemon/client/`). CI runs typecheck on every push and PR.
 
 ## Key Technical Details
 

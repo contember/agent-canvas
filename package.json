@@ -17,6 +17,7 @@
   ],
   "scripts": {
     "build": "bun daemon/build.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p daemon/tsconfig.json",
     "prepublishOnly": "bun daemon/build.ts"
   },
   "dependencies": {
@@ -25,9 +26,11 @@
   },
   "devDependencies": {
     "@tailwindcss/cli": "4",
+    "@types/bun": "^1.3.10",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "tailwindcss": "4"
+    "tailwindcss": "4",
+    "typescript": "^5.9.3"
   },
   "repository": {
     "type": "git",

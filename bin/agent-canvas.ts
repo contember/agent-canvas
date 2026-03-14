@@ -285,10 +285,6 @@ async function ensureDaemon(): Promise<void> {
 
   child.unref();
 
-  if (child.pid) {
-    writeFileSync(PID_FILE, String(child.pid));
-  }
-
   for (let i = 0; i < 30; i++) {
     await new Promise((r) => setTimeout(r, 100));
     if (await isDaemonRunning()) {
