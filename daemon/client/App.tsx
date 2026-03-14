@@ -269,7 +269,32 @@ function App() {
 
                 <ContentTabs />
                 {activeView.type === "plan" ? (
-                  <div className="max-w-[720px] mx-auto px-6 pt-12 pb-32">
+                  <div className="relative max-w-[720px] mx-auto px-6 pt-12 pb-32">
+                    <button
+                      onClick={() => {
+                        const planContent = document.querySelector(".plan-content");
+                        if (!planContent) return;
+                        const md = exportCanvasToMarkdown(planContent as HTMLElement);
+                        navigator.clipboard.writeText(md).then(() => {
+                          const btn = document.getElementById("export-md-btn");
+                          if (btn) {
+                            btn.setAttribute("data-copied", "true");
+                            setTimeout(() => { btn.removeAttribute("data-copied"); }, 1500);
+                          }
+                        });
+                      }}
+                      id="export-md-btn"
+                      className="group absolute top-3 right-6 p-1.5 text-text-tertiary hover:text-text-secondary transition-colors z-10"
+                      title="Copy as Markdown"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-[[data-copied=true]]:hidden">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                      </svg>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="hidden group-[[data-copied=true]]:block text-green-500">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    </button>
                     <PlanRenderer revision={selectedRevision} />
                   </div>
                 ) : (
@@ -395,8 +420,7 @@ function ContentTabs() {
   const { addAnnotationWithId, setActiveAnnotationId } = useAnnotations();
 
   const showTabs = openFiles.length > 0;
-  // Always render if on plan view (for export button), or if file tabs are open
-  if (!showTabs && activeView.type !== "plan") return null;
+  if (!showTabs) return null;
 
   return (
     <div className="flex items-center border-b border-border-medium bg-bg-surface overflow-x-auto sticky top-0 z-10">
@@ -461,23 +485,6 @@ function ContentTabs() {
 
       {/* Right-aligned actions */}
       <div className="ml-auto flex items-center gap-1 flex-shrink-0">
-        {activeView.type === "plan" && (
-          <button
-            onClick={() => {
-              const planContent = document.querySelector(".plan-content");
-              if (!planContent) return;
-              const md = exportCanvasToMarkdown(planContent as HTMLElement);
-              navigator.clipboard.writeText(md).then(() => {
-                const btn = document.getElementById("export-md-btn");
-                if (btn) { btn.textContent = "Copied!"; setTimeout(() => { btn.textContent = "Copy as MD"; }, 1500); }
-              });
-            }}
-            id="export-md-btn"
-            className="px-3 py-1.5 text-[11px] font-medium font-body text-text-tertiary hover:text-text-secondary whitespace-nowrap transition-colors"
-          >
-            Copy as MD
-          </button>
-        )}
         {activeView.type === "file" && (
           <button
             onClick={async () => {
