@@ -10,22 +10,24 @@ type CompileResult =
 const TEMP_DIR = join(homedir(), ".planner", "tmp");
 mkdirSync(TEMP_DIR, { recursive: true });
 
-export async function compilePlan(jsx: string): Promise<CompileResult> {
-  const wrapped = `
-import React from 'react';
+const COMPONENT_IMPORTS = `import React from 'react';
 import * as C from '@planner/components';
-const { Section, Task, FilePreview, CodeBlock, Callout,
+const { Section, Item, Task, FilePreview, CodeBlock, Callout,
         Mermaid, Table, Priority, Checklist, Note, Diff,
         Choice, MultiChoice, UserInput, RangeInput } = C;
-export default function Plan() {
-  return (<>${jsx}</>);
-}
 `;
+
+export async function compilePlan(jsx: string): Promise<CompileResult> {
+  const hasDefaultExport = /export\s+default\b/.test(jsx);
+
+  const source = hasDefaultExport
+    ? `${COMPONENT_IMPORTS}\n${jsx}`
+    : `${COMPONENT_IMPORTS}\nexport default function Plan() {\n  return (<>${jsx}</>);\n}\n`;
 
   const tmpFile = join(TEMP_DIR, `plan-${randomUUID()}.jsx`);
 
   try {
-    writeFileSync(tmpFile, wrapped);
+    writeFileSync(tmpFile, source);
 
     const result = await Bun.build({
       entrypoints: [tmpFile],

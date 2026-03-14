@@ -1,17 +1,34 @@
-import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync } from "fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, renameSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+
+export interface RevisionInfo {
+  revision: number;
+  label?: string;
+  createdAt: string;
+  hasFeedback: boolean;
+}
 
 export interface SessionData {
   id: string;
   projectRoot: string;
   jsx: string;
-  version: number;
+  currentRevision: number;
+  revisions: RevisionInfo[];
   createdAt: string;
   updatedAt: string;
 }
 
 interface SessionMeta {
+  projectRoot: string;
+  createdAt: string;
+  updatedAt: string;
+  currentRevision: number;
+  revisions: RevisionInfo[];
+}
+
+// Legacy format
+interface LegacyMeta {
   projectRoot: string;
   createdAt: string;
   updatedAt: string;
@@ -33,23 +50,50 @@ export class SessionManager {
     return join(SESSIONS_DIR, id);
   }
 
+  private revisionDir(id: string, rev: number): string {
+    return join(this.sessionDir(id), "revisions", String(rev));
+  }
+
   private loadFromDisk() {
     if (!existsSync(SESSIONS_DIR)) return;
     for (const name of readdirSync(SESSIONS_DIR, { withFileTypes: true })) {
       if (!name.isDirectory()) continue;
       const dir = join(SESSIONS_DIR, name.name);
       const metaPath = join(dir, "meta.json");
-      const jsxPath = join(dir, "plan.jsx");
-      if (!existsSync(metaPath) || !existsSync(jsxPath)) continue;
+      if (!existsSync(metaPath)) continue;
 
       try {
-        const meta: SessionMeta = JSON.parse(readFileSync(metaPath, "utf-8"));
-        const jsx = readFileSync(jsxPath, "utf-8");
+        const raw = JSON.parse(readFileSync(metaPath, "utf-8"));
+
+        // Detect and migrate legacy format
+        if ("version" in raw && !("currentRevision" in raw)) {
+          this.migrateLegacy(name.name, raw as LegacyMeta);
+          // Re-read after migration
+          const migrated: SessionMeta = JSON.parse(readFileSync(metaPath, "utf-8"));
+          const jsx = this.readRevisionJsx(name.name, migrated.currentRevision);
+          if (!jsx) continue;
+          this.sessions.set(name.name, {
+            id: name.name,
+            projectRoot: migrated.projectRoot,
+            jsx,
+            currentRevision: migrated.currentRevision,
+            revisions: migrated.revisions,
+            createdAt: migrated.createdAt,
+            updatedAt: migrated.updatedAt,
+          });
+          continue;
+        }
+
+        const meta = raw as SessionMeta;
+        const jsx = this.readRevisionJsx(name.name, meta.currentRevision);
+        if (!jsx) continue;
+
         this.sessions.set(name.name, {
           id: name.name,
           projectRoot: meta.projectRoot,
           jsx,
-          version: meta.version,
+          currentRevision: meta.currentRevision,
+          revisions: meta.revisions,
           createdAt: meta.createdAt,
           updatedAt: meta.updatedAt,
         });
@@ -57,51 +101,100 @@ export class SessionManager {
     }
   }
 
-  upsert(id: string, jsx: string, projectRoot: string): SessionData {
+  private migrateLegacy(id: string, legacy: LegacyMeta) {
+    const dir = this.sessionDir(id);
+    const flatJsx = join(dir, "plan.jsx");
+    const flatCompiled = join(dir, "plan.compiled.js");
+    const historyDir = join(dir, "history");
+
+    // Collect all historical revisions + current
+    const revisions: RevisionInfo[] = [];
+
+    // Migrate history files
+    if (existsSync(historyDir)) {
+      const files = readdirSync(historyDir).filter((f) => f.endsWith(".jsx")).sort();
+      for (const file of files) {
+        const num = parseInt(file.replace(".jsx", ""), 10);
+        if (isNaN(num)) continue;
+        const revDir = this.revisionDir(id, num);
+        mkdirSync(revDir, { recursive: true });
+        renameSync(join(historyDir, file), join(revDir, "plan.jsx"));
+        revisions.push({ revision: num, createdAt: legacy.createdAt, hasFeedback: false });
+      }
+      rmSync(historyDir, { recursive: true, force: true });
+    }
+
+    // Migrate current version
+    const currentRev = legacy.version;
+    const revDir = this.revisionDir(id, currentRev);
+    mkdirSync(revDir, { recursive: true });
+    if (existsSync(flatJsx)) {
+      renameSync(flatJsx, join(revDir, "plan.jsx"));
+    }
+    if (existsSync(flatCompiled)) {
+      renameSync(flatCompiled, join(revDir, "plan.compiled.js"));
+    }
+    revisions.push({ revision: currentRev, createdAt: legacy.updatedAt, hasFeedback: false });
+
+    // Write new meta
+    const meta: SessionMeta = {
+      projectRoot: legacy.projectRoot,
+      createdAt: legacy.createdAt,
+      updatedAt: legacy.updatedAt,
+      currentRevision: currentRev,
+      revisions,
+    };
+    writeFileSync(join(dir, "meta.json"), JSON.stringify(meta, null, 2));
+  }
+
+  private readRevisionJsx(id: string, rev: number): string | null {
+    try {
+      return readFileSync(join(this.revisionDir(id, rev), "plan.jsx"), "utf-8");
+    } catch {
+      return null;
+    }
+  }
+
+  upsert(id: string, jsx: string, projectRoot: string, label?: string): SessionData {
     const existing = this.sessions.get(id);
     const now = new Date().toISOString();
-    const version = existing ? existing.version + 1 : 1;
+    const revision = existing ? existing.currentRevision + 1 : 1;
+
+    const revInfo: RevisionInfo = { revision, createdAt: now, hasFeedback: false, ...(label ? { label } : {}) };
+    const revisions = existing ? [...existing.revisions, revInfo] : [revInfo];
 
     const session: SessionData = {
       id,
       projectRoot,
       jsx,
-      version,
+      currentRevision: revision,
+      revisions,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
 
     this.sessions.set(id, session);
-    this.persistToDisk(session, existing);
+    this.persistToDisk(session);
     return session;
   }
 
-  private persistToDisk(session: SessionData, previous?: SessionData) {
+  private persistToDisk(session: SessionData) {
     const dir = this.sessionDir(session.id);
-    const historyDir = join(dir, "history");
-    mkdirSync(historyDir, { recursive: true });
+    const revDir = this.revisionDir(session.id, session.currentRevision);
+    mkdirSync(revDir, { recursive: true });
 
-    // Save history of previous version
-    if (previous) {
-      const histNum = String(previous.version).padStart(3, "0");
-      writeFileSync(join(historyDir, `${histNum}.jsx`), previous.jsx);
-    }
+    // Write revision JSX
+    writeFileSync(join(revDir, "plan.jsx"), session.jsx);
 
-    // Write current
-    writeFileSync(join(dir, "plan.jsx"), session.jsx);
-    writeFileSync(
-      join(dir, "meta.json"),
-      JSON.stringify(
-        {
-          projectRoot: session.projectRoot,
-          createdAt: session.createdAt,
-          updatedAt: session.updatedAt,
-          version: session.version,
-        },
-        null,
-        2
-      )
-    );
+    // Write meta
+    const meta: SessionMeta = {
+      projectRoot: session.projectRoot,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      currentRevision: session.currentRevision,
+      revisions: session.revisions,
+    };
+    writeFileSync(join(dir, "meta.json"), JSON.stringify(meta, null, 2));
   }
 
   get(id: string): SessionData | undefined {
@@ -117,16 +210,57 @@ export class SessionManager {
     rmSync(this.sessionDir(id), { recursive: true, force: true });
   }
 
-  saveCompiled(id: string, js: string) {
-    writeFileSync(join(this.sessionDir(id), "plan.compiled.js"), js);
+  saveCompiled(id: string, js: string, rev?: number) {
+    const session = this.sessions.get(id);
+    const revision = rev ?? session?.currentRevision;
+    if (!revision) return;
+    const revDir = this.revisionDir(id, revision);
+    mkdirSync(revDir, { recursive: true });
+    writeFileSync(join(revDir, "plan.compiled.js"), js);
   }
 
-  getCompiled(id: string): string | null {
+  getCompiled(id: string, rev?: number): string | null {
+    const session = this.sessions.get(id);
+    const revision = rev ?? session?.currentRevision;
+    if (!revision) return null;
     try {
-      return readFileSync(join(this.sessionDir(id), "plan.compiled.js"), "utf-8");
+      return readFileSync(join(this.revisionDir(id, revision), "plan.compiled.js"), "utf-8");
     } catch {
       return null;
     }
+  }
+
+  saveFeedback(id: string, rev: number, markdown: string) {
+    const revDir = this.revisionDir(id, rev);
+    mkdirSync(revDir, { recursive: true });
+    writeFileSync(join(revDir, "feedback.md"), markdown);
+
+    // Update in-memory and on-disk meta
+    const session = this.sessions.get(id);
+    if (session) {
+      const ri = session.revisions.find((r) => r.revision === rev);
+      if (ri) ri.hasFeedback = true;
+      const meta: SessionMeta = {
+        projectRoot: session.projectRoot,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+        currentRevision: session.currentRevision,
+        revisions: session.revisions,
+      };
+      writeFileSync(join(this.sessionDir(id), "meta.json"), JSON.stringify(meta, null, 2));
+    }
+  }
+
+  getFeedback(id: string, rev: number): string | null {
+    try {
+      return readFileSync(join(this.revisionDir(id, rev), "feedback.md"), "utf-8");
+    } catch {
+      return null;
+    }
+  }
+
+  getRevisionJsxPath(id: string, rev: number): string {
+    return join(this.revisionDir(id, rev), "plan.jsx");
   }
 
   cleanupStale(maxAge = STALE_TIMEOUT_MS) {

@@ -61,11 +61,13 @@ const server = Bun.serve<WSData>({
       return handlePlanPost(req, sessionId);
     }
 
-    // GET /api/session/:id/plan.js
+    // GET /api/session/:id/plan.js?rev=N
     const planJsMatch = path.match(/^\/api\/session\/([^/]+)\/plan\.js$/);
     if (planJsMatch && req.method === "GET") {
       const sessionId = planJsMatch[1];
-      return handlePlanJs(sessionId);
+      const revParam = url.searchParams.get("rev");
+      const rev = revParam ? parseInt(revParam, 10) : undefined;
+      return handlePlanJs(sessionId, rev);
     }
 
     // GET /api/session/:id/meta
@@ -76,15 +78,30 @@ const server = Bun.serve<WSData>({
       if (!session) return jsonResponse({ error: "Session not found" }, 404);
       return jsonResponse({
         projectRoot: session.projectRoot,
-        version: session.version,
+        currentRevision: session.currentRevision,
+        revisions: session.revisions,
         createdAt: session.createdAt,
         updatedAt: session.updatedAt,
       });
     }
 
+    // GET /api/session/:id/revision/:rev/feedback
+    const feedbackMatch = path.match(/^\/api\/session\/([^/]+)\/revision\/(\d+)\/feedback$/);
+    if (feedbackMatch && req.method === "GET") {
+      const sessionId = feedbackMatch[1];
+      const rev = parseInt(feedbackMatch[2], 10);
+      const feedback = sessionManager.getFeedback(sessionId, rev);
+      if (feedback === null) return jsonResponse({ error: "No feedback" }, 404);
+      return jsonResponse({ feedback });
+    }
+
     // GET /api/sessions
     if (path === "/api/sessions" && req.method === "GET") {
-      return jsonResponse(sessionManager.list());
+      return jsonResponse(sessionManager.list().map((s) => ({
+        id: s.id,
+        currentRevision: s.currentRevision,
+        updatedAt: s.updatedAt,
+      })));
     }
 
     // GET /api/file
@@ -155,10 +172,20 @@ const server = Bun.serve<WSData>({
         try {
           const data = JSON.parse(typeof message === "string" ? message : new TextDecoder().decode(message));
           if (data.type === "submit") {
+            const feedback = data.feedback as string;
+
+            // Persist feedback to current revision
+            const session = sessionManager.get(sessionId);
+            if (session) {
+              sessionManager.saveFeedback(sessionId, session.currentRevision, feedback);
+              // Notify browsers that revision metadata changed
+              broadcastRevisionUpdate(sessionId);
+            }
+
             // Forward to all waiting CLI sockets
             const waiters = waitSockets.get(sessionId);
             if (waiters) {
-              const payload = JSON.stringify({ type: "submit", feedback: data.feedback });
+              const payload = JSON.stringify({ type: "submit", feedback });
               for (const waiter of waiters) {
                 waiter.send(payload);
                 waiter.close();
@@ -181,26 +208,27 @@ const server = Bun.serve<WSData>({
 async function handlePlanPost(req: Request, sessionId: string): Promise<Response> {
   try {
     const body = await req.json();
-    const { jsx, projectRoot } = body;
+    const { jsx, projectRoot, label } = body;
     if (!jsx) return jsonResponse({ error: "Missing jsx" }, 400);
 
     const isNew = !sessionManager.get(sessionId);
-    sessionManager.upsert(sessionId, jsx, projectRoot || process.cwd());
+    const session = sessionManager.upsert(sessionId, jsx, projectRoot || process.cwd(), label);
 
     const result = await compilePlan(jsx);
     if (result.ok) {
-      sessionManager.saveCompiled(sessionId, result.js);
+      sessionManager.saveCompiled(sessionId, result.js, session.currentRevision);
       broadcastPlanUpdate(sessionId);
     }
 
     // Start watching for file changes
-    watchSession(sessionId, broadcastPlanUpdate, (id, js) => sessionManager.saveCompiled(id, js));
+    watchSession(sessionId, sessionManager, broadcastPlanUpdate);
 
     const browserUrl = `http://localhost:${PORT}/s/${sessionId}`;
     return jsonResponse({
       ok: result.ok,
       browserUrl,
       isNew,
+      revision: session.currentRevision,
       error: result.ok ? undefined : result.error,
     });
   } catch (e: any) {
@@ -208,8 +236,24 @@ async function handlePlanPost(req: Request, sessionId: string): Promise<Response
   }
 }
 
-function handlePlanJs(sessionId: string): Response {
-  const compiled = sessionManager.getCompiled(sessionId);
+async function handlePlanJs(sessionId: string, rev?: number): Promise<Response> {
+  let compiled = sessionManager.getCompiled(sessionId, rev);
+
+  // On-demand compilation for historical revisions without compiled JS
+  if (!compiled && rev) {
+    const session = sessionManager.get(sessionId);
+    if (session) {
+      const jsx = readRevisionJsx(sessionId, rev);
+      if (jsx) {
+        const result = await compilePlan(jsx);
+        if (result.ok) {
+          sessionManager.saveCompiled(sessionId, result.js, rev);
+          compiled = result.js;
+        }
+      }
+    }
+  }
+
   if (!compiled) return jsonResponse({ error: "No compiled plan" }, 404);
   return new Response(compiled, {
     headers: {
@@ -219,13 +263,38 @@ function handlePlanJs(sessionId: string): Response {
   });
 }
 
+function readRevisionJsx(sessionId: string, rev: number): string | null {
+  try {
+    const path = sessionManager.getRevisionJsxPath(sessionId, rev);
+    return require("fs").readFileSync(path, "utf-8");
+  } catch {
+    return null;
+  }
+}
+
 function broadcastPlanUpdate(sessionId: string) {
   const sockets = browserSockets.get(sessionId);
   if (!sockets) return;
   const session = sessionManager.get(sessionId);
+  if (!session) return;
   const payload = JSON.stringify({
     type: "plan-updated",
-    version: session?.version ?? 0,
+    currentRevision: session.currentRevision,
+    revisions: session.revisions,
+  });
+  for (const ws of sockets) {
+    ws.send(payload);
+  }
+}
+
+function broadcastRevisionUpdate(sessionId: string) {
+  const sockets = browserSockets.get(sessionId);
+  if (!sockets) return;
+  const session = sessionManager.get(sessionId);
+  if (!session) return;
+  const payload = JSON.stringify({
+    type: "revision-updated",
+    revisions: session.revisions,
   });
   for (const ws of sockets) {
     ws.send(payload);
