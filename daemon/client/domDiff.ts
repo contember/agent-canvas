@@ -54,13 +54,13 @@ interface DiffOp {
 /**
  * Compute word-level LCS and return diff ops for both sides.
  *
- * For large inputs (>10k tokens), falls back to paragraph-chunked diffing.
+ * For large inputs (>5k tokens), falls back to chunked diffing.
  */
 export function computeWordDiff(
   oldWords: string[],
   newWords: string[]
 ): { oldOps: DiffOp[]; newOps: DiffOp[] } {
-  if (oldWords.length > 10000 || newWords.length > 10000) {
+  if (oldWords.length > 5000 || newWords.length > 5000) {
     return chunkedDiff(oldWords, newWords);
   }
   return directDiff(oldWords, newWords);
@@ -104,102 +104,150 @@ function directDiff(
   return { oldOps, newOps };
 }
 
+/**
+ * Compute LCS using Hirschberg's algorithm — O(mn) time but only O(n) space.
+ * Recursively divides the problem, using two-row DP to find the split point.
+ */
 function computeLCS(a: string[], b: string[]): string[] {
-  const m = a.length,
-    n = b.length;
+  const m = a.length, n = b.length;
+  if (m === 0 || n === 0) return [];
+  if (m === 1) return b.includes(a[0]) ? [a[0]] : [];
+  if (n === 1) return a.includes(b[0]) ? [b[0]] : [];
+
+  // For small inputs, use the simple DP approach
+  if (m * n <= 1_000_000) {
+    return simpleLCS(a, b);
+  }
+
+  // Hirschberg divide-and-conquer
+  const mid = Math.floor(m / 2);
+  const aFirst = a.slice(0, mid);
+  const aSecond = a.slice(mid);
+
+  const scoreL = lcsLengthRow(aFirst, b);
+  const scoreR = lcsLengthRow([...aSecond].reverse(), [...b].reverse());
+
+  // Find optimal split in b
+  let best = 0, bestK = 0;
+  for (let k = 0; k <= n; k++) {
+    const score = scoreL[k] + scoreR[n - k];
+    if (score > best) { best = score; bestK = k; }
+  }
+
+  const bFirst = b.slice(0, bestK);
+  const bSecond = b.slice(bestK);
+
+  return [...computeLCS(aFirst, bFirst), ...computeLCS(aSecond, bSecond)];
+}
+
+/** Two-row DP: returns last row of LCS length table. O(n) space. */
+function lcsLengthRow(a: string[], b: string[]): number[] {
+  const n = b.length;
+  let prev = new Array(n + 1).fill(0);
+  let curr = new Array(n + 1).fill(0);
+  for (let i = 0; i < a.length; i++) {
+    for (let j = 1; j <= n; j++) {
+      curr[j] = a[i] === b[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], curr[j - 1]);
+    }
+    [prev, curr] = [curr, prev];
+    curr.fill(0);
+  }
+  return prev;
+}
+
+/** Simple O(mn) space LCS for small inputs. */
+function simpleLCS(a: string[], b: string[]): string[] {
+  const m = a.length, n = b.length;
   const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
   for (let i = 1; i <= m; i++)
     for (let j = 1; j <= n; j++)
       dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
 
   const result: string[] = [];
-  let i = m,
-    j = n;
+  let i = m, j = n;
   while (i > 0 && j > 0) {
-    if (a[i - 1] === b[j - 1]) {
-      result.unshift(a[i - 1]);
-      i--;
-      j--;
-    } else if (dp[i - 1][j] > dp[i][j - 1]) {
-      i--;
-    } else {
-      j--;
-    }
+    if (a[i - 1] === b[j - 1]) { result.unshift(a[i - 1]); i--; j--; }
+    else if (dp[i - 1][j] > dp[i][j - 1]) i--;
+    else j--;
   }
   return result;
 }
 
-/** Paragraph-chunked fallback for very large plans. */
+/**
+ * Chunked fallback for very large plans.
+ * Splits words into fixed-size chunks, aligns chunks via LCS,
+ * then runs word-level diff within each aligned chunk pair.
+ */
 function chunkedDiff(
   oldWords: string[],
   newWords: string[]
 ): { oldOps: DiffOp[]; newOps: DiffOp[] } {
-  const splitIntoParagraphs = (words: string[]) => {
-    const paragraphs: { start: number; end: number; text: string }[] = [];
-    let start = 0;
-    let accum = "";
-    for (let i = 0; i < words.length; i++) {
-      accum += words[i];
-      if (words[i].includes("\n\n") || i === words.length - 1) {
-        paragraphs.push({ start, end: i + 1, text: accum });
-        start = i + 1;
-        accum = "";
-      }
+  const CHUNK_SIZE = 200;
+
+  const splitIntoChunks = (words: string[]) => {
+    const chunks: { start: number; end: number; text: string }[] = [];
+    for (let i = 0; i < words.length; i += CHUNK_SIZE) {
+      const end = Math.min(i + CHUNK_SIZE, words.length);
+      chunks.push({ start: i, end, text: words.slice(i, end).join("") });
     }
-    return paragraphs;
+    return chunks;
   };
 
-  const oldParas = splitIntoParagraphs(oldWords);
-  const newParas = splitIntoParagraphs(newWords);
+  const oldChunks = splitIntoChunks(oldWords);
+  const newChunks = splitIntoChunks(newWords);
 
-  const oldTexts = oldParas.map((p) => p.text);
-  const newTexts = newParas.map((p) => p.text);
-  const paraLCS = computeLCS(oldTexts, newTexts);
+  const oldTexts = oldChunks.map((c) => c.text);
+  const newTexts = newChunks.map((c) => c.text);
+  const chunkLCS = computeLCS(oldTexts, newTexts);
 
   const oldOps: DiffOp[] = [];
   const newOps: DiffOp[] = [];
 
-  let opi = 0, npi = 0, pli = 0;
+  let oci = 0, nci = 0, cli = 0;
 
-  while (opi < oldParas.length || npi < newParas.length) {
+  while (oci < oldChunks.length || nci < newChunks.length) {
     if (
-      pli < paraLCS.length &&
-      opi < oldParas.length &&
-      npi < newParas.length &&
-      oldTexts[opi] === paraLCS[pli] &&
-      newTexts[npi] === paraLCS[pli]
+      cli < chunkLCS.length &&
+      oci < oldChunks.length &&
+      nci < newChunks.length &&
+      oldTexts[oci] === chunkLCS[cli] &&
+      newTexts[nci] === chunkLCS[cli]
     ) {
-      for (let i = oldParas[opi].start; i < oldParas[opi].end; i++)
+      // Identical chunks
+      for (let i = oldChunks[oci].start; i < oldChunks[oci].end; i++)
         oldOps.push({ type: "same", index: i });
-      for (let i = newParas[npi].start; i < newParas[npi].end; i++)
+      for (let i = newChunks[nci].start; i < newChunks[nci].end; i++)
         newOps.push({ type: "same", index: i });
-      opi++;
-      npi++;
-      pli++;
-    } else if (opi < oldParas.length && (pli >= paraLCS.length || oldTexts[opi] !== paraLCS[pli])) {
+      oci++;
+      nci++;
+      cli++;
+    } else if (oci < oldChunks.length && (cli >= chunkLCS.length || oldTexts[oci] !== chunkLCS[cli])) {
       if (
-        npi < newParas.length &&
-        (pli >= paraLCS.length || newTexts[npi] !== paraLCS[pli])
+        nci < newChunks.length &&
+        (cli >= chunkLCS.length || newTexts[nci] !== chunkLCS[cli])
       ) {
+        // Both sides changed — word-level diff within these chunks
         const sub = directDiff(
-          oldWords.slice(oldParas[opi].start, oldParas[opi].end),
-          newWords.slice(newParas[npi].start, newParas[npi].end)
+          oldWords.slice(oldChunks[oci].start, oldChunks[oci].end),
+          newWords.slice(newChunks[nci].start, newChunks[nci].end)
         );
         for (const op of sub.oldOps)
-          oldOps.push({ type: op.type, index: op.index + oldParas[opi].start });
+          oldOps.push({ type: op.type, index: op.index + oldChunks[oci].start });
         for (const op of sub.newOps)
-          newOps.push({ type: op.type, index: op.index + newParas[npi].start });
-        opi++;
-        npi++;
+          newOps.push({ type: op.type, index: op.index + newChunks[nci].start });
+        oci++;
+        nci++;
       } else {
-        for (let i = oldParas[opi].start; i < oldParas[opi].end; i++)
+        // Only old side — removed
+        for (let i = oldChunks[oci].start; i < oldChunks[oci].end; i++)
           oldOps.push({ type: "removed", index: i });
-        opi++;
+        oci++;
       }
-    } else if (npi < newParas.length) {
-      for (let i = newParas[npi].start; i < newParas[npi].end; i++)
+    } else if (nci < newChunks.length) {
+      // Only new side — added
+      for (let i = newChunks[nci].start; i < newChunks[nci].end; i++)
         newOps.push({ type: "added", index: i });
-      npi++;
+      nci++;
     }
   }
 
