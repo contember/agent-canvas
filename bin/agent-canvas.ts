@@ -87,7 +87,7 @@ async function handleInstall(args: string[]) {
     : join(process.cwd(), ".claude");
 
   // Install skill
-  const skillTarget = join(targetBase, "commands", "canvas");
+  const skillTarget = join(targetBase, "skills", "canvas");
   mkdirSync(skillTarget, { recursive: true });
 
   const skillSrc = join(PACKAGE_ROOT, "skills", "canvas");
