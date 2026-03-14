@@ -40,7 +40,7 @@ No test runner or linter is configured.
 
 ## Testing with Demo
 
-A demo JSX file lives at `plan.jsx` in the project root. To test UI changes:
+A demo JSX file lives at `example/plan.jsx` in the project root. To test UI changes:
 
 ```bash
 # 1. Start daemon (if not running)
@@ -50,7 +50,7 @@ bun bin/agent-canvas.ts daemon start
 bun daemon/build.ts --watch
 
 # 3. Push the demo plan
-CANVAS_SESSION_ID=planner-demo bun bin/agent-canvas.ts push plan.jsx --label "Demo"
+CANVAS_SESSION_ID=planner-demo bun bin/agent-canvas.ts push example/plan.jsx --label "Demo"
 
 # 4. Open in browser
 #    http://localhost:19400/s/planner-demo

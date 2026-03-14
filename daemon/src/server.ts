@@ -109,6 +109,11 @@ const server = Bun.serve<WSData>({
       return handleFileServe(url);
     }
 
+    // GET /api/image
+    if (path === "/api/image" && req.method === "GET") {
+      return handleImageServe(url);
+    }
+
     // GET /api/tree
     if (path === "/api/tree" && req.method === "GET") {
       return handleTreeServe(url);
@@ -323,6 +328,45 @@ async function handleFileServe(url: URL): Promise<Response> {
     const content = await file.text();
     const ext = relPath.split(".").pop() || "";
     return jsonResponse({ content, language: LANG_MAP[ext] || "text" });
+  } catch {
+    return jsonResponse({ error: "Failed to read file" }, 500);
+  }
+}
+
+const IMAGE_MIME: Record<string, string> = {
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
+  gif: "image/gif", svg: "image/svg+xml", webp: "image/webp",
+  ico: "image/x-icon", bmp: "image/bmp", avif: "image/avif",
+};
+
+async function handleImageServe(url: URL): Promise<Response> {
+  const sessionId = url.searchParams.get("session");
+  const relPath = url.searchParams.get("path");
+  if (!sessionId || !relPath) return jsonResponse({ error: "Missing session or path" }, 400);
+
+  const session = sessionManager.get(sessionId);
+  if (!session) return jsonResponse({ error: "Session not found" }, 404);
+
+  const fullPath = resolve(join(session.projectRoot, relPath));
+  if (!fullPath.startsWith(resolve(session.projectRoot))) {
+    return jsonResponse({ error: "Path traversal rejected" }, 403);
+  }
+
+  try {
+    const file = Bun.file(fullPath);
+    if (!(await file.exists())) return jsonResponse({ error: "File not found" }, 404);
+    if (file.size > 10 * 1024 * 1024) return jsonResponse({ error: "File too large" }, 413);
+
+    const ext = relPath.split(".").pop()?.toLowerCase() || "";
+    const mime = IMAGE_MIME[ext];
+    if (!mime) return jsonResponse({ error: "Unsupported image format" }, 415);
+
+    return new Response(file, {
+      headers: {
+        "Content-Type": mime,
+        "Cache-Control": "public, max-age=300",
+      },
+    });
   } catch {
     return jsonResponse({ error: "Failed to read file" }, 500);
   }

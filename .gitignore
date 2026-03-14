@@ -4,3 +4,4 @@ dist/
 ~/.planner/
 .DS_Store
 .claude/settings.local.json
+.claude/canvas

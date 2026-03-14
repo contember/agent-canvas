@@ -11,7 +11,7 @@ const COMPONENT_IMPORTS = `import React from 'react';
 import * as C from '#canvas/components';
 const { Section, Item, Task, FilePreview, CodeBlock, Callout,
         Mermaid, Table, Priority, Checklist, Note, Diff,
-        Choice, MultiChoice, UserInput, RangeInput,
+        Choice, MultiChoice, UserInput, RangeInput, ImageView,
         useFeedback, useAnnotations } = C;
 `;
 

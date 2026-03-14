@@ -7,9 +7,9 @@ import { extractContext } from "./annotationContext";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 
 /** All navigable blocks (keyboard arrows) */
-const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='choice-option'], [data-md='multichoice-option'], [data-md='userinput'], [data-md='rangeinput']";
+const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='choice-option'], [data-md='multichoice-option'], [data-md='userinput'], [data-md='rangeinput'], [data-md='image']";
 /** Blocks eligible for annotation comment icons (excludes interactive controls) */
-const ANNOTATABLE_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item']";
+const ANNOTATABLE_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='image']";
 
 interface PlanRendererProps {
   revision: number;
@@ -491,6 +491,10 @@ function getBlockSnippet(block: HTMLElement): string | null {
   if (md === "rangeinput") {
     const label = block.getAttribute("data-md-label");
     return label ? `[Range] ${label}` : null;
+  }
+  if (md === "image") {
+    const src = block.getAttribute("data-md-src");
+    return src ? `[Image] ${src}` : null;
   }
   return null;
 }
