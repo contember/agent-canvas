@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useRef, useContext, useCallback } from "react";
+import React, { useEffect, useState, useRef, useContext, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { SessionContext } from "#canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
 import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, restoreMarks } from "./highlightRange";
@@ -21,6 +22,10 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
   // Popover state
   const [editPopover, setEditPopover] = useState<{ anchorEl: HTMLElement; annId: string } | null>(null);
   const [createPopover, setCreatePopover] = useState<{ anchorEl: HTMLElement; tempId: string; snippet: string; ctx: any } | null>(null);
+
+  // Block annotation hover state
+  const [hoveredBlock, setHoveredBlock] = useState<HTMLElement | null>(null);
+  const [blockPopover, setBlockPopover] = useState<{ anchorEl: HTMLElement; snippet: string; annId?: string } | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -92,7 +97,53 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
       container.removeEventListener("mouseover", handleMouseOver);
       container.removeEventListener("mouseout", handleMouseOut);
     };
-  }, [annotations, activeAnnotationId]);
+  }, [PlanComponent, annotations, activeAnnotationId]);
+
+  // Block annotation: hover detection
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleMove = (e: MouseEvent) => {
+      // Don't change hover when a popover is open
+      if (blockPopover || createPopover || editPopover) return;
+      const target = e.target as HTMLElement;
+      // Ignore events on the block comment button itself
+      if (target.closest("[data-block-comment-btn]")) return;
+      const block = target.closest(BLOCK_SELECTOR) as HTMLElement | null;
+      if (block && container.contains(block)) {
+        setHoveredBlock(block);
+      } else {
+        setHoveredBlock(null);
+      }
+    };
+
+    const handleLeave = (e: MouseEvent) => {
+      if (blockPopover || createPopover || editPopover) return;
+      // Don't clear if moving onto the block comment button
+      const related = e.relatedTarget as HTMLElement | null;
+      if (related?.closest("[data-block-comment-btn]")) return;
+      setHoveredBlock(null);
+    };
+
+    container.addEventListener("mousemove", handleMove);
+    container.addEventListener("mouseleave", handleLeave);
+    return () => {
+      container.removeEventListener("mousemove", handleMove);
+      container.removeEventListener("mouseleave", handleLeave);
+    };
+  }, [PlanComponent, blockPopover, createPopover, editPopover]);
+
+  // Build a map of block snippets to annotation IDs for quick lookup
+  const blockAnnotationMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const ann of annotations) {
+      if (ann.snippet.startsWith("[")) {
+        map.set(ann.snippet, ann.id);
+      }
+    }
+    return map;
+  }, [annotations]);
 
   // Use document-level mouseup so selections that end outside the container still work
   useEffect(() => {
@@ -192,7 +243,227 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
           }}
         />
       )}
+
+      {/* Block annotation floating buttons */}
+      <BlockCommentButtons
+        containerRef={containerRef}
+        hoveredBlock={hoveredBlock}
+        blockPopover={blockPopover}
+        blockAnnotationMap={blockAnnotationMap}
+        activeAnnotationId={activeAnnotationId}
+        onOpen={(anchorEl, snippet, annId) => {
+          if (annId) {
+            setActiveAnnotationId(annId);
+            setBlockPopover({ anchorEl, snippet, annId });
+          } else {
+            setBlockPopover({ anchorEl, snippet });
+          }
+        }}
+      />
+
+      {/* Block annotation popover */}
+      {blockPopover && !blockPopover.annId && (
+        <AnnotationCreatePopover
+          anchorEl={blockPopover.anchorEl}
+          scrollContainer={scrollContainer}
+          snippet={blockPopover.snippet}
+          truncateAt={80}
+          onAdd={(note) => {
+            const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            addAnnotationWithId(id, blockPopover.snippet, note);
+            setBlockPopover(null);
+          }}
+          onCancel={() => setBlockPopover(null)}
+        />
+      )}
+      {blockPopover?.annId && (() => {
+        const ann = annotations.find((a) => a.id === blockPopover.annId);
+        if (!ann) return null;
+        return (
+          <AnnotationEditPopover
+            anchorEl={blockPopover.anchorEl}
+            scrollContainer={scrollContainer}
+            initialNote={ann.note}
+            onUpdate={(note) => updateAnnotation(blockPopover.annId!, note)}
+            onDelete={() => { removeAnnotation(blockPopover.annId!); setActiveAnnotationId(null); setBlockPopover(null); }}
+            onClose={() => setBlockPopover(null)}
+          />
+        );
+      })()}
     </>
+  );
+}
+
+/** Extract a snippet identifier for a block element */
+function getBlockSnippet(block: HTMLElement): string | null {
+  const md = block.getAttribute("data-md");
+  if (md === "item") {
+    const label = block.getAttribute("data-md-label");
+    return label ? `[Item] ${label}` : null;
+  }
+  if (md === "section") {
+    const title = block.getAttribute("data-md-title");
+    return title ? `[Section] ${title}` : null;
+  }
+  if (md === "callout") {
+    const type = block.getAttribute("data-md-type") || "info";
+    const text = block.textContent?.trim().slice(0, 60) || "Callout";
+    return `[Callout:${type}] ${text}`;
+  }
+  if (md === "note") {
+    const text = block.textContent?.trim().slice(0, 60) || "Note";
+    return `[Note] ${text}`;
+  }
+  // Table row
+  if (block.tagName === "TR") {
+    const cells = Array.from(block.querySelectorAll("td")).map((td) => td.textContent?.trim()).filter(Boolean);
+    return cells.length ? `[Row] ${cells.join(" | ")}` : null;
+  }
+  return null;
+}
+
+const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note']";
+
+/** Renders comment icons: always visible on annotated blocks, on hover for others */
+function BlockCommentButtons({
+  containerRef,
+  hoveredBlock,
+  blockPopover,
+  blockAnnotationMap,
+  activeAnnotationId,
+  onOpen,
+}: {
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  hoveredBlock: HTMLElement | null;
+  blockPopover: { anchorEl: HTMLElement; snippet: string; annId?: string } | null;
+  blockAnnotationMap: Map<string, string>;
+  activeAnnotationId: string | null;
+  onOpen: (anchorEl: HTMLElement, snippet: string, annId?: string) => void;
+}) {
+  // Find all blocks that have annotations
+  const [annotatedBlocks, setAnnotatedBlocks] = useState<HTMLElement[]>([]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || blockAnnotationMap.size === 0) { setAnnotatedBlocks([]); return; }
+    const blocks: HTMLElement[] = [];
+    for (const el of container.querySelectorAll(BLOCK_SELECTOR)) {
+      const snippet = getBlockSnippet(el as HTMLElement);
+      if (snippet && blockAnnotationMap.has(snippet)) {
+        blocks.push(el as HTMLElement);
+      }
+    }
+    setAnnotatedBlocks(blocks);
+  }, [blockAnnotationMap, containerRef.current]);
+
+  // Also highlight block when its annotation is active from sidebar hover
+  const [activeBlock, setActiveBlock] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!activeAnnotationId || !containerRef.current) { setActiveBlock(null); return; }
+    // Find block matching active annotation
+    for (const el of containerRef.current.querySelectorAll(BLOCK_SELECTOR)) {
+      const snippet = getBlockSnippet(el as HTMLElement);
+      if (snippet && blockAnnotationMap.get(snippet) === activeAnnotationId) {
+        setActiveBlock(el as HTMLElement);
+        return;
+      }
+    }
+    setActiveBlock(null);
+  }, [activeAnnotationId, blockAnnotationMap]);
+
+  // Apply highlight style to active block
+  useEffect(() => {
+    if (!activeBlock) return;
+    activeBlock.style.outline = "2px solid var(--color-highlight-annotation)";
+    activeBlock.style.outlineOffset = "-2px";
+    activeBlock.style.borderRadius = "8px";
+    return () => {
+      activeBlock.style.outline = "";
+      activeBlock.style.outlineOffset = "";
+      activeBlock.style.borderRadius = "";
+    };
+  }, [activeBlock]);
+
+  // Collect all blocks that need a button: annotated + hovered + popover target
+  const targets = useMemo(() => {
+    const set = new Set<HTMLElement>(annotatedBlocks);
+    if (hoveredBlock) set.add(hoveredBlock);
+    if (blockPopover?.anchorEl) set.add(blockPopover.anchorEl);
+    return Array.from(set);
+  }, [annotatedBlocks, hoveredBlock, blockPopover]);
+
+  return (
+    <>
+      {targets.map((block) => (
+        <BlockCommentIcon
+          key={block.getAttribute("data-task-id") || block.getAttribute("data-md-title") || block.textContent?.slice(0, 30) || "block"}
+          block={block}
+          isHovered={block === hoveredBlock || block === blockPopover?.anchorEl}
+          blockAnnotationMap={blockAnnotationMap}
+          activeAnnotationId={activeAnnotationId}
+          onOpen={onOpen}
+        />
+      ))}
+    </>
+  );
+}
+
+function BlockCommentIcon({
+  block,
+  isHovered,
+  blockAnnotationMap,
+  activeAnnotationId,
+  onOpen,
+}: {
+  block: HTMLElement;
+  isHovered: boolean;
+  blockAnnotationMap: Map<string, string>;
+  activeAnnotationId: string | null;
+  onOpen: (anchorEl: HTMLElement, snippet: string, annId?: string) => void;
+}) {
+  // Ensure block has relative positioning
+  useEffect(() => {
+    const prev = block.style.position;
+    if (!prev || prev === "static") {
+      block.style.position = "relative";
+    }
+    return () => {
+      if (!prev || prev === "static") {
+        block.style.position = prev;
+      }
+    };
+  }, [block]);
+
+  const snippet = getBlockSnippet(block);
+  if (!snippet) return null;
+
+  const existingAnnId = blockAnnotationMap.get(snippet);
+  const hasAnnotation = !!existingAnnId;
+  const isActive = existingAnnId === activeAnnotationId;
+
+  return createPortal(
+    <button
+      data-block-comment-btn
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen(block, snippet, existingAnnId);
+      }}
+      className={`absolute top-1 right-1 z-10 w-6 h-6 flex items-center justify-center rounded transition-all duration-150 ${
+        hasAnnotation
+          ? isActive
+            ? "text-accent-amber bg-accent-amber-muted"
+            : "text-accent-amber opacity-60 hover:opacity-100"
+          : isHovered
+            ? "text-text-disabled hover:text-text-tertiary opacity-50 hover:opacity-100"
+            : "opacity-0 pointer-events-none"
+      }`}
+      title={hasAnnotation ? "Edit annotation" : "Add annotation"}
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill={hasAnnotation ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+    </button>,
+    block,
   );
 }
 
