@@ -7,7 +7,7 @@ import { FileIcon } from "./FileIcon";
 interface TreeEntry { name: string; type: "file" | "dir"; }
 interface DirState { entries: TreeEntry[]; expanded: boolean; loaded: boolean; }
 
-export function FileBrowser() {
+export function FileBrowser({ embedded }: { embedded?: boolean } = {}) {
   const sessionId = useContext(SessionContext);
   const { annotations, addAnnotation } = useAnnotations();
   const { setActiveView } = useContext(ActiveViewContext);
@@ -126,9 +126,33 @@ export function FileBrowser() {
     });
   };
 
+  if (embedded) {
+    return (
+      <>
+        <div className="flex items-center justify-between px-4 pt-3 pb-2 flex-shrink-0">
+          <span className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary font-body">Files</span>
+        </div>
+        <div className="flex-1 overflow-y-auto">{renderTree("")}</div>
+        {annotatedFiles.length > 0 && (
+          <div className="border-t border-border-subtle px-4 py-3 flex-shrink-0">
+            <div className="text-[10px] uppercase tracking-widest text-text-tertiary font-body mb-1.5">Referenced</div>
+            {annotatedFiles.map((f) => (
+              <div key={f} onClick={() => openFile(f)} className="flex items-center justify-between text-[12px] font-body text-text-secondary hover:text-text-primary cursor-pointer py-0.5">
+                <span className="truncate">{f.split("/").pop()}</span>
+                <span className="text-[10px] font-medium bg-badge-bg text-accent-amber px-1.5 py-px rounded-full min-w-[18px] text-center flex-shrink-0 ml-1">
+                  {getAnnCount(f)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </>
+    );
+  }
+
   if (collapsed) {
     return (
-      <div className="w-8 border-r border-border-subtle bg-bg-surface flex flex-col items-center flex-shrink-0">
+      <div className="hidden lg:flex w-8 border-r border-border-subtle bg-bg-surface flex-col items-center flex-shrink-0">
         <button onClick={() => setCollapsed(false)} className="mt-3 p-1 text-text-tertiary hover:text-text-secondary transition-colors">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
@@ -137,7 +161,7 @@ export function FileBrowser() {
   }
 
   return (
-    <div className="w-60 border-r border-border-subtle bg-bg-surface flex flex-col flex-shrink-0 overflow-hidden">
+    <div className="hidden lg:flex w-60 border-r border-border-subtle bg-bg-surface flex-col flex-shrink-0 overflow-hidden">
       <div className="flex items-center justify-between px-4 pt-4 pb-3 flex-shrink-0">
         <span className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary font-body">Files</span>
         <button onClick={() => setCollapsed(true)} className="text-text-tertiary hover:text-text-secondary transition-colors p-0.5">

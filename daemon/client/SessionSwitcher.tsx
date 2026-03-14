@@ -61,7 +61,7 @@ export function SessionSwitcher({ currentSessionId }: SessionSwitcherProps) {
               href={`/s/${s.id}`}
               className="flex items-center gap-2.5 px-4 py-2.5 text-body font-body text-text-secondary hover:bg-bg-surface hover:text-text-primary transition-colors"
             >
-              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.version > 0 ? "bg-accent-green" : "bg-border-hover"}`} />
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.currentRevision > 0 ? "bg-accent-green" : "bg-border-hover"}`} />
               <span className="truncate">{s.id}</span>
             </a>
           ))}

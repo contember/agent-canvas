@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { AnnotationCtx } from "@planner/runtime";
 import type { Annotation, AnnotationContext, PlanResponse, AnnotationContextValue } from "@planner/runtime";
 
@@ -6,11 +6,88 @@ import type { Annotation, AnnotationContext, PlanResponse, AnnotationContextValu
 export type { Annotation, AnnotationContext, PlanResponse, AnnotationContextValue };
 export { useAnnotations } from "@planner/runtime";
 
-export function AnnotationProvider({ children }: { children: React.ReactNode }) {
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [generalNote, setGeneralNote] = useState("");
+interface AnnotationProviderProps {
+  sessionId: string;
+  revision: number;
+  isReadOnly: boolean;
+  children: React.ReactNode;
+}
+
+interface PersistedState {
+  annotations: Annotation[];
+  generalNote: string;
+  responses: [string, PlanResponse][];
+}
+
+function storageKey(sessionId: string, revision: number): string {
+  return `planner:${sessionId}:rev:${revision}`;
+}
+
+function loadPersisted(sessionId: string, revision: number): PersistedState | null {
+  try {
+    const raw = localStorage.getItem(storageKey(sessionId, revision));
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function savePersisted(sessionId: string, revision: number, state: PersistedState) {
+  try {
+    localStorage.setItem(storageKey(sessionId, revision), JSON.stringify(state));
+  } catch {}
+}
+
+function clearPersisted(sessionId: string, revision: number) {
+  try {
+    localStorage.removeItem(storageKey(sessionId, revision));
+  } catch {}
+}
+
+export function AnnotationProvider({ sessionId, revision, isReadOnly, children }: AnnotationProviderProps) {
+  const prevKeyRef = useRef(`${sessionId}:${revision}`);
+  const [annotations, setAnnotations] = useState<Annotation[]>(() => {
+    const saved = loadPersisted(sessionId, revision);
+    return saved?.annotations ?? [];
+  });
+  const [generalNote, setGeneralNote] = useState(() => {
+    const saved = loadPersisted(sessionId, revision);
+    return saved?.generalNote ?? "";
+  });
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
-  const [responses, setResponses] = useState<Map<string, PlanResponse>>(new Map());
+  const [responses, setResponses] = useState<Map<string, PlanResponse>>(() => {
+    const saved = loadPersisted(sessionId, revision);
+    return saved?.responses ? new Map(saved.responses) : new Map();
+  });
+
+  // Reset state when session/revision changes
+  useEffect(() => {
+    const key = `${sessionId}:${revision}`;
+    if (key === prevKeyRef.current) return;
+    prevKeyRef.current = key;
+
+    const saved = loadPersisted(sessionId, revision);
+    setAnnotations(saved?.annotations ?? []);
+    setGeneralNote(saved?.generalNote ?? "");
+    setResponses(saved?.responses ? new Map(saved.responses) : new Map());
+    setActiveAnnotationId(null);
+  }, [sessionId, revision]);
+
+  // Persist to localStorage (debounced)
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (isReadOnly) return;
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = setTimeout(() => {
+      savePersisted(sessionId, revision, {
+        annotations,
+        generalNote,
+        responses: Array.from(responses.entries()),
+      });
+    }, 300);
+    return () => { if (persistTimerRef.current) clearTimeout(persistTimerRef.current); };
+  }, [annotations, generalNote, responses, sessionId, revision, isReadOnly]);
 
   const addAnnotationWithId = useCallback((id: string, snippet: string, note: string, filePath?: string, context?: AnnotationContext) => {
     setAnnotations((prev) => [...prev, { id, snippet, note, createdAt: new Date().toISOString(), filePath, context }]);
@@ -47,7 +124,8 @@ export function AnnotationProvider({ children }: { children: React.ReactNode }) 
     setGeneralNote("");
     setActiveAnnotationId(null);
     setResponses(new Map());
-  }, []);
+    clearPersisted(sessionId, revision);
+  }, [sessionId, revision]);
 
   return (
     <AnnotationCtx.Provider

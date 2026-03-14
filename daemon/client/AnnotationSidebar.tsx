@@ -1,7 +1,10 @@
-import React, { useRef, useEffect, useCallback, useState } from "react";
+import React, { useRef, useEffect, useCallback, useState, useContext } from "react";
 import { useAnnotations, Annotation } from "./AnnotationProvider";
 import { setMarkActive } from "./highlightRange";
 import { generateMarkdown, hasValue, getMissingRequired } from "./generateMarkdown";
+import { RevisionContext } from "./App";
+import { SessionContext } from "@planner/runtime";
+import { MarkdownPreview } from "./ResponsePreview";
 
 interface AnnotationSidebarProps {
   onPreview: () => void;
@@ -9,6 +12,60 @@ interface AnnotationSidebarProps {
 }
 
 export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProps) {
+  const { isReadOnly, selectedRevision, currentRevision, revisions } = useContext(RevisionContext);
+  const sessionId = useContext(SessionContext);
+  const isCurrentButSubmitted = isReadOnly && selectedRevision === currentRevision;
+  const selectedRevInfo = revisions.find((r) => r.revision === selectedRevision);
+  const roundLabel = selectedRevInfo?.label || `Round ${selectedRevision}`;
+
+  if (isReadOnly) {
+    return <FeedbackDisplay sessionId={sessionId} revision={selectedRevision} label={roundLabel} waitingForUpdate={isCurrentButSubmitted} />;
+  }
+
+  return <AnnotationSidebarInner onPreview={onPreview} onSubmit={onSubmit} />;
+}
+
+function FeedbackDisplay({ sessionId, revision, label, waitingForUpdate }: { sessionId: string; revision: number; label: string; waitingForUpdate?: boolean }) {
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/session/${sessionId}/revision/${revision}/feedback`)
+      .then((r) => r.json())
+      .then((data: any) => { setFeedback(data.feedback || null); setLoading(false); })
+      .catch(() => { setFeedback(null); setLoading(false); });
+  }, [sessionId, revision]);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-4 py-3 flex-shrink-0">
+        <span className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary font-body">
+          {waitingForUpdate ? "Feedback sent" : `Feedback — ${label}`}
+        </span>
+      </div>
+
+      {waitingForUpdate && (
+        <div className="mx-4 mb-3 px-3 py-2.5 rounded-lg bg-accent-green-muted flex items-center gap-2 flex-shrink-0">
+          <span className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />
+          <span className="text-[12px] font-body text-accent-green">Waiting for next revision...</span>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto px-4">
+        {loading ? (
+          <p className="text-[12px] text-text-tertiary font-body py-4">Loading...</p>
+        ) : feedback ? (
+          <MarkdownPreview text={feedback} />
+        ) : (
+          <p className="text-[12px] text-text-tertiary font-body py-4">No feedback was submitted for this revision.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AnnotationSidebarInner({ onPreview, onSubmit }: AnnotationSidebarProps) {
   const {
     annotations, updateAnnotation, removeAnnotation,
     generalNote, setGeneralNote,

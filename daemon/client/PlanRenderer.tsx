@@ -6,10 +6,10 @@ import { extractContext } from "./annotationContext";
 import { getPopoverPosition } from "./popoverPosition";
 
 interface PlanRendererProps {
-  version: number;
+  revision: number;
 }
 
-export function PlanRenderer({ version }: PlanRendererProps) {
+export function PlanRenderer({ revision }: PlanRendererProps) {
   const sessionId = useContext(SessionContext);
   const [PlanComponent, setPlanComponent] = useState<React.ComponentType | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -21,10 +21,10 @@ export function PlanRenderer({ version }: PlanRendererProps) {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    import(`/api/session/${sessionId}/plan.js?v=${version}&t=${Date.now()}`)
+    import(`/api/session/${sessionId}/plan.js?rev=${revision}&t=${Date.now()}`)
       .then((mod) => { setPlanComponent(() => mod.default); setLoading(false); })
       .catch((e) => { setError(e.message); setLoading(false); });
-  }, [sessionId, version]);
+  }, [sessionId, revision]);
 
   // Update mark active states when activeAnnotationId changes
   useEffect(() => {

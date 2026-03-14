@@ -124,6 +124,12 @@ export function FileViewer({ path }: FileViewerProps) {
     return () => document.removeEventListener("mouseup", handler);
   }, []);
 
+  // Use refs so the document-level mouseup always has current values
+  const pathRef = useRef(path);
+  pathRef.current = path;
+  const addAnnotationRef = useRef(addAnnotationWithId);
+  addAnnotationRef.current = addAnnotationWithId;
+
   const handleMouseUp = useCallback(() => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
@@ -142,6 +148,7 @@ export function FileViewer({ path }: FileViewerProps) {
     const lastMark = marks[marks.length - 1] as HTMLElement | undefined;
     if (!lastMark) return;
 
+    const currentPath = pathRef.current;
     pendingSnippetRef.current = snippet;
     setPendingMarkId(tempId);
 
@@ -149,7 +156,7 @@ export function FileViewer({ path }: FileViewerProps) {
     showFileAnnotationPopover(lastMark, tempId, snippet, scrollContainer, (note) => {
       const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       renameMarkId(tempId, id);
-      addAnnotationWithId(id, snippet, note, path);
+      addAnnotationRef.current(id, snippet, note, currentPath);
       setPendingMarkId(null);
     }, () => {
       unwrapMarks(tempId);
@@ -192,24 +199,9 @@ export function FileViewer({ path }: FileViewerProps) {
   };
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Info bar */}
-      <div className="flex items-center justify-between px-5 py-2.5 border-b border-border-subtle bg-bg-surface flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <span className="text-[12px] text-text-tertiary font-body">{lines.length} lines</span>
-          {fileAnns.length > 0 && <span className="text-[12px] text-accent-amber font-body">{fileAnns.length} annotation{fileAnns.length !== 1 ? "s" : ""}</span>}
-        </div>
-        <button
-          onClick={addWholeFileWithPopup}
-          className="flex items-center gap-1.5 text-[12px] font-medium font-body text-text-secondary hover:text-text-primary px-3 py-1.5 rounded-md bg-bg-input hover:bg-border-medium border border-border-subtle hover:border-border-hover transition-all"
-        >
-          <span className="text-[14px] leading-none">+</span>
-          Add to context
-        </button>
-      </div>
-
+    <div>
       {/* Code */}
-      <pre ref={contentRef} className="flex-1 overflow-auto text-code font-mono text-text-code bg-bg-base select-text cursor-text py-3 hljs">
+      <pre ref={contentRef} className="text-code font-mono text-text-code bg-bg-base select-text cursor-text py-3 hljs">
         {lines.map((line, i) => (
           <div key={i} className="flex hover:bg-bg-elevated-half px-5">
             <span className="text-text-tertiary opacity-40 select-none w-10 text-right pr-4 shrink-0 py-px text-[12px]">{i + 1}</span>
