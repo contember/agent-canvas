@@ -12,7 +12,7 @@ const config = {
 
 export function Priority({ level }: PriorityProps) {
   return (
-    <span className={`inline text-tiny font-medium font-body px-1.5 py-0.5 rounded ${config[level]}`}>
+    <span className={`inline text-tiny font-medium font-body ml-2 px-1.5 py-0.5 rounded ${config[level]}`}>
       {level}
     </span>
   );
