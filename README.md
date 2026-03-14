@@ -34,9 +34,9 @@ This installs:
 Once installed, Claude will automatically use canvases when appropriate. You can also ask explicitly:
 
 ```
-> Plan the authentication refactor using /canvas
-> Show me an architecture overview as a canvas
-> Review this PR on a canvas
+> /canvas Plan the authentication refactor
+> /canvas Show me an architecture overview
+> /canvas Review this PR
 ```
 
 Claude creates a JSX document, pushes it to a local daemon, and opens it in your browser at `http://localhost:19400/s/<session-id>`.
