@@ -6,7 +6,7 @@ import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, rest
 import { extractContext } from "./annotationContext";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 
-const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note']";
+const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='choice-option'], [data-md='multichoice-option'], [data-md='userinput'], [data-md='rangeinput']";
 
 interface PlanRendererProps {
   revision: number;
@@ -29,9 +29,14 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
   const [hoveredBlock, setHoveredBlock] = useState<HTMLElement | null>(null);
   const [blockPopover, setBlockPopover] = useState<{ anchorEl: HTMLElement; snippet: string; annId?: string } | null>(null);
 
+  // Keyboard navigation state
+  const [focusedBlockIndex, setFocusedBlockIndex] = useState<number | null>(null);
+  const [keyboardNav, setKeyboardNav] = useState(false);
+
   useEffect(() => {
     setLoading(true);
     setError(null);
+    setFocusedBlockIndex(null);
     import(`/api/session/${sessionId}/plan.js?rev=${revision}&t=${Date.now()}`)
       .then((mod) => { setPlanComponent(() => mod.default); setLoading(false); })
       .catch((e) => { setError(e.message); setLoading(false); });
@@ -123,8 +128,13 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
       const target = e.target as HTMLElement;
       // Ignore events on the block comment button itself
       if (target.closest("[data-block-comment-btn]")) return;
+      setKeyboardNav(false);
       const block = target.closest(BLOCK_SELECTOR) as HTMLElement | null;
       if (block && container.contains(block)) {
+        // Track mouse position for keyboard nav continuity
+        const blocks = getOrderedBlocks(container);
+        const idx = blocks.indexOf(block);
+        setFocusedBlockIndex(idx >= 0 ? idx : null);
         setHoveredBlock(block);
         // Activate annotation in sidebar if this block has one
         const snippet = getBlockSnippet(block);
@@ -153,6 +163,104 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
       container.removeEventListener("mouseleave", handleLeave);
     };
   }, [PlanComponent, blockPopover, createPopover, editPopover, blockAnnotationMap, activeAnnotationId]);
+
+  // Keyboard navigation: document-level key listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Guard: skip if input/textarea focused or popover open
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
+      if (blockPopover || createPopover || editPopover) return;
+
+      const container = containerRef.current;
+      if (!container) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setKeyboardNav(true);
+        const blocks = getOrderedBlocks(container);
+        if (blocks.length === 0) return;
+        setFocusedBlockIndex((prev) => {
+          if (prev === null) return 0;
+          return Math.min(prev + 1, blocks.length - 1);
+        });
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setKeyboardNav(true);
+        const blocks = getOrderedBlocks(container);
+        if (blocks.length === 0) return;
+        setFocusedBlockIndex((prev) => {
+          if (prev === null) return blocks.length - 1;
+          return Math.max(prev - 1, 0);
+        });
+      } else if (e.key === "a" || e.key === "A") {
+        if (focusedBlockIndex === null || !container) return;
+        e.preventDefault();
+        const blocks = getOrderedBlocks(container);
+        const block = blocks[focusedBlockIndex];
+        if (!block) return;
+        const snippet = getBlockSnippet(block);
+        if (!snippet) return;
+        const existingAnnId = blockAnnotationMap.get(snippet);
+        if (existingAnnId) {
+          setActiveAnnotationId(existingAnnId);
+          setBlockPopover({ anchorEl: block, snippet, annId: existingAnnId });
+        } else {
+          setBlockPopover({ anchorEl: block, snippet });
+        }
+      } else if (e.key === " " || e.key === "Enter") {
+        if (focusedBlockIndex === null) return;
+        const blocks = getOrderedBlocks(container);
+        const block = blocks[focusedBlockIndex];
+        if (!block) return;
+        const md = block.getAttribute("data-md");
+        if (md === "choice-option" || md === "multichoice-option") {
+          e.preventDefault();
+          block.click();
+        } else if (md === "userinput") {
+          e.preventDefault();
+          const textarea = block.querySelector("textarea");
+          if (textarea) textarea.focus();
+        } else if (md === "rangeinput") {
+          e.preventDefault();
+          const input = block.querySelector("input[type='range']") as HTMLInputElement | null;
+          if (input) input.focus();
+        }
+      } else if (e.key === "Escape") {
+        setFocusedBlockIndex(null);
+        setKeyboardNav(false);
+        setActiveAnnotationId(null);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [focusedBlockIndex, blockPopover, createPopover, editPopover, blockAnnotationMap]);
+
+  // Keyboard navigation: visual focus outline + scroll into view + sidebar sync
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || focusedBlockIndex === null || !keyboardNav) return;
+    const blocks = getOrderedBlocks(container);
+    const block = blocks[focusedBlockIndex];
+    if (!block) return;
+
+    block.style.outline = "2px solid var(--color-accent-blue)";
+    block.style.outlineOffset = "-2px";
+    block.style.borderRadius = "8px";
+    block.scrollIntoView({ block: "nearest", behavior: "smooth" });
+
+    // Sync sidebar if block has an annotation
+    const snippet = getBlockSnippet(block);
+    const annId = snippet ? blockAnnotationMap.get(snippet) : undefined;
+    if (annId) setActiveAnnotationId(annId);
+
+    return () => {
+      block.style.outline = "";
+      block.style.outlineOffset = "";
+      block.style.borderRadius = "";
+    };
+  }, [focusedBlockIndex, keyboardNav, blockAnnotationMap]);
 
   // Use document-level mouseup so selections that end outside the container still work
   useEffect(() => {
@@ -261,6 +369,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
       <BlockCommentButtons
         containerRef={containerRef}
         hoveredBlock={hoveredBlock}
+        focusedBlockIndex={focusedBlockIndex}
         blockPopover={blockPopover}
         blockAnnotationMap={blockAnnotationMap}
         activeAnnotationId={activeAnnotationId}
@@ -307,6 +416,11 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
   );
 }
 
+/** Get all navigable blocks in DOM order */
+function getOrderedBlocks(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll(BLOCK_SELECTOR)) as HTMLElement[];
+}
+
 /** Extract a snippet identifier for a block element */
 function getBlockSnippet(block: HTMLElement): string | null {
   const md = block.getAttribute("data-md");
@@ -332,6 +446,22 @@ function getBlockSnippet(block: HTMLElement): string | null {
     const cells = Array.from(block.querySelectorAll("td")).map((td) => td.textContent?.trim()).filter(Boolean);
     return cells.length ? `[Row] ${cells.join(" | ")}` : null;
   }
+  if (md === "checklist-item") {
+    const label = block.getAttribute("data-md-label");
+    return label ? `[Checklist] ${label}` : null;
+  }
+  if (md === "choice-option" || md === "multichoice-option") {
+    const label = block.getAttribute("data-md-label");
+    return label ? `[Option] ${label}` : null;
+  }
+  if (md === "userinput") {
+    const label = block.getAttribute("data-md-label");
+    return label ? `[Input] ${label}` : null;
+  }
+  if (md === "rangeinput") {
+    const label = block.getAttribute("data-md-label");
+    return label ? `[Range] ${label}` : null;
+  }
   return null;
 }
 
@@ -339,6 +469,7 @@ function getBlockSnippet(block: HTMLElement): string | null {
 function BlockCommentButtons({
   containerRef,
   hoveredBlock,
+  focusedBlockIndex,
   blockPopover,
   blockAnnotationMap,
   activeAnnotationId,
@@ -346,6 +477,7 @@ function BlockCommentButtons({
 }: {
   containerRef: React.RefObject<HTMLDivElement | null>;
   hoveredBlock: HTMLElement | null;
+  focusedBlockIndex: number | null;
   blockPopover: { anchorEl: HTMLElement; snippet: string; annId?: string } | null;
   blockAnnotationMap: Map<string, string>;
   activeAnnotationId: string | null;
@@ -393,13 +525,21 @@ function BlockCommentButtons({
     };
   }, [activeBlock]);
 
-  // Collect all blocks that need a button: annotated + hovered + popover target
+  // Resolve keyboard-focused block element
+  const focusedBlock = useMemo(() => {
+    if (focusedBlockIndex === null || !containerRef.current) return null;
+    const blocks = getOrderedBlocks(containerRef.current);
+    return blocks[focusedBlockIndex] ?? null;
+  }, [focusedBlockIndex, containerRef.current]);
+
+  // Collect all blocks that need a button: annotated + hovered + focused + popover target
   const targets = useMemo(() => {
     const set = new Set<HTMLElement>(annotatedBlocks);
     if (hoveredBlock) set.add(hoveredBlock);
+    if (focusedBlock) set.add(focusedBlock);
     if (blockPopover?.anchorEl) set.add(blockPopover.anchorEl);
     return Array.from(set);
-  }, [annotatedBlocks, hoveredBlock, blockPopover]);
+  }, [annotatedBlocks, hoveredBlock, focusedBlock, blockPopover]);
 
   return (
     <>
@@ -407,7 +547,7 @@ function BlockCommentButtons({
         <BlockCommentIcon
           key={block.getAttribute("data-task-id") || block.getAttribute("data-md-title") || block.textContent?.slice(0, 30) || "block"}
           block={block}
-          isHovered={block === hoveredBlock || block === blockPopover?.anchorEl}
+          isHovered={block === hoveredBlock || block === focusedBlock || block === blockPopover?.anchorEl}
           blockAnnotationMap={blockAnnotationMap}
           activeAnnotationId={activeAnnotationId}
           onOpen={onOpen}

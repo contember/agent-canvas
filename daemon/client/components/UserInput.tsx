@@ -37,7 +37,7 @@ export function UserInput({ id, label, placeholder, multiline, required }: UserI
   const showError = current?.required && !value.trim();
 
   return (
-    <div className="-mx-4 px-4 py-3 my-1 rounded-lg transition-colors duration-150 hover:bg-bg-input">
+    <div data-md="userinput" data-md-label={label} className="-mx-4 px-4 py-3 my-1 rounded-lg transition-colors duration-150 hover:bg-bg-input">
       <div className="flex items-baseline gap-2 mb-2">
         <span className="text-[13px] font-body font-medium text-text-primary">{label}</span>
         {required && <span className="text-[10px] text-accent-red font-body">*</span>}
@@ -96,7 +96,7 @@ export function RangeInput({ id, label, min = 1, max = 10, step = 1, required, m
   const showError = current?.required && !hasValue;
 
   return (
-    <div className="-mx-4 px-4 py-3 my-1 rounded-lg transition-colors duration-150 hover:bg-bg-input">
+    <div data-md="rangeinput" data-md-label={label} className="-mx-4 px-4 py-3 my-1 rounded-lg transition-colors duration-150 hover:bg-bg-input">
       <div className="flex items-baseline justify-between mb-1">
         <div className="flex items-baseline gap-2">
           <span className="text-[13px] font-body font-medium text-text-primary">{label}</span>

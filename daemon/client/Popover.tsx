@@ -150,7 +150,10 @@ export function AnnotationEditPopover({ anchorEl, scrollContainer, initialNote, 
           e.target.style.height = "auto";
           e.target.style.height = e.target.scrollHeight + "px";
         }}
-        onKeyDown={(e) => { if (e.key === "Escape") handleClose(); }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleClose(); }
+          if (e.key === "Escape") handleClose();
+        }}
         style={{ width: "100%", background: "transparent", border: "none", color: "var(--color-text-primary)", fontFamily: "'Inter', sans-serif", fontSize: "13px", lineHeight: "1.5", resize: "none", outline: "none", overflow: "hidden" }}
       />
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "6px" }}>

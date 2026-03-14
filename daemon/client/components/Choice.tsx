@@ -30,7 +30,7 @@ export function Choice({ id, label, options, required }: ChoiceProps) {
   const showError = current?.required && !selected;
 
   return (
-    <div className="-mx-4 px-4 py-3 my-1 rounded-lg transition-colors duration-150 hover:bg-bg-input">
+    <div data-md="choice" data-md-label={label} className="-mx-4 px-4 py-3 my-1 rounded-lg transition-colors duration-150 hover:bg-bg-input">
       <div className="flex items-baseline gap-2 mb-2">
         <span className="text-[13px] font-body font-medium text-text-primary">{label}</span>
         {required && <span className="text-[10px] text-accent-red font-body">*</span>}
@@ -39,6 +39,8 @@ export function Choice({ id, label, options, required }: ChoiceProps) {
         {options.map((opt) => (
           <label
             key={opt}
+            data-md="choice-option"
+            data-md-label={opt}
             onClick={() => handleSelect(opt)}
             className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 ${
               selected === opt
@@ -92,7 +94,7 @@ export function MultiChoice({ id, label, options, required }: MultiChoiceProps) 
   const showError = current?.required && selected.length === 0;
 
   return (
-    <div className="-mx-4 px-4 py-3 my-1 rounded-lg transition-colors duration-150 hover:bg-bg-input">
+    <div data-md="multichoice" data-md-label={label} className="-mx-4 px-4 py-3 my-1 rounded-lg transition-colors duration-150 hover:bg-bg-input">
       <div className="flex items-baseline gap-2 mb-2">
         <span className="text-[13px] font-body font-medium text-text-primary">{label}</span>
         {required && <span className="text-[10px] text-accent-red font-body">*</span>}
@@ -103,6 +105,8 @@ export function MultiChoice({ id, label, options, required }: MultiChoiceProps) 
           return (
             <label
               key={opt}
+              data-md="multichoice-option"
+              data-md-label={opt}
               onClick={() => toggle(opt)}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 ${
                 checked ? "bg-highlight-selected" : "hover:bg-bg-elevated"
