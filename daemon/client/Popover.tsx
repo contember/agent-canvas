@@ -199,7 +199,7 @@ export function AnnotationCreatePopover({ anchorEl, scrollContainer, snippet, tr
                 return (
                   <div
                     key={s}
-                    onMouseDown={(e) => { e.preventDefault(); applySuggestion(s); }}
+                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); applySuggestion(s); }}
                     onMouseEnter={() => setSelectedIdx(flatIdx)}
                     style={{
                       padding: "3px 6px",
