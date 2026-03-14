@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useContext, useCallback, useRef, useMemo } from "react";
 import { SessionContext } from "#canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
-import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks } from "./highlightRange";
+import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, restoreMarks } from "./highlightRange";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 
 interface FileViewerProps {
@@ -39,6 +39,17 @@ export function FileViewer({ path }: FileViewerProps) {
       .finally(() => setLoading(false));
   }, [sessionId, path]);
 
+  // Restore persisted annotation marks after file content renders
+  useEffect(() => {
+    if (!content || !contentRef.current) return;
+    const timer = setTimeout(() => {
+      if (contentRef.current) {
+        restoreMarks(contentRef.current, fileAnns);
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [content, path]);
+
   // Update mark active states
   useEffect(() => { updateAllMarkStates(activeAnnotationId); }, [activeAnnotationId]);
 
@@ -74,7 +85,7 @@ export function FileViewer({ path }: FileViewerProps) {
       container.removeEventListener("mouseover", handleMouseOver);
       container.removeEventListener("mouseout", handleMouseOut);
     };
-  }, [annotations, activeAnnotationId]);
+  }, [content, annotations, activeAnnotationId]);
 
   useEffect(() => {
     const handler = () => handleMouseUp();

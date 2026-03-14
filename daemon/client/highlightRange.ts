@@ -129,7 +129,7 @@ export function restoreMarks(
 ) {
   // Only restore plan annotations (no filePath), skip already-marked ones
   const toRestore = annotations.filter(
-    (a) => !a.filePath && !document.querySelector(`[data-annotation-id="${a.id}"]`)
+    (a) => !document.querySelector(`[data-annotation-id="${a.id}"]`)
   );
   if (!toRestore.length) return;
 
