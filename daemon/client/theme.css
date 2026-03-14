@@ -1,0 +1,66 @@
+@theme {
+  /* Colors — initial values, overridden by [data-theme] in styles.css */
+  --color-bg-base: #1a1a1a;
+  --color-bg-surface: #1e1e1e;
+  --color-bg-elevated: #242424;
+  --color-bg-code: #1c1c1c;
+  --color-bg-input: rgba(255, 248, 240, 0.03);
+  --color-bg-elevated-half: rgba(36, 36, 36, 0.5);
+
+  --color-text-primary: #e8e4df;
+  --color-text-secondary: #a09a92;
+  --color-text-tertiary: #847d75;
+  --color-text-code: #c4beb7;
+  --color-text-disabled: #3a3530;
+  --color-text-inverse: #1a1a1a;
+
+  --color-border-subtle: rgba(255, 248, 240, 0.06);
+  --color-border-medium: rgba(255, 248, 240, 0.08);
+  --color-border-hover: rgba(255, 248, 240, 0.12);
+  --color-border-strong: rgba(255, 248, 240, 0.15);
+
+  --color-accent-green: #4a9e6d;
+  --color-accent-green-muted: rgba(74, 158, 109, 0.12);
+  --color-accent-amber: #c49a3a;
+  --color-accent-amber-muted: rgba(196, 154, 58, 0.12);
+  --color-accent-red: #c45a5a;
+  --color-accent-red-muted: rgba(196, 90, 90, 0.12);
+  --color-accent-blue: #5a8ec4;
+  --color-accent-blue-muted: rgba(90, 142, 196, 0.10);
+
+  --color-highlight-bg: rgba(255, 220, 100, 0.15);
+  --color-highlight-border: rgba(255, 220, 100, 0.35);
+  --color-highlight-annotation: rgba(255, 220, 100, 0.08);
+  --color-highlight-active: rgba(255, 220, 100, 0.25);
+  --color-highlight-selected: rgba(255, 220, 100, 0.10);
+
+  --color-badge-bg: rgba(196, 154, 58, 0.20);
+  --color-btn-primary: #e8e4df;
+  --color-btn-primary-text: #1a1a1a;
+
+  /* Fonts */
+  --font-heading: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+
+  /* Font sizes */
+  --text-section: 1.75rem;
+  --text-section--line-height: 1.25;
+  --text-section--letter-spacing: -0.01em;
+  --text-task-label: 0.9375rem;
+  --text-task-label--line-height: 1.4;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.65;
+  --text-code: 0.8125rem;
+  --text-code--line-height: 1.6;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1.4;
+  --text-meta--letter-spacing: 0.02em;
+  --text-tiny: 0.6875rem;
+  --text-tiny--line-height: 1.4;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px var(--color-shadow);
+  --shadow-md: 0 4px 12px var(--color-shadow);
+  --shadow-lg: 0 8px 24px var(--color-shadow);
+}

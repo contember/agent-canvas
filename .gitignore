@@ -3,3 +3,4 @@ dist/
 *.compiled.js
 ~/.planner/
 .DS_Store
+.claude/settings.local.json

@@ -1,4 +1,4 @@
-import { mkdirSync, cpSync, writeFileSync, existsSync, watch as fsWatch } from "fs";
+import { mkdirSync, cpSync, writeFileSync, readFileSync, existsSync, watch as fsWatch } from "fs";
 import { join, dirname } from "path";
 import { $ } from "bun";
 
@@ -64,7 +64,10 @@ async function build() {
   console.log("  Building CSS...");
   await $`cd ${ROOT} && npx @tailwindcss/cli -i client/styles.css -o dist/client.css --minify`.quiet();
 
-  // 5. Create React shims for import maps
+  // 5. Read theme.css to inline into HTML for browser Tailwind runtime
+  const themeCss = readFileSync(join(ROOT, "client/theme.css"), "utf-8");
+
+  // 6. Create React shims for import maps
   // These re-export from the global React loaded via UMD
   console.log("  Creating React shims...");
 
@@ -78,6 +81,10 @@ async function build() {
   <script>document.documentElement.dataset.theme = localStorage.getItem('canvas-theme') || 'dark';</script>
   <link rel="stylesheet" href="/assets/client.css" />
   <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark-dimmed.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style type="text/tailwindcss">
+${themeCss}
+  </style>
 </head>
 <body class="min-h-screen">
   <div id="root"></div>

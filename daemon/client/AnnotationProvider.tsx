@@ -125,6 +125,10 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
 
   const setFeedbackEntry = useCallback((id: string, entry: FeedbackEntry) => {
     setFeedbackEntries((prev) => {
+      const existing = prev.get(id);
+      if (existing && existing.markdown === entry.markdown && existing.label === entry.label && existing.required === entry.required) {
+        return prev; // same reference → no re-render
+      }
       const next = new Map(prev);
       next.set(id, entry);
       return next;
@@ -133,6 +137,7 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
 
   const removeFeedbackEntry = useCallback((id: string) => {
     setFeedbackEntries((prev) => {
+      if (!prev.has(id)) return prev;
       const next = new Map(prev);
       next.delete(id);
       return next;

@@ -9,6 +9,7 @@ import { FileBrowser } from "./FileBrowser";
 import { FileViewer } from "./FileViewer";
 import { SessionSwitcher } from "./SessionSwitcher";
 import { exportCanvasToMarkdown } from "./exportMarkdown";
+import { CompareView } from "./CompareView";
 
 export type ActiveView = { type: "plan" } | { type: "file"; path: string };
 
@@ -37,12 +38,16 @@ export const RevisionContext = createContext<{
   revisions: RevisionInfo[];
   setSelectedRevision: (rev: number) => void;
   isReadOnly: boolean;
+  compareRevision: number | null;
+  setCompareRevision: (rev: number | null) => void;
 }>({
   currentRevision: 1,
   selectedRevision: 1,
   revisions: [],
   setSelectedRevision: () => {},
   isReadOnly: false,
+  compareRevision: null,
+  setCompareRevision: () => {},
 });
 
 function ThemeSwitcher() {
@@ -83,7 +88,7 @@ function ThemeSwitcher() {
 }
 
 function RevisionSelector() {
-  const { currentRevision, selectedRevision, revisions, setSelectedRevision } = React.useContext(RevisionContext);
+  const { currentRevision, selectedRevision, revisions, setSelectedRevision, setCompareRevision } = React.useContext(RevisionContext);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -107,7 +112,7 @@ function RevisionSelector() {
   const isLatest = selectedRevision === currentRevision;
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative flex items-center gap-1.5" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
         className={`flex items-center gap-1.5 text-[12px] font-body font-medium px-2 py-1 rounded-md transition-colors ${
@@ -120,6 +125,16 @@ function RevisionSelector() {
           <path d="M2.5 4l2.5 2.5L7.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
+
+      {!isLatest && (
+        <button
+          onClick={() => setCompareRevision(selectedRevision)}
+          className="text-[11px] font-body font-medium px-2 py-0.5 rounded-md text-accent-blue hover:bg-accent-blue-muted transition-colors"
+          title={`Compare Round ${selectedRevision} with Round ${currentRevision}`}
+        >
+          Compare
+        </button>
+      )}
 
       {open && (
         <div className="absolute top-full left-0 mt-1 w-56 bg-bg-elevated border border-border-hover rounded-lg shadow-lg z-50 py-1 overflow-hidden max-h-80 overflow-y-auto">
@@ -152,6 +167,7 @@ function App() {
   const [currentRevision, setCurrentRevision] = useState(1);
   const [selectedRevision, setSelectedRevision] = useState(1);
   const [revisions, setRevisions] = useState<RevisionInfo[]>([]);
+  const [compareRevision, setCompareRevision] = useState<number | null>(null);
   const [connected, setConnected] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [activeView, setActiveViewRaw] = useState<ActiveView>({ type: "plan" });
@@ -207,6 +223,7 @@ function App() {
           if (data.type === "plan-updated") {
             setCurrentRevision(data.currentRevision);
             setSelectedRevision(data.currentRevision);
+            setCompareRevision(null);
             if (data.revisions) setRevisions(data.revisions);
           }
           if (data.type === "revision-updated") {
@@ -234,19 +251,31 @@ function App() {
 
   return (
     <SessionContext.Provider value={sessionId}>
-      <RevisionContext.Provider value={{ currentRevision, selectedRevision, revisions, setSelectedRevision, isReadOnly }}>
+      <RevisionContext.Provider value={{ currentRevision, selectedRevision, revisions, setSelectedRevision, isReadOnly, compareRevision, setCompareRevision }}>
         <AnnotationProvider sessionId={sessionId} revision={selectedRevision} isReadOnly={isReadOnly}>
           <ActiveViewContext.Provider value={{ activeView, setActiveView, openFiles, closeFile }}>
             <div className="min-h-screen bg-bg-base">
               {/* Left panel — fixed to viewport */}
               <LeftPanel sessionId={sessionId} connected={connected} onMobileSidebar={() => setMobileSidebar(!mobileSidebar)} collapsed={leftCollapsed} onToggle={() => setLeftCollapsed((c) => !c)} />
 
-              {/* Right panel — fixed to viewport, resizable */}
-              <ResizableSidebar collapsed={rightCollapsed} onToggle={() => setRightCollapsed((c) => !c)}>
-                <AnnotationSidebar onPreview={() => setPreviewOpen(true)} onSubmit={handleSubmit} />
-              </ResizableSidebar>
+              {/* Right panel — fixed to viewport, resizable (hidden in compare mode) */}
+              {compareRevision === null && (
+                <ResizableSidebar collapsed={rightCollapsed} onToggle={() => setRightCollapsed((c) => !c)}>
+                  <AnnotationSidebar onPreview={() => setPreviewOpen(true)} onSubmit={handleSubmit} />
+                </ResizableSidebar>
+              )}
 
               {/* Center content — normal document flow, browser scroll */}
+              {compareRevision !== null ? (
+                <div className={`${leftCollapsed ? "lg:ml-0" : "lg:ml-60"} transition-[margin] duration-200`}>
+                  <CompareView
+                    oldRevision={compareRevision}
+                    newRevision={currentRevision}
+                    sessionId={sessionId}
+                    onExit={() => setCompareRevision(null)}
+                  />
+                </div>
+              ) : (
               <div className={`relative ${leftCollapsed ? "lg:ml-0" : "lg:ml-60"} ${rightCollapsed ? "lg:mr-0" : "lg:mr-[var(--sidebar-width,320px)]"} transition-[margin] duration-200`} id="plan-scroll-container">
                 {/* Mobile top bar — only visible < lg */}
                 <div className="lg:hidden sticky top-0 z-20 flex items-center justify-between px-4 py-2 border-b border-border-subtle bg-bg-surface">
@@ -303,6 +332,7 @@ function App() {
                   <FileViewer path={activeView.path} />
                 )}
               </div>
+              )}
 
               {/* Mobile sidebar overlay */}
               {mobileSidebar && (

@@ -187,6 +187,10 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
     setCreatePopover({ anchorEl: lastMark, tempId, snippet, ctx });
   }, [addAnnotationWithId]);
 
+  // Memoize so context-triggered re-renders of PlanRenderer don't re-render the plan tree.
+  // This prevents remounting custom components defined inside the Plan function.
+  const planElement = useMemo(() => PlanComponent ? <PlanComponent /> : null, [PlanComponent]);
+
   if (loading) {
     return <div className="flex items-center justify-center h-64 text-text-tertiary font-body text-body">Loading plan...</div>;
   }
@@ -209,7 +213,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
   return (
     <>
       <div ref={containerRef} className="plan-content plan-updated">
-        <PlanComponent />
+        {planElement}
       </div>
       {editingAnn && (
         <EditAnnotationModal
