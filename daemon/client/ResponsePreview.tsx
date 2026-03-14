@@ -45,18 +45,18 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-8" onClick={onClose}>
-      <div className="bg-[#1e1e1e] border border-[rgba(255,248,240,0.08)] rounded-xl shadow-lg w-full max-w-2xl flex flex-col" style={{ height: "80vh" }} onClick={(e) => e.stopPropagation()}>
+      <div className="bg-bg-surface border border-border-medium rounded-xl shadow-lg w-full max-w-2xl flex flex-col" style={{ height: "80vh" }} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[rgba(255,248,240,0.06)] flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border-subtle flex-shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-[13px] font-medium text-[#e8e4df] font-body">Response preview</span>
+            <span className="text-[13px] font-medium text-text-primary font-body">Response preview</span>
             {manuallyEdited && (
-              <button onClick={() => setManuallyEdited(false)} className="text-[11px] text-[#847d75] hover:text-[#a09a92] font-body">
+              <button onClick={() => setManuallyEdited(false)} className="text-[11px] text-text-tertiary hover:text-text-secondary font-body">
                 Reset
               </button>
             )}
           </div>
-          <button onClick={onClose} className="text-[#847d75] hover:text-[#a09a92] w-7 h-7 flex items-center justify-center rounded-md hover:bg-[rgba(255,248,240,0.06)] transition-colors">
+          <button onClick={onClose} className="text-text-tertiary hover:text-text-secondary w-7 h-7 flex items-center justify-center rounded-md hover:bg-border-subtle transition-colors">
             &#x2715;
           </button>
         </div>
@@ -66,15 +66,15 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
           ref={textareaRef}
           value={text}
           onChange={(e) => { setText(e.target.value); setManuallyEdited(true); }}
-          className="flex-1 w-full bg-[#1a1a1a] p-5 text-[13px] font-mono text-[#c4beb7] resize-none focus:outline-none leading-relaxed placeholder:text-[#3a3530]"
+          className="flex-1 w-full bg-bg-base p-5 text-[13px] font-mono text-text-code resize-none focus:outline-none leading-relaxed placeholder:text-text-disabled"
           placeholder="Your feedback will appear here..."
         />
 
         {/* Actions */}
-        <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-[rgba(255,248,240,0.06)] flex-shrink-0">
+        <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-border-subtle flex-shrink-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg text-[13px] font-body text-[#847d75] hover:text-[#a09a92] transition-colors"
+            className="px-4 py-2 rounded-lg text-[13px] font-body text-text-tertiary hover:text-text-secondary transition-colors"
           >
             Cancel
           </button>
@@ -83,8 +83,8 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
             disabled={!hasContent}
             className={`px-6 py-2 rounded-lg font-body text-[13px] font-medium transition-all ${
               hasContent
-                ? "bg-[#e8e4df] text-[#1a1a1a] hover:opacity-90"
-                : "bg-[rgba(255,248,240,0.04)] text-[#3a3530] cursor-default"
+                ? "bg-btn-primary text-btn-primary-text hover:opacity-90"
+                : "bg-bg-input text-text-disabled cursor-default"
             }`}
           >
             Submit feedback
@@ -94,4 +94,3 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
     </div>
   );
 }
-

@@ -27,7 +27,7 @@ export function CodeBlock({ language, children }: CodeBlockProps) {
           {language}
         </span>
       )}
-      <pre className="bg-bg-code rounded-md p-4 overflow-x-auto text-code font-mono leading-relaxed !bg-transparent" style={{ background: "#1c1c1c" }}>
+      <pre className="bg-bg-code rounded-md p-4 overflow-x-auto text-code font-mono leading-relaxed">
         <code ref={codeRef} className={language ? `language-${language}` : ""}>{code}</code>
       </pre>
     </div>

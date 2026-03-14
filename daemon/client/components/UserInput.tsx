@@ -41,7 +41,7 @@ export function UserInput({ id, label, placeholder, multiline, defaultValue }: U
         onChange={(e) => { handleChange(e.target.value); autoResize(e.target); }}
         placeholder={placeholder || "Type your response..."}
         rows={multiline ? 3 : 1}
-        className="w-full bg-[rgba(255,248,240,0.03)] text-[13px] font-body text-text-primary rounded-lg px-3 py-2 resize-none focus:outline-none border border-[rgba(255,248,240,0.06)] focus:border-[rgba(255,248,240,0.12)] placeholder:text-text-tertiary transition-colors"
+        className="w-full bg-bg-input text-[13px] font-body text-text-primary rounded-lg px-3 py-2 resize-none focus:outline-none border border-border-subtle focus:border-border-hover placeholder:text-text-tertiary transition-colors"
         onInput={(e) => autoResize(e.target as HTMLTextAreaElement)}
         onFocus={(e) => autoResize(e.target)}
       />
@@ -83,15 +83,15 @@ export function RangeInput({ id, label, min = 1, max = 10, step = 1, defaultValu
     <div className="my-3">
       <div className="flex items-baseline justify-between mb-2">
         <span className="text-[13px] font-body font-medium text-text-primary">{label}</span>
-        <span className="text-[13px] font-mono text-[#c49a3a]">{value}</span>
+        <span className="text-[13px] font-mono text-accent-amber">{value}</span>
       </div>
       <div className="relative h-8 flex items-center">
         {/* Track background */}
-        <div className="absolute left-0 right-0 h-1.5 rounded-full bg-[rgba(255,248,240,0.08)]">
-          <div className="h-full rounded-full bg-[#c49a3a]" style={{ width: `${pct}%` }} />
+        <div className="absolute left-0 right-0 h-1.5 rounded-full bg-border-medium">
+          <div className="h-full rounded-full bg-accent-amber" style={{ width: `${pct}%` }} />
         </div>
         {/* Thumb indicator */}
-        <div className="absolute h-5 w-5 rounded-full bg-[#c49a3a] border-2 border-[#1a1a1a] shadow-md pointer-events-none" style={{ left: `calc(${pct}% - 10px)` }} />
+        <div className="absolute h-5 w-5 rounded-full bg-accent-amber shadow-md pointer-events-none" style={{ left: `calc(${pct}% - 10px)`, borderWidth: "2px", borderStyle: "solid", borderColor: "var(--color-bg-base)" }} />
         <input
           type="range"
           min={min}

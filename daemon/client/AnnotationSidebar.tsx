@@ -62,15 +62,15 @@ export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProp
       ref={(el) => { if (el) annRefs.current.set(ann.id, el); else annRefs.current.delete(ann.id); }}
       className={`group/ann rounded-md px-3 py-2.5 mb-1 transition-colors duration-150 ${
         activeAnnotationId === ann.id
-          ? "bg-[rgba(255,220,100,0.1)]"
-          : "hover:bg-[rgba(255,248,240,0.03)]"
+          ? "bg-highlight-selected"
+          : "hover:bg-bg-input"
       }`}
       onMouseEnter={() => handleMouseEnter(ann.id)}
       onMouseLeave={() => handleMouseLeave(ann.id)}
       onClick={() => setActiveAnnotationId(ann.id === activeAnnotationId ? null : ann.id)}
     >
       {/* Snippet quote */}
-      <div className="text-[11px] text-[#847d75] italic line-clamp-2 mb-1 leading-snug font-body">
+      <div className="text-[11px] text-text-tertiary italic line-clamp-2 mb-1 leading-snug font-body">
         "{ann.snippet.length > 80 ? ann.snippet.slice(0, 80) + "..." : ann.snippet}"
       </div>
 
@@ -79,7 +79,7 @@ export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProp
         value={ann.note}
         onChange={(e) => updateAnnotation(ann.id, e.target.value)}
         onClick={(e) => e.stopPropagation()}
-        className="w-full bg-transparent text-[13px] font-body text-[#e8e4df] resize-none focus:outline-none leading-relaxed p-0 border-none min-h-[20px]"
+        className="w-full bg-transparent text-[13px] font-body text-text-primary resize-none focus:outline-none leading-relaxed p-0 border-none min-h-[20px]"
         rows={1}
         style={{ height: "auto", overflow: "hidden" }}
         onInput={(e) => {
@@ -99,7 +99,7 @@ export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProp
       <div className="flex mt-1 opacity-0 group-hover/ann:opacity-100 transition-opacity duration-100">
         <button
           onClick={(e) => { e.stopPropagation(); removeAnnotation(ann.id); }}
-          className="text-[11px] text-[#847d75] hover:text-[#c45a5a] font-body transition-colors"
+          className="text-[11px] text-text-tertiary hover:text-accent-red font-body transition-colors"
         >
           Delete
         </button>
@@ -111,7 +111,7 @@ export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProp
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-4 py-3 flex items-center justify-between flex-shrink-0">
-        <span className="text-[11px] font-medium uppercase tracking-widest text-[#847d75] font-body">
+        <span className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary font-body">
           Annotations
           {annotations.length > 0 && (
             <span className="ml-1 font-normal">{annotations.length}</span>
@@ -122,19 +122,19 @@ export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProp
       {/* Annotation list */}
       <div ref={listRef} className="flex-1 overflow-y-auto px-1">
         {annotations.length === 0 && (
-          <p className="text-[12px] text-[#847d75] px-3 py-4 leading-relaxed font-body">
+          <p className="text-[12px] text-text-tertiary px-3 py-4 leading-relaxed font-body">
             Select text in the plan or in files to add annotations.
           </p>
         )}
 
         {planAnnotations.length > 0 && fileAnnotations.length > 0 && (
-          <div className="text-[10px] uppercase tracking-widest text-[#847d75] font-body px-3 mb-1 mt-1">Plan</div>
+          <div className="text-[10px] uppercase tracking-widest text-text-tertiary font-body px-3 mb-1 mt-1">Plan</div>
         )}
         {planAnnotations.map(renderAnnotation)}
 
         {Object.entries(fileGroups).map(([filePath, anns]) => (
           <div key={filePath}>
-            <div className="text-[10px] uppercase tracking-widest text-[#847d75] font-body px-3 pt-3 pb-1 truncate" title={filePath}>
+            <div className="text-[10px] uppercase tracking-widest text-text-tertiary font-body px-3 pt-3 pb-1 truncate" title={filePath}>
               {filePath}
             </div>
             {anns.map(renderAnnotation)}
@@ -143,11 +143,11 @@ export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProp
       </div>
 
       {/* General note — seamless */}
-      <div className="border-t border-[rgba(255,248,240,0.06)] px-4 py-3 flex-shrink-0">
+      <div className="border-t border-border-subtle px-4 py-3 flex-shrink-0">
         <textarea
           value={generalNote}
           onChange={(e) => setGeneralNote(e.target.value)}
-          className="w-full bg-transparent text-[13px] font-body text-[#e8e4df] resize-none focus:outline-none leading-relaxed p-0 border-none placeholder:text-[#4a4540] min-h-[40px]"
+          className="w-full bg-transparent text-[13px] font-body text-text-primary resize-none focus:outline-none leading-relaxed p-0 border-none placeholder:text-text-disabled min-h-[40px]"
           placeholder="General notes..."
           onInput={(e) => {
             const t = e.target as HTMLTextAreaElement;
@@ -164,14 +164,14 @@ export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProp
       </div>
 
       {/* Action buttons */}
-      <div className="px-4 py-3 border-t border-[rgba(255,248,240,0.06)] flex gap-2 flex-shrink-0">
+      <div className="px-4 py-3 border-t border-border-subtle flex gap-2 flex-shrink-0">
         <button
           onClick={onPreview}
           disabled={!hasContent}
           className={`flex-1 py-2 rounded-lg font-body text-[13px] font-medium transition-all ${
             hasContent
-              ? "bg-[rgba(255,248,240,0.06)] text-[#a09a92] hover:bg-[rgba(255,248,240,0.1)] hover:text-[#e8e4df]"
-              : "text-[#3a3530] cursor-default"
+              ? "bg-border-subtle text-text-secondary hover:bg-border-medium hover:text-text-primary"
+              : "text-text-disabled cursor-default"
           }`}
         >
           Preview
@@ -184,8 +184,8 @@ export function AnnotationSidebar({ onPreview, onSubmit }: AnnotationSidebarProp
           disabled={!hasContent}
           className={`flex-1 py-2 rounded-lg font-body text-[13px] font-medium transition-all ${
             hasContent
-              ? "bg-[#e8e4df] text-[#1a1a1a] hover:opacity-90 hover:-translate-y-px shadow-sm"
-              : "bg-[rgba(255,248,240,0.04)] text-[#3a3530] cursor-default"
+              ? "bg-btn-primary text-btn-primary-text hover:opacity-90 hover:-translate-y-px shadow-sm"
+              : "bg-bg-input text-text-disabled cursor-default"
           }`}
         >
           Submit

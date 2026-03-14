@@ -41,9 +41,9 @@ export function FileIcon({ name, type, expanded, className = "" }: FileIconProps
     return (
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={`flex-shrink-0 ${className}`}>
         {expanded ? (
-          <path d="M1.5 3.5h5l1.5 1.5h6.5v8h-13z" fill="rgba(196,154,58,0.25)" stroke="#c49a3a" strokeWidth="1" />
+          <path d="M1.5 3.5h5l1.5 1.5h6.5v8h-13z" style={{ fill: "var(--color-folder-fill-active)", stroke: "var(--color-folder-stroke-active)" }} strokeWidth="1" />
         ) : (
-          <path d="M1.5 3.5h5l1.5 1.5h6.5v8h-13z" fill="rgba(196,154,58,0.15)" stroke="rgba(196,154,58,0.5)" strokeWidth="1" />
+          <path d="M1.5 3.5h5l1.5 1.5h6.5v8h-13z" style={{ fill: "var(--color-folder-fill)", stroke: "var(--color-folder-stroke)" }} strokeWidth="1" />
         )}
       </svg>
     );

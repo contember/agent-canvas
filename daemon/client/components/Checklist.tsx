@@ -21,7 +21,7 @@ export function Checklist({ items }: ChecklistProps) {
           }`}>
             {item.checked && (
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M2.5 5L4.5 7L7.5 3" stroke="#1a1a1a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M2.5 5L4.5 7L7.5 3" style={{ stroke: "var(--color-text-inverse)" }} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             )}
           </span>

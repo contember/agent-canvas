@@ -173,19 +173,19 @@ function showAnnotationPopover(
     position: "fixed", zIndex: "50",
     top: `${rect.bottom + 8}px`,
     left: `${Math.min(rect.left, window.innerWidth - 300)}px`,
-    width: "280px", background: "#242424",
-    border: "1px solid rgba(255,248,240,0.12)",
-    borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+    width: "280px", background: "var(--color-bg-elevated)",
+    border: "1px solid var(--color-border-hover)",
+    borderRadius: "8px", boxShadow: "0 4px 12px var(--color-shadow)",
     padding: "12px", fontFamily: "'Inter', sans-serif",
   });
 
   const truncated = snippet.length > 80 ? snippet.slice(0, 80) + "..." : snippet;
   popover.innerHTML = `
-    <div style="font-size:12px;color:#847d75;font-style:italic;margin-bottom:8px;line-height:1.4;">"${escapeHtml(truncated)}"</div>
-    <textarea id="annotation-note" style="width:100%;min-height:60px;background:transparent;border:none;color:#e8e4df;font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;resize:vertical;outline:none;" placeholder="Add your note..."></textarea>
+    <div style="font-size:12px;color:var(--color-text-tertiary);font-style:italic;margin-bottom:8px;line-height:1.4;">"${escapeHtml(truncated)}"</div>
+    <textarea id="annotation-note" style="width:100%;min-height:60px;background:transparent;border:none;color:var(--color-text-primary);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;resize:vertical;outline:none;" placeholder="Add your note..."></textarea>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
-      <button id="annotation-cancel" style="font-size:12px;color:#847d75;background:none;border:none;cursor:pointer;padding:4px 12px;font-family:'Inter',sans-serif;">Cancel</button>
-      <button id="annotation-add" style="font-size:12px;font-weight:500;padding:4px 12px;border-radius:6px;background:rgba(255,220,100,0.15);color:#e8e4df;border:1px solid rgba(255,220,100,0.35);cursor:pointer;font-family:'Inter',sans-serif;">Add</button>
+      <button id="annotation-cancel" style="font-size:12px;color:var(--color-text-tertiary);background:none;border:none;cursor:pointer;padding:4px 12px;font-family:'Inter',sans-serif;">Cancel</button>
+      <button id="annotation-add" style="font-size:12px;font-weight:500;padding:4px 12px;border-radius:6px;background:var(--color-highlight-bg);color:var(--color-text-primary);border:1px solid var(--color-highlight-border);cursor:pointer;font-family:'Inter',sans-serif;">Add</button>
     </div>
   `;
   document.body.appendChild(popover);
@@ -231,16 +231,16 @@ function showInlinePopover(
     position: "fixed", zIndex: "60",
     top: `${rect.bottom + 6}px`,
     left: `${Math.min(rect.left, window.innerWidth - 300)}px`,
-    width: "280px", background: "#242424",
-    border: "1px solid rgba(255,248,240,0.12)",
-    borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+    width: "280px", background: "var(--color-bg-elevated)",
+    border: "1px solid var(--color-border-hover)",
+    borderRadius: "8px", boxShadow: "0 4px 12px var(--color-shadow)",
     padding: "10px 12px", fontFamily: "'Inter', sans-serif",
   });
 
   pop.innerHTML = `
-    <textarea id="ann-pop-textarea" style="width:100%;background:transparent;border:none;color:#e8e4df;font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;resize:none;outline:none;overflow:hidden;">${escapeHtml(ann.note)}</textarea>
+    <textarea id="ann-pop-textarea" style="width:100%;background:transparent;border:none;color:var(--color-text-primary);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;resize:none;outline:none;overflow:hidden;">${escapeHtml(ann.note)}</textarea>
     <div style="display:flex;justify-content:flex-end;margin-top:6px;">
-      <button id="ann-pop-delete" style="font-size:11px;color:#847d75;background:none;border:none;cursor:pointer;padding:2px 0;font-family:'Inter',sans-serif;">Delete</button>
+      <button id="ann-pop-delete" style="font-size:11px;color:var(--color-text-tertiary);background:none;border:none;cursor:pointer;padding:2px 0;font-family:'Inter',sans-serif;">Delete</button>
     </div>
   `;
   document.body.appendChild(pop);
@@ -262,8 +262,8 @@ function showInlinePopover(
 
   const deleteBtn = document.getElementById("ann-pop-delete")!;
   deleteBtn.onclick = (e) => { e.stopPropagation(); cleanup(); onDelete(ann.id); setActive(null); };
-  deleteBtn.addEventListener("mouseenter", () => { deleteBtn.style.color = "#c45a5a"; });
-  deleteBtn.addEventListener("mouseleave", () => { deleteBtn.style.color = "#847d75"; });
+  deleteBtn.addEventListener("mouseenter", () => { deleteBtn.style.color = "var(--color-accent-red)"; });
+  deleteBtn.addEventListener("mouseleave", () => { deleteBtn.style.color = "var(--color-text-tertiary)"; });
 
   textarea.addEventListener("keydown", (e) => {
     if (e.key === "Escape") cleanup();

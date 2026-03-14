@@ -1,4 +1,4 @@
-import { mkdirSync, cpSync, writeFileSync, existsSync } from "fs";
+import { mkdirSync, cpSync, writeFileSync, existsSync, watch as fsWatch } from "fs";
 import { join, dirname } from "path";
 import { $ } from "bun";
 
@@ -70,15 +70,16 @@ async function build() {
 
   // Write the index.html to use CDN React
   const indexHtml = `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Planner</title>
+  <script>document.documentElement.dataset.theme = localStorage.getItem('planner-theme') || 'dark';</script>
   <link rel="stylesheet" href="/assets/client.css" />
   <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark-dimmed.min.css" />
 </head>
-<body class="min-h-screen" style="background:#1a1a1a;color:#e8e4df">
+<body class="min-h-screen">
   <div id="root"></div>
   <script src="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
   <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
@@ -155,7 +156,21 @@ export function jsxDEV(type, props, key) { return _jsx(type, props, key); }
   console.log("Build complete! Output in dist/");
 }
 
-build().catch((e) => {
+build().then(() => {
+  if (process.argv.includes("--watch")) {
+    const clientDir = join(ROOT, "client");
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    console.log("Watching for changes in client/...");
+    fsWatch(clientDir, { recursive: true }, (_event: string, filename: string | null) => {
+      if (!filename || filename.endsWith("~")) return;
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        console.log(`\n  Changed: ${filename}`);
+        build().catch((e) => console.error("Rebuild failed:", e));
+      }, 200);
+    });
+  }
+}).catch((e) => {
   console.error("Build failed:", e);
   process.exit(1);
 });

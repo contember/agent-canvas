@@ -1,5 +1,140 @@
 @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
+/* ── Theme variables ── */
+:root {
+  /* Backgrounds */
+  --color-bg-base: #1a1a1a;
+  --color-bg-surface: #1e1e1e;
+  --color-bg-elevated: #242424;
+  --color-bg-code: #1c1c1c;
+  --color-bg-input: rgba(255, 248, 240, 0.03);
+  --color-bg-elevated-half: rgba(36, 36, 36, 0.5);
+
+  /* Text */
+  --color-text-primary: #e8e4df;
+  --color-text-secondary: #a09a92;
+  --color-text-tertiary: #847d75;
+  --color-text-code: #c4beb7;
+  --color-text-disabled: #3a3530;
+  --color-text-inverse: #1a1a1a;
+
+  /* Borders */
+  --color-border-subtle: rgba(255, 248, 240, 0.06);
+  --color-border-medium: rgba(255, 248, 240, 0.08);
+  --color-border-hover: rgba(255, 248, 240, 0.12);
+  --color-border-strong: rgba(255, 248, 240, 0.15);
+
+  /* Accents */
+  --color-accent-green: #4a9e6d;
+  --color-accent-green-muted: rgba(74, 158, 109, 0.12);
+  --color-accent-amber: #c49a3a;
+  --color-accent-amber-muted: rgba(196, 154, 58, 0.12);
+  --color-accent-red: #c45a5a;
+  --color-accent-red-muted: rgba(196, 90, 90, 0.12);
+  --color-accent-blue: #5a8ec4;
+  --color-accent-blue-muted: rgba(90, 142, 196, 0.10);
+
+  /* Highlights */
+  --color-highlight-bg: rgba(255, 220, 100, 0.15);
+  --color-highlight-border: rgba(255, 220, 100, 0.35);
+  --color-highlight-annotation: rgba(255, 220, 100, 0.08);
+  --color-highlight-active: rgba(255, 220, 100, 0.25);
+  --color-highlight-selected: rgba(255, 220, 100, 0.10);
+
+  /* UI elements */
+  --color-badge-bg: rgba(196, 154, 58, 0.20);
+  --color-btn-primary: #e8e4df;
+  --color-btn-primary-text: #1a1a1a;
+  --color-shadow: rgba(0, 0, 0, 0.25);
+
+  /* Scrollbar */
+  --color-scrollbar: rgba(255, 248, 240, 0.06);
+  --color-scrollbar-hover: rgba(255, 248, 240, 0.12);
+
+  /* Folder icon */
+  --color-folder-fill: rgba(196, 154, 58, 0.15);
+  --color-folder-fill-active: rgba(196, 154, 58, 0.25);
+  --color-folder-stroke: rgba(196, 154, 58, 0.5);
+  --color-folder-stroke-active: #c49a3a;
+
+  /* Syntax highlighting */
+  --color-hljs-base: #c4beb7;
+  --color-hljs-keyword: #d2a6ff;
+  --color-hljs-string: #a8cc8c;
+  --color-hljs-comment: #847d75;
+  --color-hljs-number: #e8a87c;
+  --color-hljs-variable: #7ec8e3;
+  --color-hljs-function: #dbc074;
+  --color-hljs-punctuation: #a09a92;
+}
+
+[data-theme="light"] {
+  /* Backgrounds — warm cream/parchment */
+  --color-bg-base: #faf6ef;
+  --color-bg-surface: #f3ede4;
+  --color-bg-elevated: #ebe5db;
+  --color-bg-code: #f0ebe2;
+  --color-bg-input: rgba(80, 60, 30, 0.04);
+  --color-bg-elevated-half: rgba(235, 229, 219, 0.5);
+
+  /* Text — warm dark browns */
+  --color-text-primary: #2a2520;
+  --color-text-secondary: #5a5550;
+  --color-text-tertiary: #9a9390;
+  --color-text-code: #4a4540;
+  --color-text-disabled: #c5c0b8;
+  --color-text-inverse: #faf6ef;
+
+  /* Borders */
+  --color-border-subtle: rgba(80, 60, 30, 0.08);
+  --color-border-medium: rgba(80, 60, 30, 0.10);
+  --color-border-hover: rgba(80, 60, 30, 0.15);
+  --color-border-strong: rgba(80, 60, 30, 0.20);
+
+  /* Accents — adjusted for contrast on light */
+  --color-accent-green: #3a8a5a;
+  --color-accent-green-muted: rgba(58, 138, 90, 0.10);
+  --color-accent-amber: #a07820;
+  --color-accent-amber-muted: rgba(160, 120, 32, 0.10);
+  --color-accent-red: #b84a4a;
+  --color-accent-red-muted: rgba(184, 74, 74, 0.08);
+  --color-accent-blue: #4a7eb4;
+  --color-accent-blue-muted: rgba(74, 126, 180, 0.08);
+
+  /* Highlights */
+  --color-highlight-bg: rgba(200, 160, 30, 0.15);
+  --color-highlight-border: rgba(200, 160, 30, 0.40);
+  --color-highlight-annotation: rgba(200, 160, 30, 0.08);
+  --color-highlight-active: rgba(200, 160, 30, 0.25);
+  --color-highlight-selected: rgba(200, 160, 30, 0.10);
+
+  /* UI elements */
+  --color-badge-bg: rgba(160, 120, 32, 0.15);
+  --color-btn-primary: #2a2520;
+  --color-btn-primary-text: #faf6ef;
+  --color-shadow: rgba(80, 60, 30, 0.10);
+
+  /* Scrollbar */
+  --color-scrollbar: rgba(80, 60, 30, 0.08);
+  --color-scrollbar-hover: rgba(80, 60, 30, 0.15);
+
+  /* Folder icon */
+  --color-folder-fill: rgba(160, 120, 32, 0.12);
+  --color-folder-fill-active: rgba(160, 120, 32, 0.22);
+  --color-folder-stroke: rgba(160, 120, 32, 0.4);
+  --color-folder-stroke-active: #a07820;
+
+  /* Syntax highlighting — adjusted for light bg */
+  --color-hljs-base: #4a4540;
+  --color-hljs-keyword: #7c3aed;
+  --color-hljs-string: #2e7d32;
+  --color-hljs-comment: #9a9390;
+  --color-hljs-number: #c45a20;
+  --color-hljs-variable: #1976d2;
+  --color-hljs-function: #8a6d00;
+  --color-hljs-punctuation: #6b6560;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,8 +142,8 @@
 @layer base {
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background-color: #1a1a1a;
-    color: #e8e4df;
+    background-color: var(--color-bg-base);
+    color: var(--color-text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -20,8 +155,8 @@ code, pre, .font-mono {
 
 /* Annotation highlight */
 .annotation-highlight {
-  background: rgba(255, 220, 100, 0.15);
-  border-bottom: 2px solid rgba(255, 220, 100, 0.35);
+  background: var(--color-highlight-bg);
+  border-bottom: 2px solid var(--color-highlight-border);
   border-radius: 2px;
   cursor: pointer;
   transition: background 150ms ease;
@@ -29,18 +164,18 @@ code, pre, .font-mono {
 
 .annotation-highlight:hover,
 .annotation-highlight.active {
-  background: rgba(255, 220, 100, 0.25);
+  background: var(--color-highlight-active);
 }
 
 /* Selection color */
 ::selection {
-  background-color: rgba(255, 220, 100, 0.25);
-  color: #e8e4df;
+  background-color: var(--color-highlight-active);
+  color: var(--color-text-primary);
 }
 
 /* Focus ring */
 *:focus-visible {
-  outline: 2px solid #5a8ec4;
+  outline: 2px solid var(--color-accent-blue);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -61,12 +196,12 @@ button, a, [role="button"] {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 248, 240, 0.06);
+  background: var(--color-scrollbar);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 248, 240, 0.12);
+  background: var(--color-scrollbar-hover);
 }
 
 /* Plan update flash */
@@ -93,9 +228,9 @@ input[type="range"]::-webkit-slider-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #c49a3a;
+  background: var(--color-accent-amber);
   cursor: pointer;
-  border: 2px solid #1a1a1a;
+  border: 2px solid var(--color-bg-base);
   margin-top: -5px;
 }
 
@@ -103,9 +238,9 @@ input[type="range"]::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #c49a3a;
+  background: var(--color-accent-amber);
   cursor: pointer;
-  border: 2px solid #1a1a1a;
+  border: 2px solid var(--color-bg-base);
 }
 
 input[type="range"]::-webkit-slider-runnable-track {
@@ -123,7 +258,7 @@ input[type="range"]::-moz-range-track {
 /* highlight.js overrides to blend with our theme */
 .hljs {
   background: transparent !important;
-  color: #c4beb7 !important;
+  color: var(--color-hljs-base) !important;
 }
 
 pre code.hljs {
@@ -136,7 +271,7 @@ pre code.hljs {
 .hljs-built_in,
 .hljs-name,
 .hljs-tag {
-  color: #d2a6ff !important;
+  color: var(--color-hljs-keyword) !important;
 }
 
 .hljs-string,
@@ -147,40 +282,40 @@ pre code.hljs {
 .hljs-template-tag,
 .hljs-template-variable,
 .hljs-type {
-  color: #a8cc8c !important;
+  color: var(--color-hljs-string) !important;
 }
 
 .hljs-comment,
 .hljs-quote,
 .hljs-deletion,
 .hljs-meta {
-  color: #847d75 !important;
+  color: var(--color-hljs-comment) !important;
 }
 
 .hljs-number,
 .hljs-regexp,
 .hljs-addition {
-  color: #e8a87c !important;
+  color: var(--color-hljs-number) !important;
 }
 
 .hljs-variable,
 .hljs-attr {
-  color: #7ec8e3 !important;
+  color: var(--color-hljs-variable) !important;
 }
 
 .hljs-function .hljs-title,
 .hljs-title.function_ {
-  color: #dbc074 !important;
+  color: var(--color-hljs-function) !important;
 }
 
 .hljs-params {
-  color: #c4beb7 !important;
+  color: var(--color-hljs-base) !important;
 }
 
 .hljs-property {
-  color: #7ec8e3 !important;
+  color: var(--color-hljs-variable) !important;
 }
 
 .hljs-punctuation {
-  color: #a09a92 !important;
+  color: var(--color-hljs-punctuation) !important;
 }

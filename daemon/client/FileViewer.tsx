@@ -85,16 +85,16 @@ export function FileViewer({ path }: FileViewerProps) {
     Object.assign(pop.style, {
       position: "fixed", zIndex: "60",
       top: `${rect.bottom + 6}px`, left: `${Math.min(rect.left, window.innerWidth - 300)}px`,
-      width: "280px", background: "#242424",
-      border: "1px solid rgba(255,248,240,0.12)", borderRadius: "8px",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.25)", padding: "10px 12px",
+      width: "280px", background: "var(--color-bg-elevated)",
+      border: "1px solid var(--color-border-hover)", borderRadius: "8px",
+      boxShadow: "0 4px 12px var(--color-shadow)", padding: "10px 12px",
       fontFamily: "'Inter', sans-serif",
     });
     const esc = (s: string) => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
     pop.innerHTML = `
-      <textarea id="ann-pop-textarea" style="width:100%;background:transparent;border:none;color:#e8e4df;font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;resize:none;outline:none;overflow:hidden;">${esc(ann.note)}</textarea>
+      <textarea id="ann-pop-textarea" style="width:100%;background:transparent;border:none;color:var(--color-text-primary);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;resize:none;outline:none;overflow:hidden;">${esc(ann.note)}</textarea>
       <div style="display:flex;justify-content:flex-end;margin-top:6px;">
-        <button id="ann-pop-delete" style="font-size:11px;color:#847d75;background:none;border:none;cursor:pointer;padding:2px 0;font-family:'Inter',sans-serif;">Delete</button>
+        <button id="ann-pop-delete" style="font-size:11px;color:var(--color-text-tertiary);background:none;border:none;cursor:pointer;padding:2px 0;font-family:'Inter',sans-serif;">Delete</button>
       </div>
     `;
     document.body.appendChild(pop);
@@ -107,8 +107,8 @@ export function FileViewer({ path }: FileViewerProps) {
     });
     const del = document.getElementById("ann-pop-delete")!;
     del.onclick = () => { pop.remove(); removeAnnotation(annId); setActiveAnnotationId(null); };
-    del.addEventListener("mouseenter", () => { del.style.color = "#c45a5a"; });
-    del.addEventListener("mouseleave", () => { del.style.color = "#847d75"; });
+    del.addEventListener("mouseenter", () => { del.style.color = "var(--color-accent-red)"; });
+    del.addEventListener("mouseleave", () => { del.style.color = "var(--color-text-tertiary)"; });
     textarea.addEventListener("keydown", (e) => { if (e.key === "Escape") pop.remove(); });
     setTimeout(() => {
       const h = (e: MouseEvent) => {
@@ -171,8 +171,8 @@ export function FileViewer({ path }: FileViewerProps) {
     } catch { return null; }
   }, [content, path]);
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-[#847d75] font-body text-[13px]">Loading {path}...</div>;
-  if (error) return <div className="p-8 text-[#c45a5a] font-body text-[13px]">{error}</div>;
+  if (loading) return <div className="flex items-center justify-center h-64 text-text-tertiary font-body text-[13px]">Loading {path}...</div>;
+  if (error) return <div className="p-8 text-accent-red font-body text-[13px]">{error}</div>;
   if (!content) return null;
 
   const lines = content.split("\n");
@@ -191,11 +191,11 @@ export function FileViewer({ path }: FileViewerProps) {
       <div className="flex items-center justify-between px-5 py-2.5 border-b border-border-subtle bg-bg-surface flex-shrink-0">
         <div className="flex items-center gap-3">
           <span className="text-[12px] text-text-tertiary font-body">{lines.length} lines</span>
-          {fileAnns.length > 0 && <span className="text-[12px] text-[#c49a3a] font-body">{fileAnns.length} annotation{fileAnns.length !== 1 ? "s" : ""}</span>}
+          {fileAnns.length > 0 && <span className="text-[12px] text-accent-amber font-body">{fileAnns.length} annotation{fileAnns.length !== 1 ? "s" : ""}</span>}
         </div>
         <button
           onClick={addWholeFileWithPopup}
-          className="flex items-center gap-1.5 text-[12px] font-medium font-body text-text-secondary hover:text-text-primary px-3 py-1.5 rounded-md bg-[rgba(255,248,240,0.04)] hover:bg-[rgba(255,248,240,0.08)] border border-border-subtle hover:border-border-hover transition-all"
+          className="flex items-center gap-1.5 text-[12px] font-medium font-body text-text-secondary hover:text-text-primary px-3 py-1.5 rounded-md bg-bg-input hover:bg-border-medium border border-border-subtle hover:border-border-hover transition-all"
         >
           <span className="text-[14px] leading-none">+</span>
           Add to context
@@ -205,8 +205,8 @@ export function FileViewer({ path }: FileViewerProps) {
       {/* Code */}
       <pre ref={contentRef} onMouseUp={handleMouseUp} className="flex-1 overflow-auto text-code font-mono text-text-code bg-bg-base select-text cursor-text py-3 hljs">
         {lines.map((line, i) => (
-          <div key={i} className="flex hover:bg-bg-elevated/50 px-5">
-            <span className="text-[#847d75] opacity-40 select-none w-10 text-right pr-4 shrink-0 py-px text-[12px]">{i + 1}</span>
+          <div key={i} className="flex hover:bg-bg-elevated-half px-5">
+            <span className="text-text-tertiary opacity-40 select-none w-10 text-right pr-4 shrink-0 py-px text-[12px]">{i + 1}</span>
             {highlightedLines ? (
               <code className="py-px" dangerouslySetInnerHTML={{ __html: highlightedLines[i] || " " }} />
             ) : (
@@ -218,13 +218,13 @@ export function FileViewer({ path }: FileViewerProps) {
 
       {/* New annotation popover */}
       {showPopover && (
-        <div className="fixed z-50 rounded-lg shadow-md p-3 w-72" style={{ top: popoverPos.top, left: popoverPos.left, background: "#242424", border: "1px solid rgba(255,248,240,0.12)" }}>
-          <div className="text-[11px] text-[#847d75] italic line-clamp-2 mb-2 font-body">
+        <div className="fixed z-50 rounded-lg shadow-md p-3 w-72 bg-bg-elevated border border-border-hover" style={{ top: popoverPos.top, left: popoverPos.left }}>
+          <div className="text-[11px] text-text-tertiary italic line-clamp-2 mb-2 font-body">
             "{selectedSnippet.length > 100 ? selectedSnippet.slice(0, 100) + "..." : selectedSnippet}"
           </div>
           <textarea
             ref={noteRef} value={noteText} onChange={(e) => setNoteText(e.target.value)}
-            className="w-full bg-transparent border-none text-[13px] font-body text-[#e8e4df] resize-vertical focus:outline-none min-h-[60px]"
+            className="w-full bg-transparent border-none text-[13px] font-body text-text-primary resize-vertical focus:outline-none min-h-[60px]"
             placeholder="Add your note..."
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submitAnnotation();
@@ -232,8 +232,8 @@ export function FileViewer({ path }: FileViewerProps) {
             }}
           />
           <div className="flex justify-end gap-2 mt-2">
-            <button onClick={() => { setShowPopover(false); window.getSelection()?.removeAllRanges(); }} className="text-[11px] text-[#847d75] font-body px-3 py-1">Cancel</button>
-            <button onClick={submitAnnotation} className="text-[11px] font-medium font-body px-3 py-1 rounded-md bg-[rgba(255,220,100,0.15)] text-[#e8e4df] border border-[rgba(255,220,100,0.35)]">Add</button>
+            <button onClick={() => { setShowPopover(false); window.getSelection()?.removeAllRanges(); }} className="text-[11px] text-text-tertiary font-body px-3 py-1">Cancel</button>
+            <button onClick={submitAnnotation} className="text-[11px] font-medium font-body px-3 py-1 rounded-md bg-highlight-bg text-text-primary border border-highlight-border">Add</button>
           </div>
         </div>
       )}

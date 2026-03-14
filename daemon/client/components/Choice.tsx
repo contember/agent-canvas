@@ -36,16 +36,16 @@ export function Choice({ id, label, options, defaultValue }: ChoiceProps) {
             onClick={() => handleSelect(opt)}
             className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 ${
               selected === opt
-                ? "bg-[rgba(255,220,100,0.1)]"
+                ? "bg-highlight-selected"
                 : "hover:bg-bg-elevated"
             }`}
           >
             <span className={`w-4 h-4 rounded-full border-[1.5px] flex items-center justify-center flex-shrink-0 transition-all ${
               selected === opt
-                ? "border-[#c49a3a] bg-[#c49a3a]"
-                : "border-[rgba(255,248,240,0.15)]"
+                ? "border-accent-amber bg-accent-amber"
+                : "border-border-strong"
             }`}>
-              {selected === opt && <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a1a]" />}
+              {selected === opt && <span className="w-1.5 h-1.5 rounded-full bg-text-inverse" />}
             </span>
             <span className="text-[13px] font-body text-text-secondary">{opt}</span>
           </label>
@@ -90,17 +90,17 @@ export function MultiChoice({ id, label, options, defaultValue }: MultiChoicePro
               key={opt}
               onClick={() => toggle(opt)}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 ${
-                checked ? "bg-[rgba(255,220,100,0.1)]" : "hover:bg-bg-elevated"
+                checked ? "bg-highlight-selected" : "hover:bg-bg-elevated"
               }`}
             >
               <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all ${
                 checked
-                  ? "bg-[#c49a3a]"
-                  : "border-[1.5px] border-[rgba(255,248,240,0.15)]"
+                  ? "bg-accent-amber"
+                  : "border-[1.5px] border-border-strong"
               }`}>
                 {checked && (
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <path d="M2.5 5L4.5 7L7.5 3" stroke="#1a1a1a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M2.5 5L4.5 7L7.5 3" style={{ stroke: "var(--color-text-inverse)" }} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 )}
               </span>

@@ -87,7 +87,7 @@ export function FileBrowser() {
                 </span>
                 <button
                   onClick={(e) => { e.stopPropagation(); addWholeDir(fullPath); }}
-                  className="text-[11px] text-[#847d75] hover:text-[#a09a92] opacity-0 group-hover/item:opacity-100 transition-opacity px-1 flex-shrink-0"
+                  className="text-[11px] text-text-tertiary hover:text-text-secondary opacity-0 group-hover/item:opacity-100 transition-opacity px-1 flex-shrink-0"
                   title="Add all files in folder"
                 >
                   +
@@ -105,13 +105,13 @@ export function FileBrowser() {
                 {/* Right side: annotation badge + add button */}
                 <div className="flex items-center gap-1 flex-shrink-0 ml-1">
                   {annCount > 0 && (
-                    <span className="text-[10px] font-medium bg-[rgba(196,154,58,0.2)] text-[#c49a3a] px-1.5 py-px rounded-full min-w-[18px] text-center">
+                    <span className="text-[10px] font-medium bg-badge-bg text-accent-amber px-1.5 py-px rounded-full min-w-[18px] text-center">
                       {annCount}
                     </span>
                   )}
                   <button
                     onClick={(e) => { e.stopPropagation(); addWholeFile(fullPath); }}
-                    className="text-[11px] text-[#847d75] hover:text-[#a09a92] opacity-0 group-hover/item:opacity-100 transition-opacity px-1"
+                    className="text-[11px] text-text-tertiary hover:text-text-secondary opacity-0 group-hover/item:opacity-100 transition-opacity px-1"
                     title="Add file to context"
                   >
                     +
@@ -139,8 +139,8 @@ export function FileBrowser() {
   return (
     <div className="w-60 border-r border-border-subtle bg-bg-surface flex flex-col flex-shrink-0 overflow-hidden">
       <div className="flex items-center justify-between px-4 pt-4 pb-3 flex-shrink-0">
-        <span className="text-[11px] font-medium uppercase tracking-widest text-[#847d75] font-body">Files</span>
-        <button onClick={() => setCollapsed(true)} className="text-[#847d75] hover:text-[#a09a92] transition-colors p-0.5">
+        <span className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary font-body">Files</span>
+        <button onClick={() => setCollapsed(true)} className="text-text-tertiary hover:text-text-secondary transition-colors p-0.5">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 3l-4 4 4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
       </div>
@@ -148,11 +148,11 @@ export function FileBrowser() {
 
       {annotatedFiles.length > 0 && (
         <div className="border-t border-border-subtle px-4 py-3 flex-shrink-0">
-          <div className="text-[10px] uppercase tracking-widest text-[#847d75] font-body mb-1.5">Referenced</div>
+          <div className="text-[10px] uppercase tracking-widest text-text-tertiary font-body mb-1.5">Referenced</div>
           {annotatedFiles.map((f) => (
             <div key={f} onClick={() => openFile(f)} className="flex items-center justify-between text-[12px] font-body text-text-secondary hover:text-text-primary cursor-pointer py-0.5">
               <span className="truncate">{f.split("/").pop()}</span>
-              <span className="text-[10px] font-medium bg-[rgba(196,154,58,0.2)] text-[#c49a3a] px-1.5 py-px rounded-full min-w-[18px] text-center flex-shrink-0 ml-1">
+              <span className="text-[10px] font-medium bg-badge-bg text-accent-amber px-1.5 py-px rounded-full min-w-[18px] text-center flex-shrink-0 ml-1">
                 {getAnnCount(f)}
               </span>
             </div>
