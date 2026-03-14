@@ -229,49 +229,40 @@ function AnnotationSidebarInner({ onPreview, onSubmit }: AnnotationSidebarProps)
       )}
 
       {/* Action buttons */}
-      <div className="px-4 py-3 border-t border-border-subtle flex gap-2 flex-shrink-0">
-        <button
-          onClick={onPreview}
-          disabled={!hasContent}
-          className={`flex-1 py-2 rounded-lg font-body text-[13px] font-medium transition-all ${
-            hasContent
-              ? "bg-border-subtle text-text-secondary hover:bg-border-medium hover:text-text-primary"
-              : "text-text-disabled cursor-default"
-          }`}
-        >
-          Preview
-        </button>
-        <button
-          onClick={() => {
-            const missing = getMissingRequired(responses);
-            if (missing.length > 0) {
-              setValidationError(`Please answer: ${missing.map((r) => r.label).join(", ")}`);
-              return;
-            }
-            setValidationError(null);
-            const md = generateMarkdown(annotations, generalNote, responses);
-            onSubmit(md);
-          }}
-          disabled={!hasContent}
-          className={`flex-1 py-2 rounded-lg font-body text-[13px] font-medium transition-all ${
-            hasContent
-              ? "bg-btn-primary text-btn-primary-text hover:opacity-90 hover:-translate-y-px shadow-sm"
-              : "bg-bg-input text-text-disabled cursor-default"
-          }`}
-        >
-          Submit
-        </button>
-      </div>
-      {!hasContent && (
-        <div className="px-4 pb-3 flex-shrink-0">
+      <div className="px-4 py-3 border-t border-border-subtle flex-shrink-0">
+        {hasContent ? (
+          <div className="flex gap-2">
+            <button
+              onClick={onPreview}
+              className="flex-1 py-2 rounded-lg font-body text-[13px] font-medium transition-all bg-border-subtle text-text-secondary hover:bg-border-medium hover:text-text-primary"
+            >
+              Preview
+            </button>
+            <button
+              onClick={() => {
+                const missing = getMissingRequired(responses);
+                if (missing.length > 0) {
+                  setValidationError(`Please answer: ${missing.map((r) => r.label).join(", ")}`);
+                  return;
+                }
+                setValidationError(null);
+                const md = generateMarkdown(annotations, generalNote, responses);
+                onSubmit(md);
+              }}
+              className="flex-1 py-2 rounded-lg font-body text-[13px] font-medium transition-all bg-btn-primary text-btn-primary-text hover:opacity-90 hover:-translate-y-px shadow-sm"
+            >
+              Submit
+            </button>
+          </div>
+        ) : (
           <button
             onClick={() => onSubmit("No feedback — looks good.")}
-            className="w-full py-2 rounded-lg font-body text-[12px] text-text-tertiary hover:text-text-secondary hover:bg-bg-input transition-all"
+            className="w-full py-2 rounded-lg font-body text-[13px] font-medium border border-border-medium text-text-secondary hover:text-text-primary hover:border-border-hover hover:bg-bg-input transition-all"
           >
             Submit without feedback
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
