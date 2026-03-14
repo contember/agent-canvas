@@ -94,7 +94,7 @@ export function AnnotationCreatePopover({ anchorEl, scrollContainer, snippet, tr
         value={note}
         onChange={(e) => setNote(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit();
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
           if (e.key === "Escape") onCancel();
         }}
         style={{ width: "100%", minHeight: "60px", background: "transparent", border: "none", color: "var(--color-text-primary)", fontFamily: "'Inter', sans-serif", fontSize: "13px", lineHeight: "1.5", resize: "vertical", outline: "none" }}

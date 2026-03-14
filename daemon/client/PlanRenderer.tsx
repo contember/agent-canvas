@@ -6,6 +6,8 @@ import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, rest
 import { extractContext } from "./annotationContext";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 
+const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note']";
+
 interface PlanRendererProps {
   revision: number;
 }
@@ -99,6 +101,17 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
     };
   }, [PlanComponent, annotations, activeAnnotationId]);
 
+  // Build a map of block snippets to annotation IDs for quick lookup
+  const blockAnnotationMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const ann of annotations) {
+      if (ann.snippet.startsWith("[")) {
+        map.set(ann.snippet, ann.id);
+      }
+    }
+    return map;
+  }, [annotations]);
+
   // Block annotation: hover detection
   useEffect(() => {
     const container = containerRef.current;
@@ -113,6 +126,12 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
       const block = target.closest(BLOCK_SELECTOR) as HTMLElement | null;
       if (block && container.contains(block)) {
         setHoveredBlock(block);
+        // Activate annotation in sidebar if this block has one
+        const snippet = getBlockSnippet(block);
+        const annId = snippet ? blockAnnotationMap.get(snippet) : undefined;
+        if (annId && annId !== activeAnnotationId) {
+          setActiveAnnotationId(annId);
+        }
       } else {
         setHoveredBlock(null);
       }
@@ -124,6 +143,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
       const related = e.relatedTarget as HTMLElement | null;
       if (related?.closest("[data-block-comment-btn]")) return;
       setHoveredBlock(null);
+      setActiveAnnotationId(null);
     };
 
     container.addEventListener("mousemove", handleMove);
@@ -132,18 +152,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
       container.removeEventListener("mousemove", handleMove);
       container.removeEventListener("mouseleave", handleLeave);
     };
-  }, [PlanComponent, blockPopover, createPopover, editPopover]);
-
-  // Build a map of block snippets to annotation IDs for quick lookup
-  const blockAnnotationMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const ann of annotations) {
-      if (ann.snippet.startsWith("[")) {
-        map.set(ann.snippet, ann.id);
-      }
-    }
-    return map;
-  }, [annotations]);
+  }, [PlanComponent, blockPopover, createPopover, editPopover, blockAnnotationMap, activeAnnotationId]);
 
   // Use document-level mouseup so selections that end outside the container still work
   useEffect(() => {
@@ -322,8 +331,6 @@ function getBlockSnippet(block: HTMLElement): string | null {
   return null;
 }
 
-const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note']";
-
 /** Renders comment icons: always visible on annotated blocks, on hover for others */
 function BlockCommentButtons({
   containerRef,
@@ -374,12 +381,10 @@ function BlockCommentButtons({
   // Apply highlight style to active block
   useEffect(() => {
     if (!activeBlock) return;
-    activeBlock.style.outline = "2px solid var(--color-highlight-annotation)";
-    activeBlock.style.outlineOffset = "-2px";
+    activeBlock.style.boxShadow = "inset 0 0 0 1.5px var(--color-highlight-bg)";
     activeBlock.style.borderRadius = "8px";
     return () => {
-      activeBlock.style.outline = "";
-      activeBlock.style.outlineOffset = "";
+      activeBlock.style.boxShadow = "";
       activeBlock.style.borderRadius = "";
     };
   }, [activeBlock]);
@@ -421,19 +426,6 @@ function BlockCommentIcon({
   activeAnnotationId: string | null;
   onOpen: (anchorEl: HTMLElement, snippet: string, annId?: string) => void;
 }) {
-  // Ensure block has relative positioning
-  useEffect(() => {
-    const prev = block.style.position;
-    if (!prev || prev === "static") {
-      block.style.position = "relative";
-    }
-    return () => {
-      if (!prev || prev === "static") {
-        block.style.position = prev;
-      }
-    };
-  }, [block]);
-
   const snippet = getBlockSnippet(block);
   if (!snippet) return null;
 
@@ -446,7 +438,7 @@ function BlockCommentIcon({
       data-block-comment-btn
       onClick={(e) => {
         e.stopPropagation();
-        onOpen(block, snippet, existingAnnId);
+        onOpen(e.currentTarget as HTMLElement, snippet, existingAnnId);
       }}
       className={`absolute top-1 right-1 z-10 w-6 h-6 flex items-center justify-center rounded transition-all duration-150 ${
         hasAnnotation

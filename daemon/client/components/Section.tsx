@@ -9,7 +9,7 @@ export function Section({ title, children }: SectionProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="mb-12 group/section" data-md="section" data-md-title={title}>
+    <div className="relative mb-12 p-2 group/section" data-md="section" data-md-title={title}>
       <div className="mb-2 flex items-center gap-1 -ml-5">
         <button
           onClick={() => setCollapsed(!collapsed)}

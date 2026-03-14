@@ -15,7 +15,7 @@ const config = {
 export function Callout({ type = "info", children }: CalloutProps) {
   const cfg = config[type];
   return (
-    <div className={`${cfg.bg} rounded-lg px-5 py-4 mt-3 flex gap-3 items-start`} data-md="callout" data-md-type={type}>
+    <div className={`${cfg.bg} relative rounded-lg px-5 py-4 mt-3 flex gap-3 items-start`} data-md="callout" data-md-type={type}>
       <span className={`${cfg.iconColor} opacity-70 text-base leading-relaxed flex-shrink-0 mt-px`}>
         {cfg.icon}
       </span>
