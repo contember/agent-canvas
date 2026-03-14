@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useAnnotations } from "@canvas/runtime";
+import { useAnnotations } from "#canvas/runtime";
 import { ResponseNote } from "./ResponseNote";
 
 /** Free text input from user */

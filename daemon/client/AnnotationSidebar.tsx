@@ -3,7 +3,7 @@ import { useAnnotations, Annotation } from "./AnnotationProvider";
 import { setMarkActive } from "./highlightRange";
 import { generateMarkdown, hasValue, getMissingRequired } from "./generateMarkdown";
 import { RevisionContext } from "./App";
-import { SessionContext } from "@canvas/runtime";
+import { SessionContext } from "#canvas/runtime";
 import { MarkdownPreview } from "./ResponsePreview";
 
 interface AnnotationSidebarProps {

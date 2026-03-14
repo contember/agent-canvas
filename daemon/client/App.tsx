@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, createContext, useMemo } from "react";
 import { createRoot } from "react-dom/client";
-import { SessionContext } from "@canvas/runtime";
+import { SessionContext } from "#canvas/runtime";
 import { AnnotationProvider, useAnnotations } from "./AnnotationProvider";
 import { PlanRenderer } from "./PlanRenderer";
 import { AnnotationSidebar } from "./AnnotationSidebar";

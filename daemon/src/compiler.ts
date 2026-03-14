@@ -11,7 +11,7 @@ const TEMP_DIR = join(homedir(), ".planner", "tmp");
 mkdirSync(TEMP_DIR, { recursive: true });
 
 const COMPONENT_IMPORTS = `import React from 'react';
-import * as C from '@canvas/components';
+import * as C from '#canvas/components';
 const { Section, Item, Task, FilePreview, CodeBlock, Callout,
         Mermaid, Table, Priority, Checklist, Note, Diff,
         Choice, MultiChoice, UserInput, RangeInput } = C;
@@ -32,7 +32,7 @@ export async function compilePlan(jsx: string): Promise<CompileResult> {
     const result = await Bun.build({
       entrypoints: [tmpFile],
       format: "esm",
-      external: ["react", "react-dom", "@canvas/components", "@canvas/runtime"],
+      external: ["react", "react-dom", "#canvas/components", "#canvas/runtime"],
     });
 
     if (!result.success) {

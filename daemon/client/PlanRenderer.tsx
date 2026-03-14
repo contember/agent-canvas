@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useContext, useCallback } from "react";
-import { SessionContext } from "@canvas/runtime";
+import { SessionContext } from "#canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
 import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks } from "./highlightRange";
 import { extractContext } from "./annotationContext";

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useAnnotations } from "@canvas/runtime";
+import { useAnnotations } from "#canvas/runtime";
 import { getPopoverPosition } from "../popoverPosition";
 
 interface MermaidProps {

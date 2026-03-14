@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { AnnotationCtx } from "@canvas/runtime";
-import type { Annotation, AnnotationContext, PlanResponse, AnnotationContextValue } from "@canvas/runtime";
+import { AnnotationCtx } from "#canvas/runtime";
+import type { Annotation, AnnotationContext, PlanResponse, AnnotationContextValue } from "#canvas/runtime";
 
 // Re-export types for convenience
 export type { Annotation, AnnotationContext, PlanResponse, AnnotationContextValue };
-export { useAnnotations } from "@canvas/runtime";
+export { useAnnotations } from "#canvas/runtime";
 
 interface AnnotationProviderProps {
   sessionId: string;

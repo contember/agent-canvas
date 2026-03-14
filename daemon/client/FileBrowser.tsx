@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext, useCallback } from "react";
-import { SessionContext } from "@canvas/runtime";
+import { SessionContext } from "#canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
 import { ActiveViewContext } from "./App";
 import { FileIcon } from "./FileIcon";
