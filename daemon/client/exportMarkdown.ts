@@ -8,7 +8,17 @@ export function exportCanvasToMarkdown(container: HTMLElement): string {
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
 }
 
+const INLINE_TAGS = new Set(["CODE", "SPAN", "STRONG", "EM", "A", "B", "I", "U", "SMALL", "SUB", "SUP", "MARK", "ABBR"]);
+
 function walkChildren(el: HTMLElement, lines: string[], depth: number) {
+  // Detect if this element contains only inline content (text nodes + inline elements).
+  // If so, concatenate into a single paragraph instead of splitting across lines.
+  if (isInlineContainer(el)) {
+    const text = extractInlineText(el);
+    if (text) lines.push(text, "");
+    return;
+  }
+
   for (const child of el.childNodes) {
     if (child.nodeType === Node.ELEMENT_NODE) {
       walkNode(child as HTMLElement, lines, depth);
@@ -17,6 +27,36 @@ function walkChildren(el: HTMLElement, lines: string[], depth: number) {
       if (text) lines.push(text, "");
     }
   }
+}
+
+/** Check if an element contains only text nodes and inline elements (no block-level children) */
+function isInlineContainer(el: HTMLElement): boolean {
+  for (const child of el.childNodes) {
+    if (child.nodeType === Node.TEXT_NODE) continue;
+    if (child.nodeType === Node.ELEMENT_NODE) {
+      const childEl = child as HTMLElement;
+      if (!INLINE_TAGS.has(childEl.tagName) || childEl.hasAttribute("data-md")) return false;
+    }
+  }
+  return el.childNodes.length > 0;
+}
+
+/** Extract text from an inline container, wrapping <code> in backticks */
+function extractInlineText(el: HTMLElement): string {
+  let result = "";
+  for (const child of el.childNodes) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      result += child.textContent || "";
+    } else if (child.nodeType === Node.ELEMENT_NODE) {
+      const childEl = child as HTMLElement;
+      if (childEl.tagName === "CODE") {
+        result += "`" + (childEl.textContent || "") + "`";
+      } else {
+        result += childEl.textContent || "";
+      }
+    }
+  }
+  return result.trim();
 }
 
 function walkNode(el: HTMLElement, lines: string[], depth: number) {
@@ -40,8 +80,13 @@ function walkNode(el: HTMLElement, lines: string[], depth: number) {
       case "userinput": return handleUserInput(el, lines);
       case "rangeinput": return handleRangeInput(el, lines);
       case "checklist-item": return; // handled by parent (checklist)
+      case "filepreview": return handleFilePreview(el, lines);
+      case "priority": return handlePriority(el, lines);
     }
   }
+
+  // Skip interactive widgets (custom components with buttons/inputs/selects)
+  if (el.querySelector("button, input, select, textarea")) return;
 
   // Unknown element — if it has text, extract it; if it has children, recurse
   if (el.children.length > 0) {
@@ -58,7 +103,9 @@ function handleSection(el: HTMLElement, lines: string[], depth: number) {
   lines.push(`${prefix} ${title}`, "");
 
   // Process section content (skip the heading div, process the content div)
-  const contentDiv = el.querySelector(":scope > div:last-child");
+  // Use :last-of-type instead of :last-child — portaled <button> elements from
+  // BlockCommentButtons can be appended as the last child, breaking :last-child
+  const contentDiv = el.querySelector(":scope > div:last-of-type");
   if (contentDiv) {
     walkChildren(contentDiv as HTMLElement, lines, depth + 1);
   }
@@ -195,6 +242,29 @@ function handleRangeInput(el: HTMLElement, lines: string[]) {
   const display = el.querySelector(".font-mono");
   const value = display?.textContent?.trim() || input?.value || "—";
   lines.push(`**${label}:** ${value}`, "");
+}
+
+function handleFilePreview(el: HTMLElement, lines: string[]) {
+  const path = el.getAttribute("data-md-path") || "";
+  const linesAttr = el.getAttribute("data-md-lines") || "";
+  const code = el.querySelector("code");
+  const text = code?.textContent || "";
+  const ext = path.split(".").pop() || "";
+  const langMap: Record<string, string> = {
+    ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
+    py: "python", rs: "rust", go: "go", rb: "ruby", java: "java",
+    json: "json", yaml: "yaml", yml: "yaml", md: "markdown",
+    css: "css", html: "html", sh: "bash", bash: "bash",
+  };
+  const lang = langMap[ext] || "";
+  const header = linesAttr ? `${path} (L${linesAttr})` : path;
+  lines.push(header, "", `\`\`\`${lang}`, text, "```", "");
+}
+
+function handlePriority(_el: HTMLElement, _lines: string[]) {
+  // Priority is rendered inline within Task items — the Task handler already
+  // captures it as part of child content. Skip standalone rendering to avoid
+  // duplicating the bare level text (e.g. "high").
 }
 
 function extractText(el: HTMLElement): string {

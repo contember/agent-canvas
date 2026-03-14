@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext, useRef } from "react";
-import { SessionContext } from "#canvas/runtime";
+import { SessionContext, ActiveViewCtx } from "#canvas/runtime";
 
 interface FilePreviewProps {
   path: string;
@@ -18,6 +18,7 @@ const EXT_TO_LANG: Record<string, string> = {
 
 export function FilePreview({ path, lines, __content }: FilePreviewProps) {
   const sessionId = useContext(SessionContext);
+  const { setActiveView } = useContext(ActiveViewCtx);
   const [content, setContent] = useState<string | null>(__content ?? null);
   const [language, setLanguage] = useState(() => {
     const ext = path.split(".").pop() || "";
@@ -70,9 +71,13 @@ export function FilePreview({ path, lines, __content }: FilePreviewProps) {
   }
 
   return (
-    <div className="mt-3 bg-bg-code rounded-md overflow-hidden">
+    <div className="mt-3 bg-bg-code rounded-md overflow-hidden" data-md="filepreview" data-md-path={path} {...(lines ? { "data-md-lines": `${lines[0]}-${lines[1]}` } : {})}>
       <div className="px-4 py-2 flex items-center justify-between">
-        <span className="font-mono text-meta text-text-tertiary">{path}</span>
+        <button
+          className="font-mono text-meta text-text-tertiary hover:text-text-secondary hover:underline cursor-pointer text-left"
+          onClick={() => setActiveView({ type: "file", path })}
+          title={`Open ${path}`}
+        >{path}</button>
         {lines && <span className="font-mono text-meta text-text-tertiary opacity-60">L{lines[0]}–{lines[1]}</span>}
       </div>
       <pre className="px-4 pb-3 overflow-x-auto text-code font-mono !bg-transparent" style={{ background: "transparent" }}>
