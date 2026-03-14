@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useAnnotations } from "@planner/runtime";
+import { useAnnotations } from "@canvas/runtime";
 import { ResponseNote } from "./ResponseNote";
 
 /** Radio — pick one option */

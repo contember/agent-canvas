@@ -4,7 +4,12 @@
       "Bash(bun:*)",
       "Bash(lsof:*)",
       "Bash(curl:*)",
-      "WebFetch(domain:mobbin.com)"
+      "WebFetch(domain:mobbin.com)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(ls:*)",
+      "Bash(git status:*)",
+      "Bash(find:*)"
     ]
   }
 }

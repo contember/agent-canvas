@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext, useRef } from "react";
-import { SessionContext } from "@planner/runtime";
+import { SessionContext } from "@canvas/runtime";
 
 interface FilePreviewProps {
   path: string;

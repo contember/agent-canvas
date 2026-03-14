@@ -1,4 +1,4 @@
-// @planner/runtime — shared context between client app and components bundle
+// @canvas/runtime — shared context between client app and components bundle
 // The React.createContext call MUST live here (not in AnnotationProvider)
 // so that both bundles reference the same context object.
 

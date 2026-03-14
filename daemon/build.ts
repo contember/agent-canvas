@@ -13,7 +13,7 @@ async function build() {
   const REACT_EXTERNALS = ["react", "react-dom", "react-dom/client", "react/jsx-runtime", "react/jsx-dev-runtime"];
 
   // 1. Build runtime (shared context between app and components)
-  console.log("  Building @planner/runtime...");
+  console.log("  Building @canvas/runtime...");
   const runtimeResult = await Bun.build({
     entrypoints: [join(ROOT, "client/runtime.ts")],
     outdir: DIST,
@@ -29,12 +29,12 @@ async function build() {
   }
 
   // 2. Build the components library (ESM, React + runtime external)
-  console.log("  Building @planner/components...");
+  console.log("  Building @canvas/components...");
   const componentsResult = await Bun.build({
     entrypoints: [join(ROOT, "client/components/index.ts")],
     outdir: DIST,
     format: "esm",
-    external: [...REACT_EXTERNALS, "@planner/runtime"],
+    external: [...REACT_EXTERNALS, "@canvas/runtime"],
     naming: "components.js",
     minify: true,
   });
@@ -50,7 +50,7 @@ async function build() {
     entrypoints: [join(ROOT, "client/App.tsx")],
     outdir: DIST,
     format: "esm",
-    external: [...REACT_EXTERNALS, "@planner/components", "@planner/runtime"],
+    external: [...REACT_EXTERNALS, "@canvas/components", "@canvas/runtime"],
     naming: "client.js",
     minify: true,
   });
@@ -99,8 +99,8 @@ async function build() {
       "react-dom/client": "/assets/react-dom-client-shim.js",
       "react/jsx-runtime": "/assets/jsx-runtime-shim.js",
       "react/jsx-dev-runtime": "/assets/jsx-dev-runtime-shim.js",
-      "@planner/components": "/assets/components.js",
-      "@planner/runtime": "/assets/runtime.js"
+      "@canvas/components": "/assets/components.js",
+      "@canvas/runtime": "/assets/runtime.js"
     }
   }
   </script>

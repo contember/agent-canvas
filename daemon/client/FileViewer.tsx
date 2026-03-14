@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext, useCallback, useRef, useMemo } from "react";
-import { SessionContext } from "@planner/runtime";
+import { SessionContext } from "@canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
 import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks } from "./highlightRange";
 import { getPopoverPosition } from "./popoverPosition";
