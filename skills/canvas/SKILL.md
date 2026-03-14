@@ -15,9 +15,9 @@ disable-model-invocation: true
 
 Canvas opens a rich, annotatable document in the user's browser. You write JSX, the user reviews and annotates it like Google Docs, and feedback comes back as markdown. Use it whenever structured visual communication beats inline chat.
 
-**Read the flow reference before starting**: Check `references/flows.md` to pick the right flow for your task. Each flow has a specific sequence of canvases with templates.
+**Read the flow reference before starting**: Check `flows.md` to pick the right flow for your task. Each flow has a specific sequence of canvases with templates.
 
-**Read the component reference as needed**: Check `references/components.md` for the full component API.
+**Read the component reference as needed**: Check `components.md` for the full component API.
 
 ## Core Mechanics
 
@@ -97,7 +97,7 @@ All canvas files go in `.claude/canvas/` within the project root. Add `.claude/c
 
 ## Choosing a Flow
 
-Determine which flow fits before starting. See `references/flows.md` for full details with templates.
+Determine which flow fits before starting. See `flows.md` for full details with templates.
 
 ```
 User wants something built/changed?
