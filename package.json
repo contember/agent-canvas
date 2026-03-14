@@ -3,11 +3,10 @@
   "version": "0.1.0",
   "description": "Interactive visual canvas for Claude Code — rich annotatable documents in the browser",
   "bin": {
-    "agent-canvas": "./bin/agent-canvas.ts"
+    "agent-canvas": "bin/agent-canvas.js"
   },
   "files": [
     "bin/",
-    "cli/",
     "daemon/src/",
     "daemon/client/",
     "daemon/dist/",
@@ -31,5 +30,10 @@
     "tailwindcss": "4"
   },
   "license": "MIT",
-  "keywords": ["claude-code", "canvas", "interactive", "annotations"]
+  "keywords": [
+    "claude-code",
+    "canvas",
+    "interactive",
+    "annotations"
+  ]
 }
