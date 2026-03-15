@@ -64,6 +64,17 @@ CANVAS_SESSION_ID=planner-demo bun bin/agent-canvas.ts push example/plan.jsx --l
 
 The CLI blocks waiting for feedback after push — press Ctrl+C to exit without submitting. Each push creates a new revision visible in the browser's revision selector.
 
+## Publishing
+
+Before publishing to npm, always bump the version first:
+
+```bash
+npm version patch          # bumps 0.1.5 → 0.1.6, creates git commit + tag
+npm publish
+```
+
+Use `npm version minor` or `npm version major` for larger changes. Never publish without bumping — npm rejects duplicate versions.
+
 ## Environment Variables
 
 - `CANVAS_SESSION_ID` — current session (set by SessionStart hook)
