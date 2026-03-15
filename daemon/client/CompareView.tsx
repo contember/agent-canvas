@@ -321,7 +321,7 @@ const ComparePanelRenderer = React.forwardRef<HTMLDivElement, ComparePanelRender
     }
 
     if (!PlanComponent) {
-      return <div className="text-text-tertiary text-center py-8 font-body text-body">No plan loaded</div>;
+      return <div className="text-text-tertiary text-center py-8 font-body text-body">No canvas loaded</div>;
     }
 
     return (

@@ -12,7 +12,10 @@ import { SessionSwitcher } from "./SessionSwitcher";
 import { exportCanvasToMarkdown } from "./exportMarkdown";
 import { CompareView } from "./CompareView";
 import { RevisionSelect } from "./RevisionSelect";
-import { generateAnnotationId } from "./utils";
+import { generateAnnotationId, RESPONSE_ANNOTATION_PATH } from "./utils";
+import { wrapRangeWithMark, restoreMarks, renameMarkId, unwrapMarks, updateAllMarkStates } from "./highlightRange";
+import { extractContext } from "./annotationContext";
+import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 
 export type ActiveView = { type: "plan" } | { type: "file"; path: string };
 
@@ -524,11 +527,94 @@ function ResizableSidebar({ children, collapsed, onToggle }: { children: React.R
 function ResponseBanner({ markdown }: { markdown: string }) {
   const [dismissed, setDismissed] = useState(false);
   const html = useMemo(() => marked.parse(markdown, { async: false }) as string, [markdown]);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const { annotations, addAnnotationWithId, removeAnnotation, updateAnnotation, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
+  const [createPopover, setCreatePopover] = useState<{ anchorEl: HTMLElement; tempId: string; snippet: string; ctx: any } | null>(null);
+  const [editPopover, setEditPopover] = useState<{ anchorEl: HTMLElement; annId: string } | null>(null);
+
+  const responseAnnotations = useMemo(() => annotations.filter((a) => a.filePath === RESPONSE_ANNOTATION_PATH), [annotations]);
 
   // Reset dismissed state when markdown changes
   useEffect(() => { setDismissed(false); }, [markdown]);
 
+  // Restore marks after content renders
+  useEffect(() => {
+    if (!contentRef.current || responseAnnotations.length === 0) return;
+    const timer = setTimeout(() => {
+      if (contentRef.current) restoreMarks(contentRef.current, responseAnnotations);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [html, responseAnnotations.length]);
+
+  // Update mark active states
+  const prevActiveRef = useRef<string | null>(null);
+  useEffect(() => {
+    updateAllMarkStates(activeAnnotationId, prevActiveRef.current);
+    prevActiveRef.current = activeAnnotationId;
+  }, [activeAnnotationId]);
+
+  // Click/hover handlers on marks
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container) return;
+    const handleClick = (e: MouseEvent) => {
+      const mark = (e.target as HTMLElement).closest("[data-annotation-id]") as HTMLElement | null;
+      if (!mark) return;
+      e.stopPropagation();
+      const annId = mark.getAttribute("data-annotation-id")!;
+      if (annId === activeAnnotationId) {
+        setEditPopover({ anchorEl: mark, annId });
+      } else {
+        setActiveAnnotationId(annId);
+      }
+    };
+    const handleMouseOver = (e: MouseEvent) => {
+      const mark = (e.target as HTMLElement).closest("[data-annotation-id]") as HTMLElement | null;
+      if (mark) setActiveAnnotationId(mark.getAttribute("data-annotation-id")!);
+    };
+    const handleMouseOut = (e: MouseEvent) => {
+      const mark = (e.target as HTMLElement).closest("[data-annotation-id]");
+      const relatedMark = (e.relatedTarget as HTMLElement | null)?.closest?.("[data-annotation-id]");
+      if (mark && !relatedMark) setActiveAnnotationId(null);
+    };
+    container.addEventListener("click", handleClick);
+    container.addEventListener("mouseover", handleMouseOver);
+    container.addEventListener("mouseout", handleMouseOut);
+    return () => {
+      container.removeEventListener("click", handleClick);
+      container.removeEventListener("mouseover", handleMouseOver);
+      container.removeEventListener("mouseout", handleMouseOut);
+    };
+  }, [html, activeAnnotationId]);
+
+  // Text selection → annotation
+  useEffect(() => {
+    const handler = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+      if (!contentRef.current) return;
+      const range = sel.getRangeAt(0);
+      if (!contentRef.current.contains(range.startContainer)) return;
+      if ((range.startContainer.parentElement as HTMLElement)?.closest?.("[data-annotation-id]")) return;
+      const snippet = sel.toString().trim();
+      if (snippet.length < 2) return;
+      const savedRange = range.cloneRange();
+      const ctx = extractContext(range, contentRef.current);
+      const tempId = `__pending_${Date.now()}`;
+      try { wrapRangeWithMark(savedRange, tempId); } catch {}
+      window.getSelection()?.removeAllRanges();
+      const marks = document.querySelectorAll(`[data-annotation-id="${tempId}"]`);
+      const lastMark = marks[marks.length - 1] as HTMLElement | undefined;
+      if (!lastMark) return;
+      setCreatePopover({ anchorEl: lastMark, tempId, snippet, ctx });
+    };
+    document.addEventListener("mouseup", handler);
+    return () => document.removeEventListener("mouseup", handler);
+  }, []);
+
   if (dismissed) return null;
+
+  const scrollContainer = document.getElementById("plan-scroll-container");
 
   return (
     <div className="mb-6 rounded-lg border border-accent-blue/20 bg-accent-blue/5 relative">
@@ -545,8 +631,42 @@ function ResponseBanner({ markdown }: { markdown: string }) {
           </svg>
           <span className="text-[11px] font-medium uppercase tracking-widest text-accent-blue font-body">Agent Response</span>
         </div>
-        <div className="prose-canvas text-sm" dangerouslySetInnerHTML={{ __html: html }} />
+        <div ref={contentRef} className="prose-canvas text-sm" dangerouslySetInnerHTML={{ __html: html }} />
       </div>
+
+      {createPopover && (
+        <AnnotationCreatePopover
+          anchorEl={createPopover.anchorEl}
+          scrollContainer={scrollContainer}
+          snippet={createPopover.snippet}
+          truncateAt={80}
+          onAdd={(note) => {
+            const id = generateAnnotationId();
+            renameMarkId(createPopover.tempId, id);
+            addAnnotationWithId(id, createPopover.snippet, note, RESPONSE_ANNOTATION_PATH, createPopover.ctx);
+            setCreatePopover(null);
+          }}
+          onCancel={() => {
+            unwrapMarks(createPopover.tempId);
+            setCreatePopover(null);
+          }}
+        />
+      )}
+
+      {editPopover && (() => {
+        const ann = annotations.find((a) => a.id === editPopover.annId);
+        if (!ann) return null;
+        return (
+          <AnnotationEditPopover
+            anchorEl={editPopover.anchorEl}
+            scrollContainer={scrollContainer}
+            initialNote={ann.note}
+            onUpdate={(note) => updateAnnotation(editPopover.annId, note)}
+            onDelete={() => { removeAnnotation(editPopover.annId); setActiveAnnotationId(null); }}
+            onClose={() => setEditPopover(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
@@ -574,7 +694,7 @@ function ContentTabs() {
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="opacity-60">
             <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          Plan
+          Canvas
           {activeView.type === "plan" && (
             <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-text-primary rounded-full" />
           )}

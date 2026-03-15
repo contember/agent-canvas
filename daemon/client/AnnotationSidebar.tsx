@@ -6,7 +6,7 @@ import { RevisionContext, ActiveViewContext, type ActiveView } from "./App";
 import { SessionContext } from "#canvas/runtime";
 import { MarkdownPreview } from "./ResponsePreview";
 import { FileIcon } from "./FileIcon";
-import { autoResizeTextarea } from "./utils";
+import { autoResizeTextarea, RESPONSE_ANNOTATION_PATH } from "./utils";
 
 interface AnnotationSidebarProps {
   onPreview: () => void;
@@ -166,8 +166,9 @@ function ReadOnlyAnnotationList({ annotations, generalNote, activeAnnotationId, 
   setActiveAnnotationId: (id: string | null) => void;
   setActiveView: (view: ActiveView) => void;
 }) {
+  const responseAnnotations = annotations.filter((a) => a.filePath === RESPONSE_ANNOTATION_PATH);
   const planAnnotations = annotations.filter((a) => !a.filePath);
-  const fileAnnotations = annotations.filter((a) => a.filePath);
+  const fileAnnotations = annotations.filter((a) => a.filePath && a.filePath !== RESPONSE_ANNOTATION_PATH);
   const fileGroups: Record<string, Annotation[]> = {};
   for (const ann of fileAnnotations) {
     const key = ann.filePath!;
@@ -225,13 +226,28 @@ function ReadOnlyAnnotationList({ annotations, generalNote, activeAnnotationId, 
     </div>
   );
 
+  const hasMultipleGroups = [responseAnnotations, planAnnotations, fileAnnotations].filter((g) => g.length > 0).length > 1;
+
   return (
     <>
       <div className="flex-1 overflow-y-auto">
-        {planAnnotations.length > 0 && fileAnnotations.length > 0 && (
-          <div className="text-[10px] uppercase tracking-widest text-text-tertiary font-body px-3 mb-1 mt-1">Plan</div>
+        {responseAnnotations.length > 0 && (
+          <>
+            {hasMultipleGroups && (
+              <div className="text-[10px] uppercase tracking-widest text-text-tertiary font-body px-3 mb-1 mt-1">Agent Response</div>
+            )}
+            {responseAnnotations.map(renderAnnotation)}
+          </>
         )}
-        {planAnnotations.map(renderAnnotation)}
+
+        {planAnnotations.length > 0 && (
+          <>
+            {hasMultipleGroups && (
+              <div className="text-[10px] uppercase tracking-widest text-text-tertiary font-body px-3 mb-1 mt-1">Canvas</div>
+            )}
+            {planAnnotations.map(renderAnnotation)}
+          </>
+        )}
 
         {Object.entries(fileGroups).map(([filePath, anns]) => (
           <div key={filePath}>
@@ -271,8 +287,9 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
   const listRef = useRef<HTMLDivElement>(null);
   const annRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
+  const responseAnnotations = annotations.filter((a) => a.filePath === RESPONSE_ANNOTATION_PATH);
   const planAnnotations = annotations.filter((a) => !a.filePath);
-  const fileAnnotations = annotations.filter((a) => a.filePath);
+  const fileAnnotations = annotations.filter((a) => a.filePath && a.filePath !== RESPONSE_ANNOTATION_PATH);
   const fileGroups: Record<string, Annotation[]> = {};
   for (const ann of fileAnnotations) {
     const key = ann.filePath!;
@@ -387,12 +404,21 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
       <div ref={listRef} className="flex-1 overflow-y-auto">
         {annotations.length === 0 && (
           <p className="text-[12px] text-text-tertiary px-3 py-4 leading-relaxed font-body">
-            Select text in the plan or in files to add annotations.
+            Select text in the canvas or in files to add annotations.
           </p>
         )}
 
-        {planAnnotations.length > 0 && fileAnnotations.length > 0 && (
-          <div className="text-[10px] uppercase tracking-widest text-text-tertiary font-body px-3 mb-1 mt-1">Plan</div>
+        {responseAnnotations.length > 0 && (
+          <>
+            {(planAnnotations.length > 0 || fileAnnotations.length > 0) && (
+              <div className="text-[10px] uppercase tracking-widest text-text-tertiary font-body px-3 mb-1 mt-1">Agent Response</div>
+            )}
+            {responseAnnotations.map(renderAnnotation)}
+          </>
+        )}
+
+        {planAnnotations.length > 0 && (responseAnnotations.length > 0 || fileAnnotations.length > 0) && (
+          <div className="text-[10px] uppercase tracking-widest text-text-tertiary font-body px-3 mb-1 mt-1">Canvas</div>
         )}
         {planAnnotations.map(renderAnnotation)}
 

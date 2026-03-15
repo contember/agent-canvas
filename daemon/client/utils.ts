@@ -1,3 +1,6 @@
+/** Sentinel filePath for annotations on the agent response banner */
+export const RESPONSE_ANNOTATION_PATH = "__agent-response__";
+
 /** Generate a unique annotation ID */
 export function generateAnnotationId(): string {
   return `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;

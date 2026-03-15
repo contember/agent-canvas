@@ -333,7 +333,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
   const planElement = useMemo(() => PlanComponent ? <PlanComponent /> : null, [PlanComponent]);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64 text-text-tertiary font-body text-body">Loading plan...</div>;
+    return <div className="flex items-center justify-center h-64 text-text-tertiary font-body text-body">Loading canvas...</div>;
   }
 
   if (error) {
@@ -346,7 +346,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
   }
 
   if (!PlanComponent) {
-    return <div className="text-text-tertiary text-center py-8 font-body text-body">No plan loaded</div>;
+    return <div className="text-text-tertiary text-center py-8 font-body text-body">No canvas loaded</div>;
   }
 
   const scrollContainer = document.getElementById("plan-scroll-container");

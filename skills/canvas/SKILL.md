@@ -155,12 +155,11 @@ User wants to make a decision?
 1. **Determine flow** from user intent
 2. **Announce** briefly: "I'll start with discovery, then create a detailed plan."
 3. **Write canvas JSX** with the Write tool to `.claude/agent-canvas/${CLAUDE_SESSION_ID}/<name>.jsx`
-4. **Push**: `bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/<name>.jsx --session ${CLAUDE_SESSION_ID} --label "<Label>"`
-5. **Tell the user** the canvas is ready for review (they see it in their browser)
-6. **Wait**: `bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}` — this blocks until the user submits feedback
-7. **Read feedback** — check for annotations, answers, added context files, approval
-8. **Edit with the Edit tool and re-push + wait**, or advance to next phase
-9. **After implementation**, push a summary canvas
+4. **Push + tell the user**: Push the canvas and show the `browserUrl` from the output so the user can open it
+5. **IMMEDIATELY watch** — run `bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}` right after push, in the same response. Never stop after pushing. The push→watch sequence is atomic: no push without a watch. The watch blocks until the user submits feedback.
+6. **Read feedback** — check for annotations, answers, added context files, approval
+7. **Edit with the Edit tool and re-push + watch**, or advance to next phase
+8. **After implementation**, push a summary canvas
 
 ## Interview Integration
 

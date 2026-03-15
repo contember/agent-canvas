@@ -105,7 +105,7 @@ export function formatSnippetInContext(ann: { snippet: string; context?: Annotat
   if (ctx && isShort && (ctx.before || ctx.after)) {
     const parts: string[] = [];
     if (ctx.before) parts.push(`...${ctx.before} `);
-    parts.push(snippet);
+    parts.push(`**${snippet}**`);
     if (ctx.after) parts.push(` ${ctx.after}...`);
     return parts.join("");
   }

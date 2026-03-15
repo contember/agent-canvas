@@ -1,5 +1,6 @@
 import type { Annotation, PlanResponse, FeedbackEntry } from "./AnnotationProvider";
 import { formatSnippetInContext } from "./annotationContext";
+import { RESPONSE_ANNOTATION_PATH } from "./utils";
 
 /**
  * Generate human-readable markdown feedback from annotations and responses.
@@ -11,8 +12,9 @@ export function generateMarkdown(
   feedbackEntries?: Map<string, FeedbackEntry>,
 ): string {
   const parts: string[] = [];
+  const responseAnns = annotations.filter((a) => a.filePath === RESPONSE_ANNOTATION_PATH);
   const planAnns = annotations.filter((a) => !a.filePath);
-  const fileAnns = annotations.filter((a) => a.filePath);
+  const fileAnns = annotations.filter((a) => a.filePath && a.filePath !== RESPONSE_ANNOTATION_PATH);
   const resps = responses ? Array.from(responses.values()).filter((r) => hasValue(r)) : [];
   const fbEntries = feedbackEntries
     ? Array.from(feedbackEntries.values()).filter((e) => e.markdown.trim())
@@ -32,9 +34,18 @@ export function generateMarkdown(
     }
   }
 
+  // Response annotations (on agent response banner)
+  if (responseAnns.length > 0) {
+    parts.push("## Annotations on agent response");
+    parts.push("");
+    for (const ann of responseAnns) {
+      parts.push(renderAnnotation(ann));
+    }
+  }
+
   // Plan annotations grouped by hierarchy
   if (planAnns.length > 0) {
-    parts.push("## Plan annotations");
+    parts.push("## Canvas annotations");
     parts.push("");
     const grouped = groupByHierarchy(planAnns);
     parts.push(renderHierarchyGroup(grouped));
