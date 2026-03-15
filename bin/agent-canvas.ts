@@ -1,56 +1,10 @@
 #!/usr/bin/env bun
 
-import { spawn } from "child_process";
-import { readFileSync, existsSync, mkdirSync, unlinkSync, cpSync } from "fs";
-import { join, resolve, dirname } from "path";
-import { homedir, tmpdir } from "os";
-import { randomUUID } from "crypto";
-
-const PACKAGE_ROOT = resolve(join(dirname(import.meta.path), ".."));
-const TEMP_DIR = join(tmpdir(), "agent-canvas");
-const DAEMON_PORT = parseInt(process.env.CANVAS_PORT || "19400", 10);
-const BASE_URL = `http://localhost:${DAEMON_PORT}`;
-const WS_URL = `ws://localhost:${DAEMON_PORT}`;
-const TIMEOUT_MS = parseInt(process.env.CANVAS_TIMEOUT || String(60 * 60 * 1000), 10);
-const PID_FILE = join(TEMP_DIR, "daemon.pid");
-
-function getSessionId(args?: string[]): string {
-  // Check --session flag first
-  if (args) {
-    const idx = args.indexOf("--session");
-    if (idx !== -1 && args[idx + 1]) {
-      return args[idx + 1];
-    }
-  }
-  return process.env.CANVAS_SESSION_ID || (() => {
-    const id = randomUUID();
-    console.error(`Warning: CANVAS_SESSION_ID not set, using generated ID: ${id}`);
-    return id;
-  })();
-}
-
-async function main() {
-  const args = process.argv.slice(2);
-
-  if (args.length === 0) {
-    printUsage();
-    process.exit(1);
-  }
-
-  const command = args[0];
-
-  switch (command) {
-    case "push": return handlePush(args.slice(1));
-    case "fetch": return handleFetch(args.slice(1));
-    case "watch": return handleWatch(args.slice(1));
-    case "install": return handleInstall(args.slice(1));
-    case "daemon": return handleDaemon(args.slice(1));
-    default:
-      console.error(`Unknown command: ${command}`);
-      printUsage();
-      process.exit(1);
-  }
-}
+import { handlePush } from "./lib/commands/push.ts";
+import { handleFetch } from "./lib/commands/fetch.ts";
+import { handleWatch } from "./lib/commands/watch.ts";
+import { handleDaemon } from "./lib/commands/daemon.ts";
+import { handleInstall } from "./lib/commands/install.ts";
 
 function printUsage() {
   console.error(`agent-canvas — Interactive visual canvas for Claude Code
@@ -62,277 +16,35 @@ Commands:
   agent-canvas watch [--session <id>]  Wait for user feedback (blocks until submitted)
   agent-canvas daemon status           Show daemon status
   agent-canvas daemon stop             Stop the daemon
+  agent-canvas daemon start            Start the daemon
+  agent-canvas daemon restart          Restart the daemon
 
 Environment:
   CANVAS_PORT           Daemon port (default: 19400)`);
 }
 
-// ── install ──
+async function main() {
+  const args = process.argv.slice(2);
 
-async function handleInstall(args: string[]) {
-  let mode = args[0] as "local" | "global" | undefined;
-
-  if (!mode) {
-    // Interactive prompt
-    process.stdout.write("Install canvas skill for Claude Code.\n\n");
-    process.stdout.write("  local  — install to .claude/ in current project\n");
-    process.stdout.write("  global — install to ~/.claude/ for all projects\n\n");
-    process.stdout.write("Choose [local/global]: ");
-
-    const input = await readLine();
-    mode = input.trim().toLowerCase() as "local" | "global";
+  if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
+    printUsage();
+    process.exit(args.length === 0 ? 1 : 0);
   }
 
-  if (mode !== "local" && mode !== "global") {
-    console.error("Error: specify 'local' or 'global'");
-    process.exit(1);
-  }
+  const command = args[0];
+  const rest = args.slice(1);
 
-  const targetBase = mode === "global"
-    ? join(homedir(), ".claude")
-    : join(process.cwd(), ".claude");
-
-  // Install skill
-  const skillTarget = join(targetBase, "skills", "canvas");
-  mkdirSync(skillTarget, { recursive: true });
-
-  const skillSrc = join(PACKAGE_ROOT, "skills", "canvas");
-  for (const file of ["SKILL.md", "components.md", "flows.md"]) {
-    const src = join(skillSrc, file);
-    if (existsSync(src)) {
-      cpSync(src, join(skillTarget, file));
-    }
-  }
-
-  console.log(`  Skill installed to ${skillTarget}`);
-
-  console.log(`\nInstalled! The /canvas command is now available in Claude Code.`);
-}
-
-// ── push ──
-
-async function handlePush(args: string[]) {
-  const filePath = args.find((a) => !a.startsWith("--"));
-  if (!filePath) {
-    console.error("Error: No file specified. Usage: agent-canvas push <file.jsx>");
-    process.exit(1);
-  }
-  const resolvedPath = resolve(filePath);
-  if (!existsSync(resolvedPath)) {
-    console.error(`Error: File not found: ${resolvedPath}`);
-    process.exit(1);
-  }
-  const jsx = readFileSync(resolvedPath, "utf-8");
-
-  const sessionId = getSessionId(args);
-  const projectRoot = process.env.CANVAS_PROJECT_ROOT || process.cwd();
-
-  // Extract --label flag
-  const labelIdx = args.indexOf("--label");
-  const label = labelIdx !== -1 && args[labelIdx + 1] ? args[labelIdx + 1] : undefined;
-  const autoLabel = !label ? resolvedPath.split("/").pop()?.replace(/\.jsx$/, "") : undefined;
-
-  await ensureDaemon();
-
-  const response = await fetch(`${BASE_URL}/api/session/${sessionId}/plan`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsx, projectRoot, label: label || autoLabel, sourceFile: resolvedPath.split("/").pop() }),
-  });
-
-  const result = await response.json() as any;
-
-  if (!result.ok) {
-    console.error(`Compilation error:\n${result.error}`);
-    process.exit(1);
-  }
-
-  if (result.isNew) {
-    openBrowser(result.browserUrl);
-  }
-
-  // If there was unconsumed feedback from a previous revision, output it
-  if (result.unconsumedFeedback) {
-    console.error(`Warning: Unconsumed feedback from revision ${result.unconsumedRevision} was pending.`);
-    console.log(result.unconsumedFeedback);
-  }
-
-  console.log(JSON.stringify({
-    ok: true,
-    browserUrl: result.browserUrl,
-    revision: result.revision,
-    sessionId,
-    ...(result.unconsumedFeedback ? { hadUnconsumedFeedback: true, unconsumedRevision: result.unconsumedRevision } : {}),
-  }));
-}
-
-// ── fetch ──
-
-async function consumeFeedback(sessionId: string): Promise<string | null> {
-  const res = await fetch(`${BASE_URL}/api/session/${sessionId}/feedback/consume`, { method: "POST" });
-  const data = await res.json() as any;
-  if (data.found) return data.feedback;
-  return null;
-}
-
-async function handleFetch(args: string[]) {
-  const sessionId = getSessionId(args);
-  await ensureDaemon();
-
-  const feedback = await consumeFeedback(sessionId);
-  if (feedback) {
-    process.stdout.write(feedback);
-  }
-}
-
-// ── watch ──
-
-async function handleWatch(args: string[]) {
-  const sessionId = getSessionId(args);
-  await ensureDaemon();
-
-  // Check for already-submitted feedback first
-  const feedback = await consumeFeedback(sessionId);
-  if (feedback) {
-    process.stdout.write(feedback);
-    process.exit(0);
-  }
-
-  // Otherwise block on WebSocket
-  await waitForFeedback(sessionId);
-}
-
-// ── daemon ──
-
-async function handleDaemon(args: string[]) {
-  const subcommand = args[0];
-
-  if (subcommand === "status") {
-    try {
-      const res = await fetch(`${BASE_URL}/health`, { signal: AbortSignal.timeout(2000) });
-      const data = await res.json() as any;
-      console.log(`Daemon: running on port ${DAEMON_PORT}`);
-      console.log(`Sessions: ${data.sessions.length > 0 ? data.sessions.join(", ") : "none"}`);
-    } catch {
-      console.log("Daemon: not running");
-    }
-  } else if (subcommand === "stop") {
-    if (existsSync(PID_FILE)) {
-      const pid = parseInt(readFileSync(PID_FILE, "utf-8").trim(), 10);
-      try {
-        process.kill(pid, "SIGTERM");
-        console.log("Daemon stopped.");
-      } catch {
-        console.log("Daemon was not running (stale PID file).");
-      }
-      try { unlinkSync(PID_FILE); } catch {}
-    } else {
-      console.log("No daemon PID file found.");
-    }
-  } else {
-    console.error("Usage: agent-canvas daemon [status|stop]");
-    process.exit(1);
-  }
-}
-
-// ── helpers ──
-
-async function ensureDaemon(): Promise<void> {
-  if (await isDaemonRunning()) return;
-
-  console.error("Starting canvas daemon...");
-  mkdirSync(TEMP_DIR, { recursive: true });
-
-  const daemonScript = join(PACKAGE_ROOT, "daemon", "src", "server.ts");
-
-  const child = spawn("bun", ["run", daemonScript], {
-    detached: true,
-    stdio: "ignore",
-    cwd: join(PACKAGE_ROOT, "daemon"),
-  });
-
-  child.unref();
-
-  for (let i = 0; i < 30; i++) {
-    await new Promise((r) => setTimeout(r, 100));
-    if (await isDaemonRunning()) {
-      console.error("Daemon started.");
-      return;
-    }
-  }
-
-  console.error("Error: Daemon failed to start within 3 seconds.");
-  process.exit(1);
-}
-
-async function isDaemonRunning(): Promise<boolean> {
-  try {
-    const res = await fetch(`${BASE_URL}/health`, { signal: AbortSignal.timeout(1000) });
-    const data = await res.json() as any;
-    return data.ok === true;
-  } catch {
-    return false;
-  }
-}
-
-function openBrowser(url: string) {
-  const candidates = process.platform === "darwin"
-    ? ["open"]
-    : ["xdg-open", "wslview", "sensible-browser"];
-
-  for (const cmd of candidates) {
-    const which = Bun.spawnSync(["which", cmd]);
-    if (which.exitCode === 0) {
-      spawn(cmd, [url], { detached: true, stdio: "ignore" }).unref();
-      return;
-    }
-  }
-  console.error(`Open this URL in your browser: ${url}`);
-}
-
-async function waitForFeedback(sessionId: string): Promise<void> {
-  return new Promise((resolveP, rejectP) => {
-    const ws = new WebSocket(`${WS_URL}/ws/wait/${sessionId}`);
-    const timeout = setTimeout(() => {
-      ws.close();
-      console.error("Error: Timeout waiting for feedback.");
+  switch (command) {
+    case "push": return handlePush(rest);
+    case "fetch": return handleFetch(rest);
+    case "watch": return handleWatch(rest);
+    case "install": return handleInstall(rest);
+    case "daemon": return handleDaemon(rest);
+    default:
+      console.error(`Unknown command: ${command}`);
+      printUsage();
       process.exit(1);
-    }, TIMEOUT_MS);
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(typeof event.data === "string" ? event.data : "");
-        if (data.type === "submit") {
-          clearTimeout(timeout);
-          process.stdout.write(data.feedback);
-          ws.close();
-          process.exit(0);
-        }
-      } catch {}
-    };
-
-    ws.onerror = () => {
-      clearTimeout(timeout);
-      console.error("Error: WebSocket connection failed.");
-      process.exit(1);
-    };
-
-    ws.onclose = () => {
-      clearTimeout(timeout);
-    };
-  });
-}
-
-
-async function readLine(): Promise<string> {
-  const buf: number[] = [];
-  for await (const chunk of Bun.stdin.stream()) {
-    for (const byte of chunk) {
-      if (byte === 10) return Buffer.from(buf).toString("utf-8");
-      buf.push(byte);
-    }
   }
-  return Buffer.from(buf).toString("utf-8");
 }
 
 main().catch((e) => {
