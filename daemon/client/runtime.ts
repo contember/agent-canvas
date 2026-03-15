@@ -8,6 +8,8 @@ export interface AnnotationContext {
   before: string;
   after: string;
   hierarchy: string[];
+  lineStart?: number;
+  lineEnd?: number;
 }
 
 export interface Annotation {

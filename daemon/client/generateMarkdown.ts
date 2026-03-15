@@ -144,17 +144,44 @@ function renderResponse(r: PlanResponse): string {
 function renderAnnotation(ann: Annotation): string {
   const lines: string[] = [];
   const snippet = ann.snippet.trim();
-  const context = formatSnippetInContext(ann);
+  const ctx = ann.context;
+  const hasLineInfo = ctx?.lineStart != null;
 
-  // Show selected text as a quote
-  if (snippet.split("\n").length <= 3) {
-    lines.push(`> ${context.split("\n").join("\n> ")}`);
-  } else {
-    // Longer selections — just first/last line
+  if (ann.filePath && hasLineInfo) {
+    // File annotation with line numbers
+    const lineStart = ctx!.lineStart!;
+    const lineEnd = ctx!.lineEnd ?? lineStart;
     const snippetLines = snippet.split("\n");
-    lines.push(`> ${snippetLines[0]}`);
-    lines.push(`> ... (${snippetLines.length} lines)`);
-    lines.push(`> ${snippetLines[snippetLines.length - 1]}`);
+    const isShort = snippet.length < 30 && lineStart === lineEnd;
+
+    if (isShort && (ctx!.before || ctx!.after)) {
+      // Short snippet on single line — show full line context
+      const expanded = formatSnippetInContext(ann);
+      lines.push(`> L${lineStart}: ${expanded}`);
+    } else if (snippetLines.length <= 6) {
+      for (let i = 0; i < snippetLines.length; i++) {
+        lines.push(`> ${lineStart + i} | ${snippetLines[i]}`);
+      }
+    } else {
+      for (let i = 0; i < 3; i++) {
+        lines.push(`> ${lineStart + i} | ${snippetLines[i]}`);
+      }
+      lines.push(`> ... (${snippetLines.length} lines)`);
+      for (let i = snippetLines.length - 3; i < snippetLines.length; i++) {
+        lines.push(`> ${lineStart + i} | ${snippetLines[i]}`);
+      }
+    }
+  } else {
+    // Plan annotations or file annotations without line info
+    const context = formatSnippetInContext(ann);
+    if (snippet.split("\n").length <= 3) {
+      lines.push(`> ${context.split("\n").join("\n> ")}`);
+    } else {
+      const snippetLines = snippet.split("\n");
+      lines.push(`> ${snippetLines[0]}`);
+      lines.push(`> ... (${snippetLines.length} lines)`);
+      lines.push(`> ${snippetLines[snippetLines.length - 1]}`);
+    }
   }
 
   // Comment
