@@ -101,7 +101,7 @@ function RevisionSelector() {
   const isLatest = selectedRevision === currentRevision;
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex flex-col gap-1">
       <RevisionSelect
         value={selectedRevision}
         onChange={setSelectedRevision}
@@ -123,7 +123,7 @@ function RevisionSelector() {
           }
           setCompareRevision({ left, right: currentRevision });
         }}
-        className="text-[11px] font-body font-medium px-2 py-0.5 rounded-md text-accent-blue hover:bg-accent-blue-muted transition-colors"
+        className="text-[11px] font-body font-medium px-2 py-0.5 rounded-md text-accent-blue hover:bg-accent-blue-muted transition-colors self-start"
       >
         Compare
       </button>
