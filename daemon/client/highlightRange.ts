@@ -1,23 +1,3 @@
-const MARK_STYLE_INACTIVE = `
-  background: var(--color-highlight-annotation);
-  border-bottom: 1.5px solid var(--color-highlight-bg);
-  border-radius: 2px;
-  cursor: pointer;
-  transition: background 150ms ease;
-  color: inherit;
-  padding: 1px 0;
-`;
-
-const MARK_STYLE_ACTIVE = `
-  background: var(--color-highlight-bg);
-  border-bottom: 1.5px solid var(--color-highlight-border);
-  border-radius: 2px;
-  cursor: pointer;
-  transition: background 150ms ease;
-  color: inherit;
-  padding: 1px 0;
-`;
-
 /**
  * Wraps the current browser Range in <mark> elements with the given annotation ID.
  * Works for multiline / cross-element selections.
@@ -46,7 +26,6 @@ export function wrapRangeWithMark(range: Range, annotationId: string): HTMLEleme
     // Wrap this portion in a <mark>
     const mark = document.createElement("mark");
     mark.setAttribute("data-annotation-id", annotationId);
-    mark.style.cssText = MARK_STYLE_INACTIVE;
 
     try {
       nodeRange.surroundContents(mark);
@@ -94,7 +73,7 @@ function getTextNodesInRange(range: Range): Text[] {
 export function setMarkActive(annotationId: string, active: boolean) {
   const marks = document.querySelectorAll(`[data-annotation-id="${annotationId}"]`);
   for (const mark of marks) {
-    (mark as HTMLElement).style.cssText = active ? MARK_STYLE_ACTIVE : MARK_STYLE_INACTIVE;
+    (mark as HTMLElement).classList.toggle("mark-active", active);
   }
 }
 

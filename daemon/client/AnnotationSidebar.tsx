@@ -8,6 +8,7 @@ import { MarkdownPreview } from "./ResponsePreview";
 import { FileIcon } from "./FileIcon";
 import { autoResizeTextarea, RESPONSE_ANNOTATION_PATH } from "./utils";
 import { AnnotationEditor, ImageThumbnails } from "./AnnotationEditor";
+import { findAnnotationElement, scrollToAnnotation } from "./annotationDom";
 
 interface AnnotationSidebarProps {
   onPreview: () => void;
@@ -180,8 +181,6 @@ function ReadOnlyAnnotationList({ annotations, generalNote, activeAnnotationId, 
   const handleMouseEnter = (annId: string) => {
     setActiveAnnotationId(annId);
     setMarkActive(annId, true);
-    const mark = document.querySelector(`[data-annotation-id="${annId}"]`) as HTMLElement | null;
-    if (mark) mark.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
 
   const handleMouseLeave = (annId: string) => {
@@ -197,8 +196,8 @@ function ReadOnlyAnnotationList({ annotations, generalNote, activeAnnotationId, 
       if (ann.filePath) {
         setActiveView({ type: "file", path: ann.filePath });
         setTimeout(() => {
-          const mark = document.querySelector(`[data-annotation-id="${ann.id}"]`) as HTMLElement | null;
-          if (mark) mark.scrollIntoView({ behavior: "smooth", block: "center" });
+          const el = findAnnotationElement(ann);
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
         }, 150);
       }
     }
@@ -207,7 +206,7 @@ function ReadOnlyAnnotationList({ annotations, generalNote, activeAnnotationId, 
   const renderAnnotation = (ann: Annotation) => (
     <div
       key={ann.id}
-      className={`relative px-3 py-2.5 transition-colors duration-150 cursor-pointer ${
+      className={`group/ann relative px-3 py-2.5 transition-colors duration-150 cursor-pointer ${
         activeAnnotationId === ann.id
           ? "bg-highlight-selected"
           : "odd:bg-bg-elevated-half hover:bg-bg-input"
@@ -225,6 +224,17 @@ function ReadOnlyAnnotationList({ annotations, generalNote, activeAnnotationId, 
         </div>
       )}
       <ImageThumbnails images={ann.images || []} />
+      <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/ann:opacity-100 transition-opacity duration-100">
+        <button
+          onClick={(e) => { e.stopPropagation(); scrollToAnnotation(ann, setActiveView); }}
+          className="w-5 h-5 flex items-center justify-center rounded text-text-tertiary hover:text-text-secondary hover:bg-bg-input transition-colors"
+          title="Scroll to annotation"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 
@@ -310,15 +320,10 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
     }
   }, [activeAnnotationId]);
 
-  // Hover on sidebar card → highlight inline mark + block + scroll to it
+  // Hover on sidebar card → highlight inline mark + block
   const handleMouseEnter = useCallback((annId: string) => {
     setActiveAnnotationId(annId);
     setMarkActive(annId, true);
-    // Scroll inline mark into view
-    const mark = document.querySelector(`[data-annotation-id="${annId}"]`) as HTMLElement | null;
-    if (mark) {
-      mark.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
   }, [setActiveAnnotationId]);
 
   const handleMouseLeave = useCallback((annId: string) => {
@@ -349,10 +354,9 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
           setActiveAnnotationId(ann.id);
           if (ann.filePath) {
             setActiveView({ type: "file", path: ann.filePath });
-            // Scroll to mark after file view renders
             setTimeout(() => {
-              const mark = document.querySelector(`[data-annotation-id="${ann.id}"]`) as HTMLElement | null;
-              if (mark) mark.scrollIntoView({ behavior: "smooth", block: "center" });
+              const el = findAnnotationElement(ann);
+              if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
             }, 150);
           }
         }
@@ -381,8 +385,20 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
         />
       </div>
 
-      {/* Delete — top right on hover */}
-      <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/ann:opacity-100 transition-opacity duration-100">
+      {/* Actions — top right on hover */}
+      <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/ann:opacity-100 transition-opacity duration-100 flex items-center gap-0.5">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            scrollToAnnotation(ann, setActiveView);
+          }}
+          className="w-5 h-5 flex items-center justify-center rounded text-text-tertiary hover:text-text-secondary hover:bg-bg-input transition-colors"
+          title="Scroll to annotation"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+          </svg>
+        </button>
         <button
           onClick={(e) => { e.stopPropagation(); removeAnnotation(ann.id); }}
           className="w-5 h-5 flex items-center justify-center rounded text-text-tertiary hover:text-accent-red hover:bg-accent-red-muted transition-colors"

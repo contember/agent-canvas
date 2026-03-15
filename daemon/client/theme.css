@@ -31,7 +31,7 @@
   --color-highlight-bg: rgba(255, 220, 100, 0.15);
   --color-highlight-border: rgba(255, 220, 100, 0.35);
   --color-highlight-annotation: rgba(255, 220, 100, 0.18);
-  --color-highlight-active: rgba(255, 220, 100, 0.25);
+  --color-highlight-active: rgba(255, 220, 100, 0.35);
   --color-highlight-selected: rgba(255, 220, 100, 0.10);
 
   --color-badge-bg: rgba(196, 154, 58, 0.20);
