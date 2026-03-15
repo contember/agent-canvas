@@ -12,6 +12,26 @@ async function build() {
 
   const REACT_EXTERNALS = ["react", "react-dom", "react-dom/client", "react/jsx-runtime", "react/jsx-dev-runtime"];
 
+  // 0. Build preact-compat bundle
+  console.log("  Building preact-compat...");
+  const preactResult = await Bun.build({
+    entrypoints: [join(ROOT, "client/compat/preact-all.ts")],
+    outdir: DIST,
+    format: "esm",
+    naming: "preact-compat.js",
+    minify: true,
+  });
+
+  if (!preactResult.success) {
+    console.error("Preact-compat build failed:", preactResult.logs);
+    process.exit(1);
+  }
+
+  // Write jsx-runtime shim
+  writeFileSync(join(DIST, "jsx-runtime.js"),
+    `import { jsx, jsxs, Fragment } from "./preact-compat.js";\nexport { jsx, jsxs, Fragment };\nexport const jsxDEV = jsx;\n`
+  );
+
   // 1. Build runtime (shared context between app and components)
   console.log("  Building #canvas/runtime...");
   const runtimeResult = await Bun.build({
@@ -67,11 +87,9 @@ async function build() {
   // 5. Read theme.css to inline into HTML for browser Tailwind runtime
   const themeCss = readFileSync(join(ROOT, "client/theme.css"), "utf-8");
 
-  // 6. Create React shims for import maps
-  // These re-export from the global React loaded via UMD
-  console.log("  Creating React shims...");
+  // 6. Create index.html
+  console.log("  Creating index.html...");
 
-  // Write the index.html to use CDN React
   const indexHtml = `<!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -91,21 +109,14 @@ ${themeCss}
   <script src="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
   <script src="https://unpkg.com/mermaid@11.4.1/dist/mermaid.min.js"></script>
   <script>mermaid.initialize({ startOnLoad: false, theme: document.documentElement.dataset.theme === 'light' ? 'default' : 'dark' });</script>
-  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
-  <script>
-    // Create ESM modules from UMD globals
-    window.__REACT_ESM__ = Object.keys(React).reduce((m, k) => { m[k] = React[k]; return m; }, { default: React, __esModule: true });
-    window.__REACT_DOM_ESM__ = Object.keys(ReactDOM).reduce((m, k) => { m[k] = ReactDOM[k]; return m; }, { default: ReactDOM, __esModule: true });
-  </script>
   <script type="importmap">
   {
     "imports": {
-      "react": "/assets/react-shim.js",
-      "react-dom": "/assets/react-dom-shim.js",
-      "react-dom/client": "/assets/react-dom-client-shim.js",
-      "react/jsx-runtime": "/assets/jsx-runtime-shim.js",
-      "react/jsx-dev-runtime": "/assets/jsx-dev-runtime-shim.js",
+      "react": "/assets/preact-compat.js",
+      "react-dom": "/assets/preact-compat.js",
+      "react-dom/client": "/assets/preact-compat.js",
+      "react/jsx-runtime": "/assets/jsx-runtime.js",
+      "react/jsx-dev-runtime": "/assets/jsx-runtime.js",
       "#canvas/components": "/assets/components.js",
       "#canvas/runtime": "/assets/runtime.js"
     }
@@ -116,51 +127,6 @@ ${themeCss}
 </html>`;
 
   writeFileSync(join(DIST, "index.html"), indexHtml);
-
-  // React ESM shims
-  writeFileSync(join(DIST, "react-shim.js"), `
-const R = window.React;
-export default R;
-export const { useState, useEffect, useRef, useCallback, useContext, useMemo, useReducer, createContext, createElement, Fragment, Children, cloneElement, isValidElement, memo, forwardRef, lazy, Suspense, startTransition, useTransition, useDeferredValue, useId, useSyncExternalStore, useInsertionEffect, useImperativeHandle, useLayoutEffect, useDebugValue, Component, PureComponent } = R;
-`);
-
-  writeFileSync(join(DIST, "react-dom-shim.js"), `
-const RD = window.ReactDOM;
-export default RD;
-export const { createPortal, flushSync, hydrate, render, unmountComponentAtNode, findDOMNode, unstable_batchedUpdates } = RD;
-`);
-
-  writeFileSync(join(DIST, "react-dom-client-shim.js"), `
-const RD = window.ReactDOM;
-export const { createRoot, hydrateRoot } = RD;
-export default { createRoot: RD.createRoot, hydrateRoot: RD.hydrateRoot };
-`);
-
-  // jsxDEV signature: (type, props, key, isStaticChildren, source, self)
-  // jsx/jsxs signature: (type, props, key)
-  // createElement signature: (type, props, ...children)
-  // We need to adapt: extract children from props and pass to createElement
-  const jsxShimCode = `
-const R = window.React;
-export const Fragment = R.Fragment;
-function _jsx(type, props, key) {
-  if (props && 'children' in props) {
-    const { children, ...rest } = props;
-    if (key !== undefined && key !== null) rest.key = key;
-    return Array.isArray(children)
-      ? R.createElement(type, rest, ...children)
-      : R.createElement(type, rest, children);
-  }
-  if (key !== undefined && key !== null) props = { ...props, key };
-  return R.createElement(type, props);
-}
-export const jsx = _jsx;
-export const jsxs = _jsx;
-export function jsxDEV(type, props, key) { return _jsx(type, props, key); }
-`;
-
-  writeFileSync(join(DIST, "jsx-runtime-shim.js"), jsxShimCode);
-  writeFileSync(join(DIST, "jsx-dev-runtime-shim.js"), jsxShimCode);
 
   console.log("Build complete! Output in dist/");
 }

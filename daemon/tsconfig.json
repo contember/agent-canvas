@@ -15,5 +15,6 @@
       "#canvas/components": ["./client/components/index.ts"]
     }
   },
-  "include": ["src/**/*", "client/**/*"]
+  "include": ["src/**/*", "client/**/*"],
+  "exclude": ["client/compat/**/*"]
 }
