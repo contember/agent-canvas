@@ -5,6 +5,8 @@ Interactive browser-based visual canvas for [Claude Code](https://docs.anthropic
 ![License](https://img.shields.io/npm/l/agent-canvas)
 ![npm](https://img.shields.io/npm/v/agent-canvas)
 
+![Agent Canvas](.github/dark.png)
+
 ## What it does
 
 When Claude needs to present a plan, review, explanation, or decision — instead of dumping markdown in the terminal — it renders a full interactive canvas in your browser. You can:
@@ -52,6 +54,14 @@ Claude uses different canvas flows depending on the task:
 | **Explain** | "How does X work?" | Single canvas |
 | **Review** | Code/architecture review | Findings → Fix Plan → Summary |
 | **Decision** | Choosing between options | Single canvas with comparison |
+
+## Theming
+
+Agent Canvas supports light and dark themes, automatically matching your system preference.
+
+**Dark mode**
+
+![](.github/dark.png)
 
 ## Development
 
