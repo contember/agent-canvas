@@ -321,16 +321,96 @@ export function runDomDiff(
   oldContainer: HTMLElement,
   newContainer: HTMLElement
 ): boolean {
+  // Handle mermaid blocks separately via data-md-source comparison
+  const mermaidChanged = diffMermaidBlocks(oldContainer, newContainer);
+
   const oldExtract = extractWords(oldContainer);
   const newExtract = extractWords(newContainer);
 
   const { oldOps, newOps } = computeWordDiff(oldExtract.words, newExtract.words);
 
-  const hasChanges =
+  const hasWordChanges =
     oldOps.some((op) => op.type === "removed") || newOps.some((op) => op.type === "added");
 
   applyHighlightsByNode(oldOps, oldExtract.map, "diff-removed");
   applyHighlightsByNode(newOps, newExtract.map, "diff-added");
 
-  return hasChanges;
+  return hasWordChanges || mermaidChanged;
+}
+
+/**
+ * Compare mermaid blocks between old and new containers by data-md-source.
+ * Highlights changed mermaid blocks with a border and appends a source diff.
+ */
+function diffMermaidBlocks(oldContainer: HTMLElement, newContainer: HTMLElement): boolean {
+  const oldMermaids = Array.from(oldContainer.querySelectorAll<HTMLElement>('[data-md="mermaid"]'));
+  const newMermaids = Array.from(newContainer.querySelectorAll<HTMLElement>('[data-md="mermaid"]'));
+  let changed = false;
+
+  // Match by position (simple 1:1 pairing)
+  const count = Math.max(oldMermaids.length, newMermaids.length);
+  for (let i = 0; i < count; i++) {
+    const oldEl = oldMermaids[i];
+    const newEl = newMermaids[i];
+
+    if (!oldEl && newEl) {
+      // Added
+      newEl.classList.add("diff-block-added");
+      newEl.style.position = "relative";
+      changed = true;
+      continue;
+    }
+    if (oldEl && !newEl) {
+      // Removed
+      oldEl.classList.add("diff-block-removed");
+      oldEl.style.position = "relative";
+      changed = true;
+      continue;
+    }
+    if (!oldEl || !newEl) continue;
+
+    const oldSource = (oldEl.getAttribute("data-md-source") || "").trim();
+    const newSource = (newEl.getAttribute("data-md-source") || "").trim();
+
+    if (oldSource === newSource) continue;
+    changed = true;
+
+    // Highlight containers
+    oldEl.style.borderLeft = "3px solid var(--color-accent-red)";
+    oldEl.style.paddingLeft = "8px";
+    newEl.style.borderLeft = "3px solid var(--color-accent-green)";
+    newEl.style.paddingLeft = "8px";
+
+    // Append source diffs
+    const oldLines = oldSource.split("\n");
+    const newLines = newSource.split("\n");
+    const lcs = simpleLCS(oldLines, newLines);
+
+    const buildDiffEl = (lines: string[], lcsArr: string[], side: "old" | "new") => {
+      const container = document.createElement("div");
+      container.className = "mt-2 bg-bg-code rounded-md overflow-hidden text-tiny font-mono";
+      container.setAttribute("data-no-diff", "true");
+
+      let li = 0, si = 0;
+      while (si < lines.length) {
+        const row = document.createElement("div");
+        row.className = "px-3 py-0.5 whitespace-pre-wrap";
+        if (li < lcsArr.length && lines[si] === lcsArr[li]) {
+          row.textContent = "  " + lines[si];
+          si++; li++;
+        } else {
+          row.classList.add(side === "old" ? "diff-removed" : "diff-added");
+          row.textContent = (side === "old" ? "- " : "+ ") + lines[si];
+          si++;
+        }
+        container.appendChild(row);
+      }
+      return container;
+    };
+
+    oldEl.appendChild(buildDiffEl(oldLines, lcs, "old"));
+    newEl.appendChild(buildDiffEl(newLines, lcs, "new"));
+  }
+
+  return changed;
 }

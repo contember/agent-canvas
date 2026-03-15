@@ -326,7 +326,7 @@ export default function Plan() {
         <Mermaid>{`
           graph LR
             CC[Claude Code] -->|write| JSX[plan.jsx]
-            JSX -->|planner push| D[Daemon]
+            JSX -->|push| D[Daemon :19400]
             D -->|compile + serve| B[Browser]
             B -->|WebSocket submit| D
             D -->|WebSocket forward| CLI[CLI stdout]

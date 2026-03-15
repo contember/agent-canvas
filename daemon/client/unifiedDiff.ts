@@ -101,6 +101,8 @@ function blockKey(el: HTMLElement, type: string): string {
       return "checklist-item:" + (el.getAttribute("data-md-label") || el.textContent?.slice(0, 60) || "");
     case "checklist":
       return "checklist:" + el.querySelectorAll("[data-md='checklist-item']").length;
+    case "mermaid":
+      return "mermaid:" + (el.getAttribute("data-md-source") || "").slice(0, 80);
     case "callout":
       return "callout:" + (el.getAttribute("data-md-type") || "") + ":" + (el.textContent || "").slice(0, 60);
     default:
@@ -157,7 +159,9 @@ export function buildUnifiedDom(matches: BlockMatch[]): { fragment: DocumentFrag
       const clone = match.newBlock!.element.cloneNode(true) as HTMLElement;
       const type = match.newBlock!.type;
 
-      if (match.childMatches && match.childMatches.length > 0 && (type === "table" || type === "checklist")) {
+      if (type === "mermaid") {
+        if (applyMermaidDiff(match.oldBlock!.element, clone)) hasChanges = true;
+      } else if (match.childMatches && match.childMatches.length > 0 && (type === "table" || type === "checklist")) {
         if (processListLike(clone, match.childMatches, type)) hasChanges = true;
       } else if (match.childMatches && match.childMatches.length > 0) {
         if (processBlockWithChildren(match.oldBlock!, clone, match.childMatches, type)) hasChanges = true;
@@ -226,7 +230,9 @@ function processBlockWithChildren(
     if (cm.kind === "matched") {
       const newChild = cloneMap.newMap.get(cm.newBlock!.element);
       if (newChild) {
-        if (cm.childMatches && cm.childMatches.length > 0 && (cm.newBlock!.type === "table" || cm.newBlock!.type === "checklist")) {
+        if (cm.newBlock!.type === "mermaid") {
+          if (applyMermaidDiff(cm.oldBlock!.element, newChild)) hasChanges = true;
+        } else if (cm.childMatches && cm.childMatches.length > 0 && (cm.newBlock!.type === "table" || cm.newBlock!.type === "checklist")) {
           if (processListLike(newChild, cm.childMatches, cm.newBlock!.type)) hasChanges = true;
         } else if (cm.childMatches && cm.childMatches.length > 0) {
           if (processBlockWithChildren(cm.oldBlock!, newChild, cm.childMatches, cm.newBlock!.type))
@@ -589,6 +595,63 @@ function rebuildTextNode(
   }
 
   parent.replaceChild(frag, textNode);
+}
+
+/* ── Mermaid source diff ── */
+
+/**
+ * Compare mermaid blocks by their data-md-source attribute instead of rendered SVG content.
+ * If sources differ, show a line-level text diff of the mermaid source code.
+ */
+function applyMermaidDiff(oldEl: HTMLElement, newEl: HTMLElement): boolean {
+  const oldSource = (oldEl.getAttribute("data-md-source") || "").trim();
+  const newSource = (newEl.getAttribute("data-md-source") || "").trim();
+
+  if (oldSource === newSource) return false;
+
+  // Compute line-level diff of the source
+  const oldLines = oldSource.split("\n");
+  const newLines = newSource.split("\n");
+  const lcs = simpleLCS(oldLines, newLines);
+
+  const diffLines: Array<{ type: "same" | "added" | "removed"; line: string }> = [];
+  let oi = 0, ni = 0, li = 0;
+  while (oi < oldLines.length || ni < newLines.length) {
+    if (li < lcs.length && oi < oldLines.length && ni < newLines.length &&
+        oldLines[oi] === lcs[li] && newLines[ni] === lcs[li]) {
+      diffLines.push({ type: "same", line: oldLines[oi] });
+      oi++; ni++; li++;
+    } else if (oi < oldLines.length && (li >= lcs.length || oldLines[oi] !== lcs[li])) {
+      diffLines.push({ type: "removed", line: oldLines[oi] });
+      oi++;
+    } else if (ni < newLines.length) {
+      diffLines.push({ type: "added", line: newLines[ni] });
+      ni++;
+    }
+  }
+
+  // Append a diff view after the diagram
+  const diffContainer = document.createElement("div");
+  diffContainer.className = "mt-2 bg-bg-code rounded-md overflow-hidden text-tiny font-mono";
+  diffContainer.setAttribute("data-no-diff", "true");
+
+  for (const dl of diffLines) {
+    const row = document.createElement("div");
+    row.className = "px-3 py-0.5 whitespace-pre-wrap";
+    if (dl.type === "removed") {
+      row.classList.add("diff-removed");
+      row.textContent = "- " + dl.line;
+    } else if (dl.type === "added") {
+      row.classList.add("diff-added");
+      row.textContent = "+ " + dl.line;
+    } else {
+      row.textContent = "  " + dl.line;
+    }
+    diffContainer.appendChild(row);
+  }
+
+  newEl.appendChild(diffContainer);
+  return true;
 }
 
 /* ── Helpers ── */
