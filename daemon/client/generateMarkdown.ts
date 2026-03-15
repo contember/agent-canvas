@@ -201,6 +201,14 @@ function renderAnnotation(ann: Annotation): string {
     lines.push(ann.note.trim());
   }
 
+  // Attached images
+  if (ann.images?.length) {
+    lines.push("");
+    for (const img of ann.images) {
+      lines.push(`![screenshot](${img})`);
+    }
+  }
+
   lines.push("");
   return lines.join("\n");
 }

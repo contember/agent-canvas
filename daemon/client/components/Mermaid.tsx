@@ -276,9 +276,9 @@ export function Mermaid({ children }: MermaidProps) {
               {nodePopover.snippet}
             </div>
           }
-          onAdd={(note) => {
+          onAdd={(note, images) => {
             const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-            addAnnotationWithId(id, `[Diagram ${nodePopover.prefix.toLowerCase()}] ${nodePopover.snippet}`, note);
+            addAnnotationWithId(id, `[Diagram ${nodePopover.prefix.toLowerCase()}] ${nodePopover.snippet}`, note, undefined, undefined, images);
             setNodePopover(null);
           }}
           onCancel={() => setNodePopover(null)}

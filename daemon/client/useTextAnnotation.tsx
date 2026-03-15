@@ -22,7 +22,7 @@ interface UseTextAnnotationOptions {
 
 export function useTextAnnotation(options: UseTextAnnotationOptions) {
   const { containerRef, restoreKey, restoreAnnotations, extractContext, filePath, scrollContainer } = options;
-  const { annotations: allAnnotations, addAnnotationWithId, removeAnnotation, updateAnnotation, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
+  const { annotations: allAnnotations, addAnnotationWithId, removeAnnotation, updateAnnotation, addAnnotationImage, removeAnnotationImage, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
 
   const [editPopover, setEditPopover] = useState<{ anchorEl: HTMLElement; annId: string } | null>(null);
   const [createPopover, setCreatePopover] = useState<{ anchorEl: HTMLElement; tempId: string; snippet: string; ctx?: AnnotationContext } | null>(null);
@@ -140,7 +140,18 @@ export function useTextAnnotation(options: UseTextAnnotationOptions) {
             anchorEl={editPopover.anchorEl}
             scrollContainer={scrollContainer}
             initialNote={ann.note}
-            onUpdate={(note) => updateAnnotation(editPopover.annId, note)}
+            initialImages={ann.images}
+            onUpdate={(note, images) => {
+              updateAnnotation(editPopover.annId, note);
+              // Sync images
+              const current = ann.images || [];
+              for (const img of images) {
+                if (!current.includes(img)) addAnnotationImage(editPopover.annId, img);
+              }
+              for (const img of current) {
+                if (!images.includes(img)) removeAnnotationImage(editPopover.annId, img);
+              }
+            }}
             onDelete={() => { removeAnnotation(editPopover.annId); setActiveAnnotationId(null); }}
             onClose={() => setEditPopover(null)}
           />
@@ -153,10 +164,10 @@ export function useTextAnnotation(options: UseTextAnnotationOptions) {
           scrollContainer={scrollContainer}
           snippet={createPopover.snippet}
           truncateAt={80}
-          onAdd={(note) => {
+          onAdd={(note, images) => {
             const id = generateAnnotationId();
             renameMarkId(createPopover.tempId, id);
-            addAnnotationRef.current(id, createPopover.snippet, note, filePathRef.current, createPopover.ctx);
+            addAnnotationRef.current(id, createPopover.snippet, note, filePathRef.current, createPopover.ctx, images);
             setCreatePopover(null);
           }}
           onCancel={() => {

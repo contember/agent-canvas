@@ -7,6 +7,7 @@ import { SessionContext } from "#canvas/runtime";
 import { MarkdownPreview } from "./ResponsePreview";
 import { FileIcon } from "./FileIcon";
 import { autoResizeTextarea, RESPONSE_ANNOTATION_PATH } from "./utils";
+import { AnnotationEditor, ImageThumbnails } from "./AnnotationEditor";
 
 interface AnnotationSidebarProps {
   onPreview: () => void;
@@ -223,6 +224,7 @@ function ReadOnlyAnnotationList({ annotations, generalNote, activeAnnotationId, 
           {ann.note}
         </div>
       )}
+      <ImageThumbnails images={ann.images || []} />
     </div>
   );
 
@@ -278,10 +280,12 @@ function ReadOnlyAnnotationList({ annotations, generalNote, activeAnnotationId, 
 function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: AnnotationSidebarProps) {
   const {
     annotations, updateAnnotation, removeAnnotation,
+    addAnnotationImage, removeAnnotationImage,
     generalNote, setGeneralNote,
     activeAnnotationId, setActiveAnnotationId,
     responses, feedbackEntries,
   } = useAnnotations();
+  const sessionId = useContext(SessionContext);
   const { setActiveView } = React.useContext(ActiveViewContext);
 
   const listRef = useRef<HTMLDivElement>(null);
@@ -359,17 +363,23 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
         {ann.snippet.length > 80 ? ann.snippet.slice(0, 80) + "..." : ann.snippet}
       </div>
 
-      {/* Seamless editable note */}
-      <textarea
-        value={ann.note}
-        onChange={(e) => updateAnnotation(ann.id, e.target.value)}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full bg-transparent text-[13px] font-body text-text-primary resize-none focus:outline-none leading-relaxed p-0 border-none min-h-[20px]"
-        rows={1}
-        style={{ height: "auto", overflow: "hidden" }}
-        onInput={(e) => autoResizeTextarea(e.target as HTMLTextAreaElement)}
-        ref={(el) => { if (el) autoResizeTextarea(el); }}
-      />
+      {/* Editable note + images */}
+      <div onClick={(e) => e.stopPropagation()}>
+        <AnnotationEditor
+          note={ann.note}
+          onNoteChange={(note) => updateAnnotation(ann.id, note)}
+          images={ann.images || []}
+          onAddImage={(path) => addAnnotationImage(ann.id, path)}
+          onRemoveImage={(path) => removeAnnotationImage(ann.id, path)}
+          sessionId={sessionId}
+          autoResize
+          minHeight={20}
+          textareaClassName="w-full bg-transparent text-[13px] font-body text-text-primary resize-none focus:outline-none leading-relaxed p-0 border-none min-h-[20px]"
+          textareaStyle={{ height: "auto", overflow: "hidden" }}
+          placeholder="Add your note..."
+          attachButton="on-focus"
+        />
+      </div>
 
       {/* Delete — top right on hover */}
       <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/ann:opacity-100 transition-opacity duration-100">

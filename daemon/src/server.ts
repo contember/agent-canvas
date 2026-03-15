@@ -8,6 +8,7 @@ import { jsonResponse, corsHeaders } from "./handlers/utils";
 import { createApiHandlers } from "./handlers/api";
 import { createFileHandlers } from "./handlers/files";
 import { createStaticHandlers } from "./handlers/static";
+import { createUploadHandlers } from "./handlers/uploads";
 
 const PORT = parseInt(process.env.CANVAS_PORT || "19400", 10);
 
@@ -22,6 +23,7 @@ const wsManager = createWebSocketManager(sessionManager);
 const routes = [
   ...createApiHandlers({ sessionManager, broadcastPlanUpdate: wsManager.broadcastPlanUpdate, port: PORT }),
   ...createFileHandlers(sessionManager),
+  ...createUploadHandlers(sessionManager),
   ...createStaticHandlers(),
 ];
 

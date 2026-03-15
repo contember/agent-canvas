@@ -22,7 +22,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { annotations, addAnnotationWithId, removeAnnotation, updateAnnotation, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
+  const { annotations, addAnnotationWithId, removeAnnotation, updateAnnotation, addAnnotationImage, removeAnnotationImage, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
   const [editingAnn, setEditingAnn] = useState<{ id: string; note: string } | null>(null);
 
   // Block annotation hover state
@@ -296,9 +296,9 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
           scrollContainer={scrollContainer}
           snippet={blockPopover.snippet}
           truncateAt={80}
-          onAdd={(note) => {
+          onAdd={(note, images) => {
             const id = generateAnnotationId();
-            addAnnotationWithId(id, blockPopover.snippet, note);
+            addAnnotationWithId(id, blockPopover.snippet, note, undefined, undefined, images);
             setBlockPopover(null);
           }}
           onCancel={() => setBlockPopover(null)}
@@ -312,7 +312,17 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
             anchorEl={blockPopover.anchorEl}
             scrollContainer={scrollContainer}
             initialNote={ann.note}
-            onUpdate={(note) => updateAnnotation(blockPopover.annId!, note)}
+            initialImages={ann.images}
+            onUpdate={(note, images) => {
+              updateAnnotation(blockPopover.annId!, note);
+              const current = ann.images || [];
+              for (const img of images) {
+                if (!current.includes(img)) addAnnotationImage(blockPopover.annId!, img);
+              }
+              for (const img of current) {
+                if (!images.includes(img)) removeAnnotationImage(blockPopover.annId!, img);
+              }
+            }}
             onDelete={() => { removeAnnotation(blockPopover.annId!); setActiveAnnotationId(null); setBlockPopover(null); }}
             onClose={() => setBlockPopover(null)}
           />

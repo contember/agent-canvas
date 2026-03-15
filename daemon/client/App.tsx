@@ -528,7 +528,7 @@ function ResponseBanner({ markdown }: { markdown: string }) {
   const [dismissed, setDismissed] = useState(false);
   const html = useMemo(() => marked.parse(markdown, { async: false }) as string, [markdown]);
   const contentRef = useRef<HTMLDivElement>(null);
-  const { annotations, addAnnotationWithId, removeAnnotation, updateAnnotation, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
+  const { annotations, addAnnotationWithId, removeAnnotation, updateAnnotation, addAnnotationImage, removeAnnotationImage, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
   const [createPopover, setCreatePopover] = useState<{ anchorEl: HTMLElement; tempId: string; snippet: string; ctx: any } | null>(null);
   const [editPopover, setEditPopover] = useState<{ anchorEl: HTMLElement; annId: string } | null>(null);
 
@@ -640,10 +640,10 @@ function ResponseBanner({ markdown }: { markdown: string }) {
           scrollContainer={scrollContainer}
           snippet={createPopover.snippet}
           truncateAt={80}
-          onAdd={(note) => {
+          onAdd={(note, images) => {
             const id = generateAnnotationId();
             renameMarkId(createPopover.tempId, id);
-            addAnnotationWithId(id, createPopover.snippet, note, RESPONSE_ANNOTATION_PATH, createPopover.ctx);
+            addAnnotationWithId(id, createPopover.snippet, note, RESPONSE_ANNOTATION_PATH, createPopover.ctx, images);
             setCreatePopover(null);
           }}
           onCancel={() => {
@@ -661,7 +661,17 @@ function ResponseBanner({ markdown }: { markdown: string }) {
             anchorEl={editPopover.anchorEl}
             scrollContainer={scrollContainer}
             initialNote={ann.note}
-            onUpdate={(note) => updateAnnotation(editPopover.annId, note)}
+            initialImages={ann.images}
+            onUpdate={(note, images) => {
+              updateAnnotation(editPopover.annId, note);
+              const current = ann.images || [];
+              for (const img of images) {
+                if (!current.includes(img)) addAnnotationImage(editPopover.annId, img);
+              }
+              for (const img of current) {
+                if (!images.includes(img)) removeAnnotationImage(editPopover.annId, img);
+              }
+            }}
             onDelete={() => { removeAnnotation(editPopover.annId); setActiveAnnotationId(null); }}
             onClose={() => setEditPopover(null)}
           />

@@ -17,6 +17,10 @@ export const PID_FILE = join(TEMP_DIR, "daemon.pid");
 /** Temp dir for JSX compilation */
 export const COMPILE_TEMP_DIR = join(TEMP_DIR, "compile");
 
+/** Uploaded annotation images */
+export const UPLOADS_DIR = join(TEMP_DIR, "uploads");
+
 // Ensure dirs exist
 mkdirSync(SESSIONS_DIR, { recursive: true });
 mkdirSync(COMPILE_TEMP_DIR, { recursive: true });
+mkdirSync(UPLOADS_DIR, { recursive: true });

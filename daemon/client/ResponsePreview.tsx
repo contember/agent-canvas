@@ -143,7 +143,13 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
   );
 }
 
+const UPLOADS_PATH_RE = /!\[([^\]]*)\]\((\/tmp\/agent-canvas\/uploads\/([^)]+))\)/g;
+
+function rewriteUploadPaths(md: string): string {
+  return md.replace(UPLOADS_PATH_RE, (_match, alt, _fullPath, filename) => `![${alt}](/api/uploads/${filename})`);
+}
+
 export function MarkdownPreview({ text }: { text: string }) {
-  const html = useMemo(() => marked.parse(text, { async: false }) as string, [text]);
+  const html = useMemo(() => marked.parse(rewriteUploadPaths(text), { async: false }) as string, [text]);
   return <div className="prose-canvas font-body text-body text-text-primary leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />;
 }

@@ -97,8 +97,8 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
     return () => { if (persistTimerRef.current) clearTimeout(persistTimerRef.current); };
   }, [annotations, generalNote, responses, feedbackEntries, sessionId, revision, isReadOnly]);
 
-  const addAnnotationWithId = useCallback((id: string, snippet: string, note: string, filePath?: string, context?: AnnotationContext) => {
-    setAnnotations((prev) => [...prev, { id, snippet, note, createdAt: new Date().toISOString(), filePath, context }]);
+  const addAnnotationWithId = useCallback((id: string, snippet: string, note: string, filePath?: string, context?: AnnotationContext, images?: string[]) => {
+    setAnnotations((prev) => [...prev, { id, snippet, note, createdAt: new Date().toISOString(), filePath, context, ...(images?.length ? { images } : {}) }]);
   }, []);
 
   const addAnnotation = useCallback((snippet: string, note: string, filePath?: string) => {
@@ -113,6 +113,18 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
     removeMarksFromDom(id);
     setAnnotations((prev) => prev.filter((a) => a.id !== id));
     setActiveAnnotationId((prev) => (prev === id ? null : prev));
+  }, []);
+
+  const addAnnotationImage = useCallback((id: string, imagePath: string) => {
+    setAnnotations((prev) => prev.map((a) =>
+      a.id === id ? { ...a, images: [...(a.images || []), imagePath] } : a
+    ));
+  }, []);
+
+  const removeAnnotationImage = useCallback((id: string, imagePath: string) => {
+    setAnnotations((prev) => prev.map((a) =>
+      a.id === id ? { ...a, images: (a.images || []).filter((p) => p !== imagePath) } : a
+    ));
   }, []);
 
   const setResponse = useCallback((id: string, response: PlanResponse) => {
@@ -159,7 +171,7 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
   return (
     <AnnotationCtx.Provider
       value={{
-        annotations, addAnnotation, addAnnotationWithId, updateAnnotation, removeAnnotation,
+        annotations, addAnnotation, addAnnotationWithId, updateAnnotation, removeAnnotation, addAnnotationImage, removeAnnotationImage,
         generalNote, setGeneralNote, clearAll,
         activeAnnotationId, setActiveAnnotationId,
         responses, setResponse,

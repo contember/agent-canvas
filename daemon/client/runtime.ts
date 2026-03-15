@@ -19,6 +19,7 @@ export interface Annotation {
   createdAt: string;
   filePath?: string;
   context?: AnnotationContext;
+  images?: string[];
 }
 
 export interface PlanResponse {
@@ -41,9 +42,11 @@ export interface FeedbackEntry {
 export interface AnnotationContextValue {
   annotations: Annotation[];
   addAnnotation: (snippet: string, note: string, filePath?: string) => void;
-  addAnnotationWithId: (id: string, snippet: string, note: string, filePath?: string, context?: AnnotationContext) => void;
+  addAnnotationWithId: (id: string, snippet: string, note: string, filePath?: string, context?: AnnotationContext, images?: string[]) => void;
   updateAnnotation: (id: string, note: string) => void;
   removeAnnotation: (id: string) => void;
+  addAnnotationImage: (id: string, imagePath: string) => void;
+  removeAnnotationImage: (id: string, imagePath: string) => void;
   generalNote: string;
   setGeneralNote: (text: string) => void;
   clearAll: () => void;
