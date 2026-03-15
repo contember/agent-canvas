@@ -27,7 +27,7 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
     const sessionId = match.pathname.groups.id!;
     try {
       const body = await req.json();
-      const { jsx, projectRoot, label, sourceFile } = body;
+      const { jsx, projectRoot, label, sourceFile, response } = body;
       if (!jsx) return jsonResponse({ error: "Missing jsx" }, 400);
 
       const unconsumed = sessionManager.getLatestUnconsumedFeedback(sessionId);
@@ -42,7 +42,7 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
       }
 
       const isNew = !sessionManager.get(sessionId);
-      const session = sessionManager.upsert(sessionId, jsx, projectRoot || process.cwd(), label, sourceFile);
+      const session = sessionManager.upsert(sessionId, jsx, projectRoot || process.cwd(), label, sourceFile, response);
 
       const result = await compilePlan(jsx, session.projectRoot);
       if (result.ok) {

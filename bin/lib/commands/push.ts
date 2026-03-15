@@ -11,6 +11,7 @@ export async function handlePush(args: string[]) {
     options: {
       session: { type: "string" },
       label: { type: "string" },
+      response: { type: "string" },
     },
     allowPositionals: true,
   });
@@ -38,7 +39,7 @@ export async function handlePush(args: string[]) {
   const response = await fetch(`${BASE_URL}/api/session/${sessionId}/plan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsx, projectRoot, label: label || autoLabel, sourceFile: resolvedPath.split("/").pop() }),
+    body: JSON.stringify({ jsx, projectRoot, label: label || autoLabel, sourceFile: resolvedPath.split("/").pop(), ...(values.response ? { response: values.response } : {}) }),
   });
 
   const result = await response.json() as any;

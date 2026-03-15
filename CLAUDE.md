@@ -74,6 +74,10 @@ To release a new version:
 
 The CI pipeline handles `npm publish` automatically when a new version tag is pushed. Do not run `npm publish` manually.
 
+## Bundled Skill
+
+This package distributes a Claude Code skill in `skills/canvas/`. It teaches Claude Code how to use Agent Canvas — writing JSX canvases, pushing, waiting for feedback, iterating, and responding to user feedback. The skill is automatically available to users who install this package.
+
 ## Environment Variables
 
 - `CANVAS_SESSION_ID` — current session (set by SessionStart hook)

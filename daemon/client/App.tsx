@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useState, useCallback, useRef, createContext, useMemo } from "react";
 import { createRoot } from "react-dom/client";
+import { marked } from "marked";
 import { SessionContext, ActiveViewCtx } from "#canvas/runtime";
 import { AnnotationProvider, useAnnotations } from "./AnnotationProvider";
 import { PlanRenderer } from "./PlanRenderer";
@@ -21,6 +22,7 @@ export interface RevisionInfo {
   sourceFile?: string;
   createdAt: string;
   hasFeedback: boolean;
+  response?: string;
 }
 
 export const ActiveViewContext = createContext<{
@@ -338,6 +340,9 @@ function App() {
                         <polyline points="20 6 9 17 4 12"/>
                       </svg>
                     </button>
+                    {selectedRevInfo?.response && (
+                      <ResponseBanner markdown={selectedRevInfo.response} />
+                    )}
                     <PlanRenderer revision={selectedRevision} />
                   </div>
                 </div>
@@ -513,6 +518,36 @@ function ResizableSidebar({ children, collapsed, onToggle }: { children: React.R
         )}
       </div>
     </>
+  );
+}
+
+function ResponseBanner({ markdown }: { markdown: string }) {
+  const [dismissed, setDismissed] = useState(false);
+  const html = useMemo(() => marked.parse(markdown, { async: false }) as string, [markdown]);
+
+  // Reset dismissed state when markdown changes
+  useEffect(() => { setDismissed(false); }, [markdown]);
+
+  if (dismissed) return null;
+
+  return (
+    <div className="mb-6 rounded-lg border border-accent-blue/20 bg-accent-blue/5 relative">
+      <button
+        onClick={() => setDismissed(true)}
+        className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded text-text-tertiary hover:text-text-secondary hover:bg-bg-elevated transition-colors"
+      >
+        <span className="text-xs">&#x2715;</span>
+      </button>
+      <div className="px-4 py-3 pr-10">
+        <div className="flex items-center gap-2 mb-1.5">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent-blue flex-shrink-0">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          <span className="text-[11px] font-medium uppercase tracking-widest text-accent-blue font-body">Agent Response</span>
+        </div>
+        <div className="prose-canvas text-sm" dangerouslySetInnerHTML={{ __html: html }} />
+      </div>
+    </div>
   );
 }
 

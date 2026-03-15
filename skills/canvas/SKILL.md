@@ -88,6 +88,21 @@ bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
 
 Each push creates a new **round** — the user sees previous rounds and their feedback in the UI.
 
+### Responding to feedback
+
+When pushing a revised canvas after receiving user feedback, use `--response` to tell the user how you addressed their feedback. The response renders as a short banner at the top of the canvas.
+
+```bash
+bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/plan.jsx --session ${CLAUDE_SESSION_ID} --label "Plan (revised)" --response "Incorporated all feedback. Switched to connection pooling as suggested. I kept the sync approach for writes — see the note in Phase 2 for my reasoning."
+```
+
+Use `--response` to:
+- Confirm what you incorporated and how
+- Explain any opposing stance — if you disagree with a suggestion, say why
+- Call out anything you intentionally did NOT change and why
+
+Keep it concise (2-4 sentences). The user can see the diff in the canvas UI, so focus on the "why" not the "what".
+
 ### Multiple Canvases
 
 Maintain separate files for different phases:

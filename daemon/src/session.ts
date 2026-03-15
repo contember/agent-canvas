@@ -9,6 +9,7 @@ export interface RevisionInfo {
   createdAt: string;
   hasFeedback: boolean;
   feedbackConsumed: boolean;
+  response?: string;
 }
 
 export interface SessionData {
@@ -156,12 +157,12 @@ export class SessionManager {
     }
   }
 
-  upsert(id: string, jsx: string, projectRoot: string, label?: string, sourceFile?: string): SessionData {
+  upsert(id: string, jsx: string, projectRoot: string, label?: string, sourceFile?: string, response?: string): SessionData {
     const existing = this.sessions.get(id);
     const now = new Date().toISOString();
     const revision = existing ? existing.currentRevision + 1 : 1;
 
-    const revInfo: RevisionInfo = { revision, createdAt: now, hasFeedback: false, feedbackConsumed: false, ...(label ? { label } : {}), ...(sourceFile ? { sourceFile } : {}) };
+    const revInfo: RevisionInfo = { revision, createdAt: now, hasFeedback: false, feedbackConsumed: false, ...(label ? { label } : {}), ...(sourceFile ? { sourceFile } : {}), ...(response ? { response } : {}) };
     const revisions = existing ? [...existing.revisions, revInfo] : [revInfo];
 
     const session: SessionData = {
