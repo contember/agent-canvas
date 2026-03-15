@@ -44,7 +44,12 @@ export async function handlePush(args: string[]) {
   const result = await response.json() as any;
 
   if (!result.ok) {
-    console.error(`Compilation error:\n${result.error}`);
+    if (result.unconsumedFeedback) {
+      console.error(`Error: ${result.error}`);
+      console.log(result.unconsumedFeedback);
+    } else {
+      console.error(`Compilation error:\n${result.error}`);
+    }
     process.exit(1);
   }
 
@@ -52,16 +57,10 @@ export async function handlePush(args: string[]) {
     openBrowser(result.browserUrl);
   }
 
-  if (result.unconsumedFeedback) {
-    console.error(`Warning: Unconsumed feedback from revision ${result.unconsumedRevision} was pending.`);
-    console.log(result.unconsumedFeedback);
-  }
-
   console.log(JSON.stringify({
     ok: true,
     browserUrl: result.browserUrl,
     revision: result.revision,
     sessionId,
-    ...(result.unconsumedFeedback ? { hadUnconsumedFeedback: true, unconsumedRevision: result.unconsumedRevision } : {}),
   }));
 }

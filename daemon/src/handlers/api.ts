@@ -33,6 +33,12 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
       const unconsumed = sessionManager.getLatestUnconsumedFeedback(sessionId);
       if (unconsumed) {
         sessionManager.consumeFeedback(sessionId, unconsumed.revision);
+        return jsonResponse({
+          ok: false,
+          error: `Unconsumed feedback from revision ${unconsumed.revision}. Address the feedback before pushing a new canvas.`,
+          unconsumedFeedback: unconsumed.feedback,
+          unconsumedRevision: unconsumed.revision,
+        }, 409);
       }
 
       const isNew = !sessionManager.get(sessionId);
@@ -53,7 +59,6 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
         isNew,
         revision: session.currentRevision,
         error: result.ok ? undefined : result.error,
-        ...(unconsumed ? { unconsumedFeedback: unconsumed.feedback, unconsumedRevision: unconsumed.revision } : {}),
       });
     } catch (e: any) {
       return jsonResponse({ error: e.message }, 500);
