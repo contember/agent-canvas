@@ -3,6 +3,7 @@ import { SessionContext } from "#canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
 import { ActiveViewContext } from "./App";
 import { FileIcon } from "./FileIcon";
+import { RESPONSE_ANNOTATION_PATH } from "./utils";
 
 interface TreeEntry { name: string; type: "file" | "dir"; }
 interface DirState { entries: TreeEntry[]; expanded: boolean; loaded: boolean; }
@@ -17,7 +18,7 @@ export function FileBrowser({ embedded }: { embedded?: boolean } = {}) {
   const { annCountMap, annotatedFiles } = useMemo(() => {
     const map = new Map<string, number>();
     for (const a of annotations) {
-      if (a.filePath) map.set(a.filePath, (map.get(a.filePath) || 0) + 1);
+      if (a.filePath && a.filePath !== RESPONSE_ANNOTATION_PATH) map.set(a.filePath, (map.get(a.filePath) || 0) + 1);
     }
     return { annCountMap: map, annotatedFiles: [...map.keys()] };
   }, [annotations]);
