@@ -5,7 +5,7 @@ Interactive browser-based visual canvas for [Claude Code](https://docs.anthropic
 ![License](https://img.shields.io/npm/l/agent-canvas)
 ![npm](https://img.shields.io/npm/v/agent-canvas)
 
-![Agent Canvas](.github/dark.png)
+![Agent Canvas](.github/light.png)
 
 ## What it does
 
