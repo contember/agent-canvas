@@ -8,6 +8,7 @@ export interface RevisionInfo {
   sourceFile?: string;
   createdAt: string;
   hasFeedback: boolean;
+  feedbackConsumed: boolean;
 }
 
 export interface SessionData {
@@ -119,7 +120,7 @@ export class SessionManager {
         const revDir = this.revisionDir(id, num);
         mkdirSync(revDir, { recursive: true });
         renameSync(join(historyDir, file), join(revDir, "plan.jsx"));
-        revisions.push({ revision: num, createdAt: legacy.createdAt, hasFeedback: false });
+        revisions.push({ revision: num, createdAt: legacy.createdAt, hasFeedback: false, feedbackConsumed: false });
       }
       rmSync(historyDir, { recursive: true, force: true });
     }
@@ -134,7 +135,7 @@ export class SessionManager {
     if (existsSync(flatCompiled)) {
       renameSync(flatCompiled, join(revDir, "plan.compiled.js"));
     }
-    revisions.push({ revision: currentRev, createdAt: legacy.updatedAt, hasFeedback: false });
+    revisions.push({ revision: currentRev, createdAt: legacy.updatedAt, hasFeedback: false, feedbackConsumed: false });
 
     // Write new meta
     const meta: SessionMeta = {
@@ -160,7 +161,7 @@ export class SessionManager {
     const now = new Date().toISOString();
     const revision = existing ? existing.currentRevision + 1 : 1;
 
-    const revInfo: RevisionInfo = { revision, createdAt: now, hasFeedback: false, ...(label ? { label } : {}), ...(sourceFile ? { sourceFile } : {}) };
+    const revInfo: RevisionInfo = { revision, createdAt: now, hasFeedback: false, feedbackConsumed: false, ...(label ? { label } : {}), ...(sourceFile ? { sourceFile } : {}) };
     const revisions = existing ? [...existing.revisions, revInfo] : [revInfo];
 
     const session: SessionData = {
@@ -178,15 +179,7 @@ export class SessionManager {
     return session;
   }
 
-  private persistToDisk(session: SessionData) {
-    const dir = this.sessionDir(session.id);
-    const revDir = this.revisionDir(session.id, session.currentRevision);
-    mkdirSync(revDir, { recursive: true });
-
-    // Write revision JSX
-    writeFileSync(join(revDir, "plan.jsx"), session.jsx);
-
-    // Write meta
+  private persistMeta(session: SessionData) {
     const meta: SessionMeta = {
       projectRoot: session.projectRoot,
       createdAt: session.createdAt,
@@ -194,7 +187,14 @@ export class SessionManager {
       currentRevision: session.currentRevision,
       revisions: session.revisions,
     };
-    writeFileSync(join(dir, "meta.json"), JSON.stringify(meta, null, 2));
+    writeFileSync(join(this.sessionDir(session.id), "meta.json"), JSON.stringify(meta, null, 2));
+  }
+
+  private persistToDisk(session: SessionData) {
+    const revDir = this.revisionDir(session.id, session.currentRevision);
+    mkdirSync(revDir, { recursive: true });
+    writeFileSync(join(revDir, "plan.jsx"), session.jsx);
+    this.persistMeta(session);
   }
 
   get(id: string): SessionData | undefined {
@@ -235,19 +235,14 @@ export class SessionManager {
     mkdirSync(revDir, { recursive: true });
     writeFileSync(join(revDir, "feedback.md"), markdown);
 
-    // Update in-memory and on-disk meta
     const session = this.sessions.get(id);
     if (session) {
       const ri = session.revisions.find((r) => r.revision === rev);
-      if (ri) ri.hasFeedback = true;
-      const meta: SessionMeta = {
-        projectRoot: session.projectRoot,
-        createdAt: session.createdAt,
-        updatedAt: session.updatedAt,
-        currentRevision: session.currentRevision,
-        revisions: session.revisions,
-      };
-      writeFileSync(join(this.sessionDir(id), "meta.json"), JSON.stringify(meta, null, 2));
+      if (ri) {
+        ri.hasFeedback = true;
+        ri.feedbackConsumed = false;
+      }
+      this.persistMeta(session);
     }
   }
 
@@ -257,6 +252,29 @@ export class SessionManager {
     } catch {
       return null;
     }
+  }
+
+  consumeFeedback(id: string, rev: number) {
+    const session = this.sessions.get(id);
+    if (!session) return;
+    const ri = session.revisions.find((r) => r.revision === rev);
+    if (!ri || !ri.hasFeedback || ri.feedbackConsumed) return;
+    ri.feedbackConsumed = true;
+    this.persistMeta(session);
+  }
+
+  getLatestUnconsumedFeedback(id: string): { revision: number; feedback: string } | null {
+    const session = this.sessions.get(id);
+    if (!session) return null;
+    // Search from newest to oldest
+    for (let i = session.revisions.length - 1; i >= 0; i--) {
+      const ri = session.revisions[i];
+      if (ri.hasFeedback && !ri.feedbackConsumed) {
+        const feedback = this.getFeedback(id, ri.revision);
+        if (feedback) return { revision: ri.revision, feedback };
+      }
+    }
+    return null;
   }
 
   getRevisionJsxPath(id: string, rev: number): string {

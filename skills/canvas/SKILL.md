@@ -60,10 +60,22 @@ This opens the canvas in the user's browser (first time) and exits immediately. 
 After pushing, wait for the user to review and submit:
 
 ```bash
-bunx agent-canvas wait --session ${CLAUDE_SESSION_ID}
+bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
 ```
 
-This **blocks until the user submits feedback**, then prints feedback markdown to stdout. If feedback was already submitted (e.g. retrying after a disconnect), it returns immediately with the existing feedback.
+This **blocks until the user submits feedback**, then prints feedback markdown to stdout. If feedback was already submitted but not yet consumed, it returns immediately with the existing feedback.
+
+**Timeout handling**: The watch command may time out if the user takes a while to review. If it times out, don't retry automatically — wait for the user to tell you they've submitted feedback, then run the watch command again (or use `fetch`) to retrieve it.
+
+### Checking for feedback without blocking
+
+Use `fetch` to check for feedback without waiting:
+
+```bash
+bunx agent-canvas fetch --session ${CLAUDE_SESSION_ID}
+```
+
+Returns immediately — prints feedback to stdout if available, otherwise produces no output. Use this to retry after a timeout or when the user tells you they've submitted.
 
 ### Iterating
 
@@ -71,7 +83,7 @@ Use the **Edit** tool to modify the existing JSX based on feedback — targeted 
 
 ```bash
 bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/plan.jsx --session ${CLAUDE_SESSION_ID} --label "Implementation Plan (revised)"
-bunx agent-canvas wait --session ${CLAUDE_SESSION_ID}
+bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
 ```
 
 Each push creates a new **round** — the user sees previous rounds and their feedback in the UI.
@@ -82,13 +94,13 @@ Maintain separate files for different phases:
 
 ```bash
 bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/discovery.jsx --session ${CLAUDE_SESSION_ID} --label "Discovery"
-bunx agent-canvas wait --session ${CLAUDE_SESSION_ID}
+bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
 # ... process feedback ...
 bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/requirements.jsx --session ${CLAUDE_SESSION_ID} --label "Requirements"
-bunx agent-canvas wait --session ${CLAUDE_SESSION_ID}
+bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
 # ... process feedback ...
 bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/plan.jsx --session ${CLAUDE_SESSION_ID} --label "Implementation Plan"
-bunx agent-canvas wait --session ${CLAUDE_SESSION_ID}
+bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
 ```
 
 ### File Location
@@ -130,7 +142,7 @@ User wants to make a decision?
 3. **Write canvas JSX** with the Write tool to `.claude/agent-canvas/${CLAUDE_SESSION_ID}/<name>.jsx`
 4. **Push**: `bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/<name>.jsx --session ${CLAUDE_SESSION_ID} --label "<Label>"`
 5. **Tell the user** the canvas is ready for review (they see it in their browser)
-6. **Wait**: `bunx agent-canvas wait --session ${CLAUDE_SESSION_ID}` — this blocks until the user submits feedback
+6. **Wait**: `bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}` — this blocks until the user submits feedback
 7. **Read feedback** — check for annotations, answers, added context files, approval
 8. **Edit with the Edit tool and re-push + wait**, or advance to next phase
 9. **After implementation**, push a summary canvas

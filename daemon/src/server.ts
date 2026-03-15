@@ -98,6 +98,16 @@ const server = Bun.serve<WSData>({
       return jsonResponse({ feedback });
     }
 
+    // POST /api/session/:id/feedback/consume
+    const consumeMatch = path.match(/^\/api\/session\/([^/]+)\/feedback\/consume$/);
+    if (consumeMatch && req.method === "POST") {
+      const sessionId = consumeMatch[1];
+      const result = sessionManager.getLatestUnconsumedFeedback(sessionId);
+      if (!result) return jsonResponse({ found: false });
+      sessionManager.consumeFeedback(sessionId, result.revision);
+      return jsonResponse({ found: true, revision: result.revision, feedback: result.feedback });
+    }
+
     // GET /api/sessions
     if (path === "/api/sessions" && req.method === "GET") {
       return jsonResponse(sessionManager.list().map((s) => ({
@@ -189,17 +199,18 @@ const server = Bun.serve<WSData>({
               sessionManager.saveFeedback(sessionId, session.currentRevision, feedback);
               // Notify browsers that revision metadata changed
               broadcastRevisionUpdate(sessionId);
-            }
 
-            // Forward to all waiting CLI sockets
-            const waiters = waitSockets.get(sessionId);
-            if (waiters) {
-              const payload = JSON.stringify({ type: "submit", feedback });
-              for (const waiter of waiters) {
-                waiter.send(payload);
-                waiter.close();
+              // Forward to all waiting CLI sockets and mark consumed
+              const waiters = waitSockets.get(sessionId);
+              if (waiters && waiters.size > 0) {
+                sessionManager.consumeFeedback(sessionId, session.currentRevision);
+                const payload = JSON.stringify({ type: "submit", feedback });
+                for (const waiter of waiters) {
+                  waiter.send(payload);
+                  waiter.close();
+                }
+                waitSockets.delete(sessionId);
               }
-              waitSockets.delete(sessionId);
             }
           }
         } catch {}
@@ -220,6 +231,12 @@ async function handlePlanPost(req: Request, sessionId: string): Promise<Response
     const { jsx, projectRoot, label, sourceFile } = body;
     if (!jsx) return jsonResponse({ error: "Missing jsx" }, 400);
 
+    // Check for unconsumed feedback before pushing
+    const unconsumed = sessionManager.getLatestUnconsumedFeedback(sessionId);
+    if (unconsumed) {
+      sessionManager.consumeFeedback(sessionId, unconsumed.revision);
+    }
+
     const isNew = !sessionManager.get(sessionId);
     const session = sessionManager.upsert(sessionId, jsx, projectRoot || process.cwd(), label, sourceFile);
 
@@ -239,6 +256,7 @@ async function handlePlanPost(req: Request, sessionId: string): Promise<Response
       isNew,
       revision: session.currentRevision,
       error: result.ok ? undefined : result.error,
+      ...(unconsumed ? { unconsumedFeedback: unconsumed.feedback, unconsumedRevision: unconsumed.revision } : {}),
     });
   } catch (e: any) {
     return jsonResponse({ error: e.message }, 500);

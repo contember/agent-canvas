@@ -41,7 +41,8 @@ async function main() {
 
   switch (command) {
     case "push": return handlePush(args.slice(1));
-    case "wait": return handleWait(args.slice(1));
+    case "fetch": return handleFetch(args.slice(1));
+    case "watch": return handleWatch(args.slice(1));
     case "install": return handleInstall(args.slice(1));
     case "daemon": return handleDaemon(args.slice(1));
     default:
@@ -57,7 +58,8 @@ function printUsage() {
 Commands:
   agent-canvas install [local|global]  Install skill for Claude Code
   agent-canvas push <file.jsx>         Push a canvas, open browser
-  agent-canvas wait [--session <id>]   Wait for user feedback (prints to stdout)
+  agent-canvas fetch [--session <id>]  Check for feedback (returns immediately)
+  agent-canvas watch [--session <id>]  Wait for user feedback (blocks until submitted)
   agent-canvas daemon status           Show daemon status
   agent-canvas daemon stop             Stop the daemon
 
@@ -149,38 +151,54 @@ async function handlePush(args: string[]) {
     openBrowser(result.browserUrl);
   }
 
+  // If there was unconsumed feedback from a previous revision, output it
+  if (result.unconsumedFeedback) {
+    console.error(`Warning: Unconsumed feedback from revision ${result.unconsumedRevision} was pending.`);
+    console.log(result.unconsumedFeedback);
+  }
+
   console.log(JSON.stringify({
     ok: true,
     browserUrl: result.browserUrl,
     revision: result.revision,
     sessionId,
+    ...(result.unconsumedFeedback ? { hadUnconsumedFeedback: true, unconsumedRevision: result.unconsumedRevision } : {}),
   }));
 }
 
-// ── wait ──
+// ── fetch ──
 
-async function handleWait(args: string[]) {
+async function consumeFeedback(sessionId: string): Promise<string | null> {
+  const res = await fetch(`${BASE_URL}/api/session/${sessionId}/feedback/consume`, { method: "POST" });
+  const data = await res.json() as any;
+  if (data.found) return data.feedback;
+  return null;
+}
+
+async function handleFetch(args: string[]) {
   const sessionId = getSessionId(args);
-
   await ensureDaemon();
 
-  // Check if feedback already exists
-  try {
-    const metaRes = await fetch(`${BASE_URL}/api/session/${sessionId}/meta`);
-    const meta = await metaRes.json() as any;
-    if (meta.currentRevision && meta.revisions) {
-      const currentRev = meta.revisions.find((r: any) => r.revision === meta.currentRevision);
-      if (currentRev?.hasFeedback) {
-        const fbRes = await fetch(`${BASE_URL}/api/session/${sessionId}/revision/${meta.currentRevision}/feedback`);
-        const fbData = await fbRes.json() as any;
-        if (fbData.feedback) {
-          process.stdout.write(fbData.feedback);
-          process.exit(0);
-        }
-      }
-    }
-  } catch {}
+  const feedback = await consumeFeedback(sessionId);
+  if (feedback) {
+    process.stdout.write(feedback);
+  }
+}
 
+// ── watch ──
+
+async function handleWatch(args: string[]) {
+  const sessionId = getSessionId(args);
+  await ensureDaemon();
+
+  // Check for already-submitted feedback first
+  const feedback = await consumeFeedback(sessionId);
+  if (feedback) {
+    process.stdout.write(feedback);
+    process.exit(0);
+  }
+
+  // Otherwise block on WebSocket
   await waitForFeedback(sessionId);
 }
 
