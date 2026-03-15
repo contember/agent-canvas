@@ -31,7 +31,7 @@ This installs:
 
 ## Usage in Claude Code
 
-Once installed, Claude will automatically use canvases when appropriate. You can also ask explicitly:
+Once installed, use the `/canvas` command to create a canvas:
 
 ```
 > /canvas Plan the authentication refactor

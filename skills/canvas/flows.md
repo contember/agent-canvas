@@ -2,7 +2,7 @@
 
 Each flow is a sequence of canvas rounds. Phases can be skipped or combined based on context.
 
-**Tooling reminder**: Write all `.jsx` files using the **Write** tool to `.claude/agent-canvas/`. Edit them with the **Edit** tool. Push with `bunx agent-canvas push .claude/agent-canvas/<file>.jsx --label "<Label>"`, then `bunx agent-canvas wait` to block for feedback. The JSX blocks below show what to write — they are the file content, not bash commands.
+**Tooling reminder**: Write all `.jsx` files using the **Write** tool to `.claude/agent-canvas/${CLAUDE_SESSION_ID}/`. Edit them with the **Edit** tool. Push with `bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/<file>.jsx --session ${CLAUDE_SESSION_ID} --label "<Label>"`, then `bunx agent-canvas wait --session ${CLAUDE_SESSION_ID}` to block for feedback. The JSX blocks below show what to write — they are the file content, not bash commands.
 
 ---
 
@@ -16,7 +16,7 @@ Each flow is a sequence of canvas rounds. Phases can be skipped or combined base
 
 Goal: understand scope, constraints, and user expectations. Start broad, go deep.
 
-Write to `.claude/agent-canvas/discovery.jsx`, then push and wait:
+Write to `.claude/agent-canvas/${CLAUDE_SESSION_ID}/discovery.jsx`, then push and wait:
 
 ```jsx
 <Section title="Discovery: [Feature Name]">
