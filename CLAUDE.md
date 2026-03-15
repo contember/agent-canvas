@@ -66,14 +66,13 @@ The CLI blocks waiting for feedback after push — press Ctrl+C to exit without 
 
 ## Publishing
 
-Before publishing to npm, always bump the version first:
+To release a new version:
 
-```bash
-npm version patch          # bumps 0.1.5 → 0.1.6, creates git commit + tag
-npm publish
-```
+1. Bump the version in `package.json`
+2. Commit the change and create a git tag: `git tag v<version>`
+3. Push both the commit and the tag: `git push && git push origin v<version>`
 
-Use `npm version minor` or `npm version major` for larger changes. Never publish without bumping — npm rejects duplicate versions.
+The CI pipeline handles `npm publish` automatically when a new version tag is pushed. Do not run `npm publish` manually.
 
 ## Environment Variables
 
