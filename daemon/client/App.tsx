@@ -7,6 +7,7 @@ import { PlanRenderer } from "./PlanRenderer";
 import { AnnotationSidebar } from "./AnnotationSidebar";
 import { ResponsePreview } from "./ResponsePreview";
 import { FileBrowser } from "./FileBrowser";
+import { FileIcon } from "./FileIcon";
 import { FileViewer } from "./FileViewer";
 import { SessionSwitcher } from "./SessionSwitcher";
 import { exportCanvasToMarkdown } from "./exportMarkdown";
@@ -690,8 +691,8 @@ function ContentTabs() {
               : "text-text-tertiary hover:text-text-secondary"
           }`}
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="opacity-60">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="opacity-60">
+            <path d="M12 7L2 12l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Canvas
           {activeView.type === "plan" && (
@@ -713,12 +714,13 @@ function ContentTabs() {
             <div className="flex items-center">
               <button
                 onClick={() => setActiveView({ type: "file", path })}
-                className={`flex items-center gap-1.5 pl-3 pr-1 py-2.5 text-[13px] font-mono whitespace-nowrap transition-colors relative ${
+                className={`flex items-center gap-1.5 pl-3 pr-1 py-2.5 text-[13px] font-body whitespace-nowrap transition-colors relative ${
                   isActive
                     ? "text-text-primary"
                     : "text-text-tertiary hover:text-text-secondary"
                 }`}
               >
+                <FileIcon name={name} type="file" />
                 {name}
                 {isActive && (
                   <span className="absolute bottom-0 left-3 right-1 h-[2px] bg-text-primary rounded-full" />
