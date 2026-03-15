@@ -55,17 +55,24 @@ export function SessionSwitcher({ currentSessionId, projectRoot }: SessionSwitch
 
   return (
     <div className="relative" ref={ref}>
-      <button
-        onClick={() => otherSessions.length > 0 && setOpen(!open)}
-        className="flex items-center gap-1.5 font-body text-body font-medium text-text-primary hover:text-text-secondary transition-colors"
-      >
-        <span>{displayName}</span>
+      <div className="flex items-center gap-1.5 font-body text-body font-medium">
+        <a
+          href={`/s/${currentSessionId}`}
+          className="text-text-primary hover:text-text-secondary transition-colors"
+        >
+          {displayName}
+        </a>
         {otherSessions.length > 0 && (
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className={`text-text-tertiary transition-transform duration-200 ${open ? "rotate-180" : ""}`}>
-            <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <button
+            onClick={() => setOpen(!open)}
+            className="flex items-center justify-center text-text-tertiary hover:text-text-secondary transition-colors"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}>
+              <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
         )}
-      </button>
+      </div>
 
       {open && otherSessions.length > 0 && (
         <div className="absolute top-full left-0 mt-2 w-64 bg-bg-elevated border border-border-hover rounded-lg shadow-lg z-50 py-1 overflow-hidden">
