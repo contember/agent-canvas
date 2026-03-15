@@ -85,7 +85,14 @@ export function RevisionSelect({ value, onChange, accent = "default", className 
                   <>Round {r.revision}</>
                 )}
               </span>
-              <span className="text-[10px] text-text-tertiary flex-shrink-0">
+              <span className="text-[10px] text-text-tertiary flex-shrink-0 flex items-center gap-1.5">
+                {r.diffStats && (
+                  <span className="font-mono">
+                    <span className="text-accent-green">+{r.diffStats.added}</span>
+                    {" "}
+                    <span className="text-accent-red">-{r.diffStats.removed}</span>
+                  </span>
+                )}
                 {r.revision === currentRevision ? "current" : r.hasFeedback ? "sent" : relativeTime(r.createdAt)}
               </span>
             </button>

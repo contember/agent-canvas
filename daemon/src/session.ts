@@ -2,6 +2,11 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync
 import { join } from "path";
 import { SESSIONS_DIR } from "./paths";
 
+export interface DiffStats {
+  added: number;
+  removed: number;
+}
+
 export interface RevisionInfo {
   revision: number;
   label?: string;
@@ -10,6 +15,7 @@ export interface RevisionInfo {
   hasFeedback: boolean;
   feedbackConsumed: boolean;
   response?: string;
+  diffStats?: DiffStats;
 }
 
 export interface SessionData {
@@ -39,6 +45,27 @@ interface LegacyMeta {
 }
 
 const STALE_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function computeLineDiffStats(oldText: string, newText: string): DiffStats {
+  const oldLines = oldText.split("\n");
+  const newLines = newText.split("\n");
+  const m = oldLines.length, n = newLines.length;
+
+  // LCS length via two-row DP (O(n) space)
+  let prev = new Uint32Array(n + 1);
+  let curr = new Uint32Array(n + 1);
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      curr[j] = oldLines[i - 1] === newLines[j - 1]
+        ? prev[j - 1] + 1
+        : Math.max(prev[j], curr[j - 1]);
+    }
+    [prev, curr] = [curr, prev];
+    curr.fill(0);
+  }
+  const lcsLen = prev[n];
+  return { added: n - lcsLen, removed: m - lcsLen };
+}
 
 export class SessionManager {
   private sessions = new Map<string, SessionData>();
@@ -162,7 +189,18 @@ export class SessionManager {
     const now = new Date().toISOString();
     const revision = existing ? existing.currentRevision + 1 : 1;
 
-    const revInfo: RevisionInfo = { revision, createdAt: now, hasFeedback: false, feedbackConsumed: false, ...(label ? { label } : {}), ...(sourceFile ? { sourceFile } : {}), ...(response ? { response } : {}) };
+    let diffStats: DiffStats | undefined;
+    if (existing && sourceFile) {
+      const prev = [...existing.revisions]
+        .reverse()
+        .find((r) => r.sourceFile === sourceFile);
+      if (prev) {
+        const prevJsx = this.readRevisionJsx(id, prev.revision);
+        if (prevJsx) diffStats = computeLineDiffStats(prevJsx, jsx);
+      }
+    }
+
+    const revInfo: RevisionInfo = { revision, createdAt: now, hasFeedback: false, feedbackConsumed: false, ...(label ? { label } : {}), ...(sourceFile ? { sourceFile } : {}), ...(response ? { response } : {}), ...(diffStats ? { diffStats } : {}) };
     const revisions = existing ? [...existing.revisions, revInfo] : [revInfo];
 
     const session: SessionData = {

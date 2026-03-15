@@ -26,6 +26,7 @@ export interface RevisionInfo {
   createdAt: string;
   hasFeedback: boolean;
   response?: string;
+  diffStats?: { added: number; removed: number };
 }
 
 export const ActiveViewContext = createContext<{
