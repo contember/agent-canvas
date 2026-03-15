@@ -101,6 +101,8 @@ function blockKey(el: HTMLElement, type: string): string {
       return "checklist-item:" + (el.getAttribute("data-md-label") || el.textContent?.slice(0, 60) || "");
     case "checklist":
       return "checklist:" + el.querySelectorAll("[data-md='checklist-item']").length;
+    case "markdown":
+      return "markdown:" + (el.getAttribute("data-md-file") || "inline");
     case "mermaid":
       return "mermaid:" + (el.getAttribute("data-md-source") || "").slice(0, 80);
     case "callout":
@@ -165,6 +167,8 @@ export function buildUnifiedDom(matches: BlockMatch[]): { fragment: DocumentFrag
         if (processListLike(clone, match.childMatches, type)) hasChanges = true;
       } else if (match.childMatches && match.childMatches.length > 0) {
         if (processBlockWithChildren(match.oldBlock!, clone, match.childMatches, type)) hasChanges = true;
+      } else if (type === "markdown") {
+        if (applyElementLevelDiff(match.oldBlock!.element, clone)) hasChanges = true;
       } else {
         if (applyWordDiff(match.oldBlock!.element, clone, false)) hasChanges = true;
       }
@@ -237,6 +241,8 @@ function processBlockWithChildren(
         } else if (cm.childMatches && cm.childMatches.length > 0) {
           if (processBlockWithChildren(cm.oldBlock!, newChild, cm.childMatches, cm.newBlock!.type))
             hasChanges = true;
+        } else if (cm.newBlock!.type === "markdown") {
+          if (applyElementLevelDiff(cm.oldBlock!.element, newChild)) hasChanges = true;
         } else {
           if (applyWordDiff(cm.oldBlock!.element, newChild, false)) hasChanges = true;
         }
@@ -366,6 +372,90 @@ function findInsertionPoint(
     }
   }
   return null;
+}
+
+/* ── Element-level diff for blocks with rich internal structure (e.g. markdown) ── */
+
+/**
+ * Match direct child elements between old and new by tag name,
+ * then apply word-level diff within matched pairs. If word-level churn
+ * within a pair is too high (>50%), show as removed+added instead.
+ */
+function applyElementLevelDiff(oldEl: HTMLElement, newEl: HTMLElement): boolean {
+  const oldChildren = Array.from(oldEl.children) as HTMLElement[];
+  const newChildren = Array.from(newEl.children) as HTMLElement[];
+
+  if (oldChildren.length === 0 && newChildren.length === 0) {
+    return applyWordDiff(oldEl, newEl, false);
+  }
+
+  // Match by tag name — h3↔h3, p↔p, ul↔ul, etc.
+  const oldKeys = oldChildren.map((el) => el.tagName.toLowerCase());
+  const newKeys = newChildren.map((el) => el.tagName.toLowerCase());
+  const lcs = simpleLCS(oldKeys, newKeys);
+
+  interface ElemMatch {
+    kind: "matched" | "added" | "removed";
+    oldChild?: HTMLElement;
+    newChild?: HTMLElement;
+  }
+
+  const matches: ElemMatch[] = [];
+  let oi = 0, ni = 0, li = 0;
+
+  while (oi < oldChildren.length || ni < newChildren.length) {
+    if (li < lcs.length && oi < oldChildren.length && ni < newChildren.length &&
+        oldKeys[oi] === lcs[li] && newKeys[ni] === lcs[li]) {
+      matches.push({ kind: "matched", oldChild: oldChildren[oi], newChild: newChildren[ni] });
+      oi++; ni++; li++;
+    } else if (oi < oldChildren.length && (li >= lcs.length || oldKeys[oi] !== lcs[li])) {
+      matches.push({ kind: "removed", oldChild: oldChildren[oi] });
+      oi++;
+    } else if (ni < newChildren.length) {
+      matches.push({ kind: "added", newChild: newChildren[ni] });
+      ni++;
+    }
+  }
+
+  let hasChanges = false;
+
+  // Detach all children from the clone, then re-append in match order
+  while (newEl.firstChild) newEl.removeChild(newEl.firstChild);
+
+  for (const m of matches) {
+    if (m.kind === "matched") {
+      // Check word-level churn before applying inline diff
+      const oldWords = (m.oldChild!.textContent || "").match(/\S+/g) || [];
+      const newWords = (m.newChild!.textContent || "").match(/\S+/g) || [];
+      const wordLcs = simpleLCS(oldWords, newWords);
+      const totalWords = Math.max(oldWords.length, newWords.length);
+      const churn = totalWords > 0 ? 1 - wordLcs.length / totalWords : 0;
+
+      if (churn > 0.5) {
+        // Too different — show as removed + added
+        hasChanges = true;
+        const ghost = m.oldChild!.cloneNode(true) as HTMLElement;
+        ghost.classList.add("diff-block-removed");
+        newEl.appendChild(ghost);
+        m.newChild!.classList.add("diff-block-added");
+        newEl.appendChild(m.newChild!);
+      } else {
+        if (applyWordDiff(m.oldChild!, m.newChild!, false)) hasChanges = true;
+        newEl.appendChild(m.newChild!);
+      }
+    } else if (m.kind === "removed") {
+      hasChanges = true;
+      const ghost = m.oldChild!.cloneNode(true) as HTMLElement;
+      ghost.classList.add("diff-block-removed");
+      newEl.appendChild(ghost);
+    } else {
+      hasChanges = true;
+      m.newChild!.classList.add("diff-block-added");
+      newEl.appendChild(m.newChild!);
+    }
+  }
+
+  return hasChanges;
 }
 
 /* ── Word-level diff with combined single-pass rebuild ── */

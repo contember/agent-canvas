@@ -36,6 +36,8 @@ export function Markdown({ children, file, __content }: MarkdownProps) {
     <div
       className="mt-3 prose-canvas"
       data-md="markdown"
+      {...(file ? { "data-md-file": file } : {})}
+      data-md-source={source}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

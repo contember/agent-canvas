@@ -355,29 +355,33 @@ export default function Plan() {
         Inline markdown with full GFM support:
 
         <Markdown>{`
-### Key Features
+### Supported Syntax
 
-The **Markdown** component supports all standard GitHub-Flavored Markdown:
+The **Markdown** component renders all standard GitHub-Flavored Markdown:
 
-- **Bold**, *italic*, and \`inline code\`
+- **Bold**, *italic*, ~~strikethrough~~, and \`inline code\`
 - Ordered and unordered lists
 - [Links](https://example.com) and images
 - Tables, blockquotes, and horizontal rules
+- Task lists with checkboxes
 
-> This is a blockquote — useful for highlighting important notes or quotes.
+> Blockquotes are great for callouts — they can span multiple lines
+> and support **inline formatting** too.
 
-| Feature       | Status  |
-|---------------|---------|
-| Headings      | Done    |
-| Lists         | Done    |
-| Code blocks   | Done    |
-| Tables        | Done    |
+| Feature       | Status  | Notes            |
+|---------------|---------|------------------|
+| Headings      | Done    | h1–h6 supported  |
+| Lists         | Done    | nested too        |
+| Code blocks   | Done    | with highlighting |
+| Tables        | Done    | GFM style         |
+| Blockquotes   | Done    | multi-line        |
 
 \`\`\`typescript
 // Code blocks with syntax highlighting
 interface Canvas {
   id: string;
   title: string;
+  revision: number;
   render(): JSX.Element;
 }
 \`\`\`
