@@ -96,7 +96,7 @@ async function build() {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Agent Canvas</title>
-  <script>document.documentElement.dataset.theme = localStorage.getItem('canvas-theme') || 'dark';</script>
+  <script>!function(){var p=localStorage.getItem('canvas-theme')||'auto';document.documentElement.dataset.theme=p==='auto'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):p}()</script>
   <link rel="stylesheet" href="/assets/client.css" />
   <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark-dimmed.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>

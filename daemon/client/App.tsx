@@ -60,23 +60,56 @@ export const RevisionContext = createContext<{
   setCompareRevision: () => {},
 });
 
+function resolveTheme(pref: string): "light" | "dark" {
+  if (pref === "auto") return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return pref as "light" | "dark";
+}
+
+function applyTheme(pref: string) {
+  document.documentElement.dataset.theme = resolveTheme(pref);
+}
+
 function ThemeSwitcher() {
-  const [theme, setTheme] = useState(() => localStorage.getItem("canvas-theme") || document.documentElement.dataset.theme || "dark");
+  const [pref, setPref] = useState<"auto" | "light" | "dark">(() => {
+    const stored = localStorage.getItem("canvas-theme");
+    if (stored === "light" || stored === "dark" || stored === "auto") return stored;
+    return "auto";
+  });
+
+  useEffect(() => {
+    applyTheme(pref);
+    if (pref !== "auto") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => applyTheme("auto");
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [pref]);
 
   const toggle = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
+    const next = pref === "auto" ? "light" : pref === "light" ? "dark" : "auto";
     localStorage.setItem("canvas-theme", next);
-    setTheme(next);
+    setPref(next);
   };
+
+  const titles = { auto: "Theme: system (click for light)", light: "Theme: light (click for dark)", dark: "Theme: dark (click for system)" };
 
   return (
     <button
       onClick={toggle}
       className="w-7 h-7 flex items-center justify-center rounded-md text-text-tertiary hover:text-text-secondary hover:bg-bg-elevated transition-colors"
-      title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+      title={titles[pref]}
     >
-      {theme === "dark" ? (
+      {pref === "auto" ? (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      ) : pref === "dark" ? (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
+      ) : (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="5" />
           <line x1="12" y1="1" x2="12" y2="3" />
@@ -87,10 +120,6 @@ function ThemeSwitcher() {
           <line x1="21" y1="12" x2="23" y2="12" />
           <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-        </svg>
-      ) : (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
         </svg>
       )}
     </button>
