@@ -2,10 +2,10 @@ import React, { useEffect, useState, useContext, useCallback, useRef, useMemo } 
 import { SessionContext } from "#canvas/runtime";
 import type { AnnotationContext } from "#canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
-import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, restoreMarks } from "./highlightRange";
-import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
+import { wrapRangeWithMark } from "./highlightRange";
 import { LANG_MAP } from "../langMap";
 import { generateAnnotationId } from "./utils";
+import { useTextAnnotation } from "./useTextAnnotation";
 
 /** Walk up from a node to find the parent line div with data-line-num */
 function findLineDiv(node: Node): HTMLElement | null {
@@ -17,21 +17,43 @@ function findLineDiv(node: Node): HTMLElement | null {
   return null;
 }
 
+/** Build AnnotationContext from a text selection Range inside file content */
+function buildFileContext(range: Range): AnnotationContext {
+  const snippet = range.toString().trim();
+  const startLineDiv = findLineDiv(range.startContainer);
+  const endLineDiv = findLineDiv(range.endContainer);
+  const lineStart = startLineDiv ? parseInt(startLineDiv.getAttribute("data-line-num")!, 10) : undefined;
+  const lineEnd = endLineDiv ? parseInt(endLineDiv.getAttribute("data-line-num")!, 10) : undefined;
+
+  let before = "";
+  let after = "";
+  if (snippet.length < 30 && startLineDiv && startLineDiv === endLineDiv) {
+    const code = startLineDiv.querySelector("code");
+    if (code) {
+      const lineText = code.textContent || "";
+      const idx = lineText.indexOf(snippet);
+      if (idx >= 0) {
+        before = lineText.slice(0, idx).trimStart();
+        after = lineText.slice(idx + snippet.length).trimEnd();
+      }
+    }
+  }
+
+  return { before, after, hierarchy: [], lineStart, lineEnd };
+}
+
 interface FileViewerProps {
   path: string;
 }
 
 export function FileViewer({ path }: FileViewerProps) {
   const sessionId = useContext(SessionContext);
-  const { annotations, addAnnotationWithId, removeAnnotation, updateAnnotation, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
+  const { annotations, addAnnotationWithId, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
   const [content, setContent] = useState<string | null>(null);
   const [language, setLanguage] = useState("text");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const contentRef = useRef<HTMLPreElement>(null);
-
-  const [pendingMarkId, setPendingMarkId] = useState<string | null>(null);
-  const pendingSnippetRef = useRef("");
 
   // Line gutter selection state
   const [lineSelectStart, setLineSelectStart] = useState<number | null>(null);
@@ -40,11 +62,18 @@ export function FileViewer({ path }: FileViewerProps) {
   const lineSelectEndRef = useRef<number | null>(null);
   const linesRef = useRef<string[]>([]);
 
-  // Popover state
-  const [editPopover, setEditPopover] = useState<{ anchorEl: HTMLElement; annId: string } | null>(null);
-  const [createPopover, setCreatePopover] = useState<{ anchorEl: HTMLElement; tempId: string; snippet: string; ctx?: AnnotationContext } | null>(null);
-
   const fileAnns = annotations.filter((a) => a.filePath === path);
+
+  const scrollContainer = contentRef.current?.closest("#plan-scroll-container") as HTMLElement | null;
+
+  const { popovers, openCreatePopover } = useTextAnnotation({
+    containerRef: contentRef,
+    restoreKey: `${content}:${path}`,
+    restoreAnnotations: fileAnns,
+    extractContext: buildFileContext,
+    filePath: path,
+    scrollContainer,
+  });
 
   useEffect(() => {
     setLoading(true);
@@ -57,117 +86,6 @@ export function FileViewer({ path }: FileViewerProps) {
       })
       .catch(() => { setError("Failed to fetch file"); setLoading(false); });
   }, [sessionId, path]);
-
-  // Restore persisted annotation marks after file content renders
-  useEffect(() => {
-    if (!content || !contentRef.current) return;
-    const timer = setTimeout(() => {
-      if (contentRef.current) {
-        restoreMarks(contentRef.current, fileAnns);
-      }
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [content, path]);
-
-  // Update mark active states
-  const prevActiveRef = useRef<string | null>(null);
-  useEffect(() => {
-    updateAllMarkStates(activeAnnotationId, prevActiveRef.current);
-    prevActiveRef.current = activeAnnotationId;
-  }, [activeAnnotationId]);
-
-  // Click handler for marks
-  useEffect(() => {
-    const container = contentRef.current;
-    if (!container) return;
-    const handleClick = (e: MouseEvent) => {
-      const mark = (e.target as HTMLElement).closest("[data-annotation-id]") as HTMLElement | null;
-      if (!mark) return;
-      e.stopPropagation();
-      const annId = mark.getAttribute("data-annotation-id")!;
-      if (annId === activeAnnotationId) {
-        setEditPopover({ anchorEl: mark, annId });
-      } else {
-        setActiveAnnotationId(annId);
-      }
-    };
-    const handleMouseOver = (e: MouseEvent) => {
-      const mark = (e.target as HTMLElement).closest("[data-annotation-id]") as HTMLElement | null;
-      if (mark) setActiveAnnotationId(mark.getAttribute("data-annotation-id")!);
-    };
-    const handleMouseOut = (e: MouseEvent) => {
-      const mark = (e.target as HTMLElement).closest("[data-annotation-id]");
-      const related = (e.relatedTarget as HTMLElement | null)?.closest?.("[data-annotation-id]");
-      if (mark && !related && !document.getElementById("ann-inline-popover")) setActiveAnnotationId(null);
-    };
-    container.addEventListener("click", handleClick);
-    container.addEventListener("mouseover", handleMouseOver);
-    container.addEventListener("mouseout", handleMouseOut);
-    return () => {
-      container.removeEventListener("click", handleClick);
-      container.removeEventListener("mouseover", handleMouseOver);
-      container.removeEventListener("mouseout", handleMouseOut);
-    };
-  }, [content, annotations, activeAnnotationId]);
-
-  useEffect(() => {
-    const handler = () => handleMouseUp();
-    document.addEventListener("mouseup", handler);
-    return () => document.removeEventListener("mouseup", handler);
-  }, []);
-
-  // Use refs so the document-level mouseup always has current values
-  const pathRef = useRef(path);
-  pathRef.current = path;
-  const addAnnotationRef = useRef(addAnnotationWithId);
-  addAnnotationRef.current = addAnnotationWithId;
-
-  const handleMouseUp = useCallback(() => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
-    if (!contentRef.current) return;
-    const range = sel.getRangeAt(0);
-    if (!contentRef.current.contains(range.startContainer)) return;
-    if ((range.startContainer.parentElement as HTMLElement)?.closest?.("[data-annotation-id]")) return;
-    const snippet = sel.toString().trim();
-    if (snippet.length < 2) return;
-
-    // Compute line numbers from DOM
-    const startLineDiv = findLineDiv(range.startContainer);
-    const endLineDiv = findLineDiv(range.endContainer);
-    const lineStart = startLineDiv ? parseInt(startLineDiv.getAttribute("data-line-num")!, 10) : undefined;
-    const lineEnd = endLineDiv ? parseInt(endLineDiv.getAttribute("data-line-num")!, 10) : undefined;
-
-    // Compute before/after context for short snippets on a single line
-    let before = "";
-    let after = "";
-    if (snippet.length < 30 && startLineDiv && startLineDiv === endLineDiv) {
-      const code = startLineDiv.querySelector("code");
-      if (code) {
-        const lineText = code.textContent || "";
-        const idx = lineText.indexOf(snippet);
-        if (idx >= 0) {
-          before = lineText.slice(0, idx).trimStart();
-          after = lineText.slice(idx + snippet.length).trimEnd();
-        }
-      }
-    }
-
-    const ctx: AnnotationContext = { before, after, hierarchy: [], lineStart, lineEnd };
-
-    const tempId = `__pending_${Date.now()}`;
-    const cloned = range.cloneRange();
-    try { wrapRangeWithMark(cloned, tempId); } catch {}
-    sel.removeAllRanges();
-
-    const marks = document.querySelectorAll(`[data-annotation-id="${tempId}"]`);
-    const lastMark = marks[marks.length - 1] as HTMLElement | undefined;
-    if (!lastMark) return;
-
-    pendingSnippetRef.current = snippet;
-    setPendingMarkId(tempId);
-    setCreatePopover({ anchorEl: lastMark, tempId, snippet, ctx });
-  }, []);
 
   // Line gutter: mousedown starts line selection
   const handleGutterMouseDown = useCallback((e: React.MouseEvent, lineNum: number) => {
@@ -227,9 +145,7 @@ export function FileViewer({ path }: FileViewerProps) {
         }
         const anchorEl = lineDivs[endLine - 1] as HTMLElement;
         if (anchorEl) {
-          pendingSnippetRef.current = snippet;
-          setPendingMarkId(tempId);
-          setCreatePopover({ anchorEl, tempId, snippet, ctx });
+          openCreatePopover(anchorEl, tempId, snippet, ctx);
         }
       }
       setLineSelectStart(null);
@@ -279,8 +195,6 @@ export function FileViewer({ path }: FileViewerProps) {
     setActiveAnnotationId(id);
   };
 
-  const scrollContainer = contentRef.current?.closest("#plan-scroll-container") as HTMLElement | null;
-
   return (
     <div>
       {/* Code */}
@@ -304,41 +218,7 @@ export function FileViewer({ path }: FileViewerProps) {
         })}
       </pre>
 
-      {editPopover && (() => {
-        const ann = annotations.find((a) => a.id === editPopover.annId);
-        if (!ann) return null;
-        return (
-          <AnnotationEditPopover
-            anchorEl={editPopover.anchorEl}
-            scrollContainer={scrollContainer}
-            initialNote={ann.note}
-            onUpdate={(note) => updateAnnotation(editPopover.annId, note)}
-            onDelete={() => { removeAnnotation(editPopover.annId); setActiveAnnotationId(null); }}
-            onClose={() => setEditPopover(null)}
-          />
-        );
-      })()}
-
-      {createPopover && (
-        <AnnotationCreatePopover
-          anchorEl={createPopover.anchorEl}
-          scrollContainer={scrollContainer}
-          snippet={createPopover.snippet}
-          onAdd={(note) => {
-            const id = generateAnnotationId();
-            renameMarkId(createPopover.tempId, id);
-            addAnnotationWithId(id, createPopover.snippet, note, path, createPopover.ctx);
-            setPendingMarkId(null);
-            setCreatePopover(null);
-          }}
-          onCancel={() => {
-            unwrapMarks(createPopover.tempId);
-            setPendingMarkId(null);
-            setCreatePopover(null);
-          }}
-        />
-      )}
+      {popovers}
     </div>
   );
 }
-

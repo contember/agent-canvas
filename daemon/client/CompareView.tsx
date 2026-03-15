@@ -1,7 +1,10 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { RevisionSelect } from "./RevisionSelect";
 import { runDomDiff } from "./domDiff";
 import { extractBlockTree, matchBlocks, buildUnifiedDom } from "./unifiedDiff";
+import { useAnnotations } from "./AnnotationProvider";
+import { useTextAnnotation } from "./useTextAnnotation";
+import { extractContext } from "./annotationContext";
 
 interface CompareViewProps {
   initialLeft: number;
@@ -132,6 +135,15 @@ function UnifiedView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProps) 
   const [rightReady, setRightReady] = useState(false);
   const [done, setDone] = useState(false);
 
+  const { annotations } = useAnnotations();
+  const planAnnotations = annotations.filter(a => !a.filePath);
+  const { popovers } = useTextAnnotation({
+    containerRef: unifiedRef,
+    restoreKey: done,
+    restoreAnnotations: planAnnotations,
+    extractContext: (range) => extractContext(range, unifiedRef.current!),
+  });
+
   useEffect(() => {
     if (!leftReady || !rightReady || done) return;
     if (!oldRef.current || !newRef.current) return;
@@ -155,21 +167,23 @@ function UnifiedView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProps) 
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto">
-      {/* Offscreen source panels */}
-      <div style={{ position: "absolute", left: -9999, visibility: "hidden" as const, pointerEvents: "none" as const, width: 720 }}>
-        <ComparePanelRenderer
-          ref={oldRef}
-          sessionId={sessionId}
-          revision={leftRev}
-          onReady={() => setLeftReady(true)}
-        />
-        <ComparePanelRenderer
-          ref={newRef}
-          sessionId={sessionId}
-          revision={rightRev}
-          onReady={() => setRightReady(true)}
-        />
-      </div>
+      {/* Offscreen source panels — unmount after diff is built */}
+      {!done && (
+        <div style={{ position: "absolute", left: -9999, visibility: "hidden" as const, pointerEvents: "none" as const, width: 720 }}>
+          <ComparePanelRenderer
+            ref={oldRef}
+            sessionId={sessionId}
+            revision={leftRev}
+            onReady={() => setLeftReady(true)}
+          />
+          <ComparePanelRenderer
+            ref={newRef}
+            sessionId={sessionId}
+            revision={rightRev}
+            onReady={() => setRightReady(true)}
+          />
+        </div>
+      )}
 
       {/* Visible output */}
       <div className="max-w-[720px] mx-auto px-6 pt-8 pb-32">
@@ -180,6 +194,7 @@ function UnifiedView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProps) 
         )}
         <div ref={unifiedRef} />
       </div>
+      {popovers}
     </div>
   );
 }
@@ -193,9 +208,22 @@ function SideBySideView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProp
   const [rightReady, setRightReady] = useState(false);
   const [done, setDone] = useState(false);
 
+  const viewRef = useRef<HTMLDivElement>(null);
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
   const isSyncing = useRef(false);
+
+  const handleLeftReady = useCallback(() => setLeftReady(true), []);
+  const handleRightReady = useCallback(() => setRightReady(true), []);
+
+  const { annotations } = useAnnotations();
+  const planAnnotations = annotations.filter(a => !a.filePath);
+  const { popovers } = useTextAnnotation({
+    containerRef: viewRef,
+    restoreKey: done,
+    restoreAnnotations: planAnnotations,
+    extractContext: (range) => extractContext(range, viewRef.current!),
+  });
 
   // Run diff
   useEffect(() => {
@@ -241,14 +269,14 @@ function SideBySideView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProp
   }, []);
 
   return (
-    <div className="flex flex-1 min-h-0">
+    <div ref={viewRef} className="flex flex-1 min-h-0">
       <div ref={leftPanelRef} className="w-1/2 overflow-y-auto border-r border-border-subtle">
         <div className="max-w-[720px] mx-auto px-6 pt-8 pb-32">
           <ComparePanelRenderer
             ref={oldRef}
             sessionId={sessionId}
             revision={leftRev}
-            onReady={() => setLeftReady(true)}
+            onReady={handleLeftReady}
           />
         </div>
       </div>
@@ -258,10 +286,11 @@ function SideBySideView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProp
             ref={newRef}
             sessionId={sessionId}
             revision={rightRev}
-            onReady={() => setRightReady(true)}
+            onReady={handleRightReady}
           />
         </div>
       </div>
+      {popovers}
     </div>
   );
 }
@@ -274,7 +303,7 @@ interface ComparePanelRendererProps {
   onReady: () => void;
 }
 
-const ComparePanelRenderer = React.forwardRef<HTMLDivElement, ComparePanelRendererProps>(
+const ComparePanelRenderer = React.memo(React.forwardRef<HTMLDivElement, ComparePanelRendererProps>(
   ({ sessionId, revision, onReady }, ref) => {
     const [PlanComponent, setPlanComponent] = useState<React.ComponentType | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -303,6 +332,8 @@ const ComparePanelRenderer = React.forwardRef<HTMLDivElement, ComparePanelRender
       });
     }, [PlanComponent]);
 
+    const planElement = useMemo(() => PlanComponent ? <PlanComponent /> : null, [PlanComponent]);
+
     if (loading) {
       return (
         <div className="flex items-center justify-center h-64 text-text-tertiary font-body text-body">
@@ -326,8 +357,8 @@ const ComparePanelRenderer = React.forwardRef<HTMLDivElement, ComparePanelRender
 
     return (
       <div ref={ref}>
-        <PlanComponent />
+        {planElement}
       </div>
     );
   }
-);
+));

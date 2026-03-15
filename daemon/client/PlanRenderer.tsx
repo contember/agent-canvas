@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useRef, useContext, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useRef, useContext, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { SessionContext } from "#canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
-import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, restoreMarks } from "./highlightRange";
 import { extractContext } from "./annotationContext";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 import { generateAnnotationId } from "./utils";
+import { useTextAnnotation } from "./useTextAnnotation";
 
 /** All navigable blocks (keyboard arrows) */
 const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='choice-option'], [data-md='multichoice-option'], [data-md='userinput'], [data-md='rangeinput'], [data-md='image']";
@@ -25,10 +25,6 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
   const { annotations, addAnnotationWithId, removeAnnotation, updateAnnotation, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
   const [editingAnn, setEditingAnn] = useState<{ id: string; note: string } | null>(null);
 
-  // Popover state
-  const [editPopover, setEditPopover] = useState<{ anchorEl: HTMLElement; annId: string } | null>(null);
-  const [createPopover, setCreatePopover] = useState<{ anchorEl: HTMLElement; tempId: string; snippet: string; ctx: any } | null>(null);
-
   // Block annotation hover state
   const [hoveredBlock, setHoveredBlock] = useState<HTMLElement | null>(null);
   const [blockPopover, setBlockPopover] = useState<{ anchorEl: HTMLElement; snippet: string; annId?: string } | null>(null);
@@ -46,71 +42,15 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
       .catch((e) => { setError(e.message); setLoading(false); });
   }, [sessionId, revision]);
 
-  // Restore persisted annotation marks after plan renders
-  useEffect(() => {
-    if (!PlanComponent || !containerRef.current) return;
-    // Small delay to ensure the plan DOM is fully rendered
-    const timer = setTimeout(() => {
-      if (containerRef.current) {
-        restoreMarks(containerRef.current, annotations);
-      }
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [PlanComponent]);
+  const scrollContainer = document.getElementById("plan-scroll-container");
 
-  // Update mark active states when activeAnnotationId changes
-  const prevActiveRef = useRef<string | null>(null);
-  useEffect(() => {
-    updateAllMarkStates(activeAnnotationId, prevActiveRef.current);
-    prevActiveRef.current = activeAnnotationId;
-  }, [activeAnnotationId]);
-
-  // Click handler for marks in plan
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleClick = (e: MouseEvent) => {
-      const mark = (e.target as HTMLElement).closest("[data-annotation-id]") as HTMLElement | null;
-      if (!mark) return;
-      e.stopPropagation();
-      const annId = mark.getAttribute("data-annotation-id")!;
-      if (annId === activeAnnotationId) {
-        setEditPopover({ anchorEl: mark, annId });
-      } else {
-        setActiveAnnotationId(annId);
-      }
-    };
-
-    // Hover on inline marks → highlight sidebar card
-    const handleMouseOver = (e: MouseEvent) => {
-      const mark = (e.target as HTMLElement).closest("[data-annotation-id]") as HTMLElement | null;
-      if (mark) {
-        const annId = mark.getAttribute("data-annotation-id")!;
-        setActiveAnnotationId(annId);
-      }
-    };
-
-    const handleMouseOut = (e: MouseEvent) => {
-      const mark = (e.target as HTMLElement).closest("[data-annotation-id]");
-      const relatedMark = (e.relatedTarget as HTMLElement | null)?.closest?.("[data-annotation-id]");
-      if (mark && !relatedMark) {
-        // Left a mark without entering another one — only deactivate if popover isn't open
-        if (!document.getElementById("ann-inline-popover")) {
-          setActiveAnnotationId(null);
-        }
-      }
-    };
-
-    container.addEventListener("click", handleClick);
-    container.addEventListener("mouseover", handleMouseOver);
-    container.addEventListener("mouseout", handleMouseOut);
-    return () => {
-      container.removeEventListener("click", handleClick);
-      container.removeEventListener("mouseover", handleMouseOver);
-      container.removeEventListener("mouseout", handleMouseOut);
-    };
-  }, [PlanComponent, annotations, activeAnnotationId]);
+  const { popovers: textAnnotationPopovers, isPopoverOpen: textPopoverOpen } = useTextAnnotation({
+    containerRef,
+    restoreKey: PlanComponent,
+    restoreAnnotations: annotations,
+    extractContext: (range) => extractContext(range, containerRef.current!),
+    scrollContainer,
+  });
 
   // Build a map of block snippets to annotation IDs for quick lookup
   const blockAnnotationMap = useMemo(() => {
@@ -130,7 +70,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
 
     const handleMove = (e: MouseEvent) => {
       // Don't change hover when a popover is open
-      if (blockPopover || createPopover || editPopover) return;
+      if (blockPopover || textPopoverOpen) return;
       const target = e.target as HTMLElement;
       // Ignore events on the block comment button itself
       if (target.closest("[data-block-comment-btn]")) return;
@@ -159,7 +99,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
     };
 
     const handleLeave = (e: MouseEvent) => {
-      if (blockPopover || createPopover || editPopover) return;
+      if (blockPopover || textPopoverOpen) return;
       // Don't clear if moving onto the block comment button
       const related = e.relatedTarget as HTMLElement | null;
       if (related?.closest("[data-block-comment-btn]")) return;
@@ -173,7 +113,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
       container.removeEventListener("mousemove", handleMove);
       container.removeEventListener("mouseleave", handleLeave);
     };
-  }, [PlanComponent, blockPopover, createPopover, editPopover, blockAnnotationMap, activeAnnotationId]);
+  }, [PlanComponent, blockPopover, textPopoverOpen, blockAnnotationMap, activeAnnotationId]);
 
   // Keyboard navigation: document-level key listener
   useEffect(() => {
@@ -181,7 +121,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
       // Guard: skip if input/textarea focused or popover open
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
-      if (blockPopover || createPopover || editPopover) return;
+      if (blockPopover || textPopoverOpen) return;
 
       const container = containerRef.current;
       if (!container) return;
@@ -268,7 +208,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [focusedBlockIndex, blockPopover, createPopover, editPopover, blockAnnotationMap]);
+  }, [focusedBlockIndex, blockPopover, textPopoverOpen, blockAnnotationMap]);
 
   // Keyboard navigation: visual focus outline + scroll into view + sidebar sync
   useEffect(() => {
@@ -295,39 +235,6 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
     };
   }, [focusedBlockIndex, keyboardNav, blockAnnotationMap]);
 
-  // Use document-level mouseup so selections that end outside the container still work
-  useEffect(() => {
-    const handler = () => handleMouseUp();
-    document.addEventListener("mouseup", handler);
-    return () => document.removeEventListener("mouseup", handler);
-  }, []);
-
-  const handleMouseUp = useCallback(() => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
-    if (!containerRef.current) return;
-    const range = sel.getRangeAt(0);
-    // Selection must have started inside the plan container
-    if (!containerRef.current.contains(range.startContainer)) return;
-    // Don't create new annotation if clicking inside existing mark
-    if ((range.startContainer.parentElement as HTMLElement)?.closest?.("[data-annotation-id]")) return;
-    const snippet = sel.toString().trim();
-    if (snippet.length < 2) return;
-
-    // Capture context before popover disturbs the DOM
-    const savedRange = range.cloneRange();
-    const ctx = extractContext(range, containerRef.current);
-    const tempId = `__pending_${Date.now()}`;
-    try { wrapRangeWithMark(savedRange, tempId); } catch {}
-    window.getSelection()?.removeAllRanges();
-
-    const marks = document.querySelectorAll(`[data-annotation-id="${tempId}"]`);
-    const lastMark = marks[marks.length - 1] as HTMLElement | undefined;
-    if (!lastMark) return;
-
-    setCreatePopover({ anchorEl: lastMark, tempId, snippet, ctx });
-  }, [addAnnotationWithId]);
-
   // Memoize so context-triggered re-renders of PlanRenderer don't re-render the plan tree.
   // This prevents remounting custom components defined inside the Plan function.
   const planElement = useMemo(() => PlanComponent ? <PlanComponent /> : null, [PlanComponent]);
@@ -349,8 +256,6 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
     return <div className="text-text-tertiary text-center py-8 font-body text-body">No canvas loaded</div>;
   }
 
-  const scrollContainer = document.getElementById("plan-scroll-container");
-
   return (
     <>
       <div ref={containerRef} className="plan-content plan-updated">
@@ -364,39 +269,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
         />
       )}
 
-      {editPopover && (() => {
-        const ann = annotations.find((a) => a.id === editPopover.annId);
-        if (!ann) return null;
-        return (
-          <AnnotationEditPopover
-            anchorEl={editPopover.anchorEl}
-            scrollContainer={scrollContainer}
-            initialNote={ann.note}
-            onUpdate={(note) => updateAnnotation(editPopover.annId, note)}
-            onDelete={() => { removeAnnotation(editPopover.annId); setActiveAnnotationId(null); }}
-            onClose={() => setEditPopover(null)}
-          />
-        );
-      })()}
-
-      {createPopover && (
-        <AnnotationCreatePopover
-          anchorEl={createPopover.anchorEl}
-          scrollContainer={scrollContainer}
-          snippet={createPopover.snippet}
-          truncateAt={80}
-          onAdd={(note) => {
-            const id = generateAnnotationId();
-            renameMarkId(createPopover.tempId, id);
-            addAnnotationWithId(id, createPopover.snippet, note, undefined, createPopover.ctx);
-            setCreatePopover(null);
-          }}
-          onCancel={() => {
-            unwrapMarks(createPopover.tempId);
-            setCreatePopover(null);
-          }}
-        />
-      )}
+      {textAnnotationPopovers}
 
       {/* Block annotation floating buttons */}
       <BlockCommentButtons

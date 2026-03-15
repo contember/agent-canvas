@@ -275,16 +275,14 @@ function App() {
               {/* Left panel — fixed to viewport */}
               <LeftPanel sessionId={sessionId} projectRoot={projectRoot} connected={connected} onMobileSidebar={() => setMobileSidebar(!mobileSidebar)} collapsed={leftCollapsed} onToggle={() => setLeftCollapsed((c) => !c)} />
 
-              {/* Right panel — fixed to viewport, resizable (hidden in compare mode) */}
-              {compareRevision === null && (
-                <ResizableSidebar collapsed={rightCollapsed} onToggle={() => setRightCollapsed((c) => !c)}>
-                  <AnnotationSidebar onPreview={() => setPreviewOpen(true)} onSubmit={handleSubmit} />
-                </ResizableSidebar>
-              )}
+              {/* Right panel — fixed to viewport, resizable */}
+              <ResizableSidebar collapsed={rightCollapsed} onToggle={() => setRightCollapsed((c) => !c)}>
+                <AnnotationSidebar onPreview={() => setPreviewOpen(true)} onSubmit={handleSubmit} />
+              </ResizableSidebar>
 
               {/* Center content — normal document flow, browser scroll */}
               {compareRevision !== null ? (
-                <div className={`${leftCollapsed ? "lg:ml-0" : "lg:ml-60"} transition-[margin] duration-200`}>
+                <div className={`${leftCollapsed ? "lg:ml-0" : "lg:ml-60"} ${rightCollapsed ? "lg:mr-0" : "lg:mr-[var(--sidebar-width,320px)]"} transition-[margin] duration-200`}>
                   <CompareView
                     initialLeft={compareRevision.left}
                     initialRight={compareRevision.right}
