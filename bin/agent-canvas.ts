@@ -1,13 +1,12 @@
 #!/usr/bin/env bun
 
 import { spawn } from "child_process";
-import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync, cpSync } from "fs";
+import { readFileSync, existsSync, mkdirSync, unlinkSync, cpSync } from "fs";
 import { join, resolve, dirname } from "path";
 import { homedir, tmpdir } from "os";
 import { randomUUID } from "crypto";
 
 const PACKAGE_ROOT = resolve(join(dirname(import.meta.path), ".."));
-const DATA_DIR = join(homedir(), ".claude", "agent-canvas");
 const TEMP_DIR = join(tmpdir(), "agent-canvas");
 const DAEMON_PORT = parseInt(process.env.CANVAS_PORT || "19400", 10);
 const BASE_URL = `http://localhost:${DAEMON_PORT}`;
@@ -56,15 +55,13 @@ function printUsage() {
   console.error(`agent-canvas — Interactive visual canvas for Claude Code
 
 Commands:
-  agent-canvas install [local|global]  Install skill & hooks for Claude Code
+  agent-canvas install [local|global]  Install skill for Claude Code
   agent-canvas push <file.jsx>         Push a canvas, open browser
   agent-canvas wait [--session <id>]   Wait for user feedback (prints to stdout)
   agent-canvas daemon status           Show daemon status
   agent-canvas daemon stop             Stop the daemon
 
 Environment:
-  CANVAS_SESSION_ID     Session ID (set automatically by hooks)
-  CANVAS_PROJECT_ROOT   Project root (set automatically by hooks)
   CANVAS_PORT           Daemon port (default: 19400)`);
 }
 
@@ -75,7 +72,7 @@ async function handleInstall(args: string[]) {
 
   if (!mode) {
     // Interactive prompt
-    process.stdout.write("Install canvas skill and hooks for Claude Code.\n\n");
+    process.stdout.write("Install canvas skill for Claude Code.\n\n");
     process.stdout.write("  local  — install to .claude/ in current project\n");
     process.stdout.write("  global — install to ~/.claude/ for all projects\n\n");
     process.stdout.write("Choose [local/global]: ");
@@ -107,70 +104,23 @@ async function handleInstall(args: string[]) {
 
   console.log(`  Skill installed to ${skillTarget}`);
 
-  // Install hook script
-  const hooksDir = join(targetBase, "agent-canvas");
-  mkdirSync(hooksDir, { recursive: true });
-  const hookSrc = join(PACKAGE_ROOT, "hooks", "session-start.sh");
-  const hookDest = join(hooksDir, "session-start.sh");
-  cpSync(hookSrc, hookDest);
-  try { require("fs").chmodSync(hookDest, 0o755); } catch {}
-  console.log(`  Hook script installed to ${hookDest}`);
-
-  // Register hook in settings.json
-  const settingsPath = join(targetBase, "settings.json");
-  let settings: any = {};
-  if (existsSync(settingsPath)) {
-    try { settings = JSON.parse(readFileSync(settingsPath, "utf-8")); } catch {}
-  }
-
-  if (!settings.hooks) settings.hooks = {};
-  if (!settings.hooks.SessionStart) settings.hooks.SessionStart = [];
-
-  const hasHook = settings.hooks.SessionStart.some((h: any) =>
-    h.hooks?.some((hh: any) => hh.command?.includes("CANVAS_SESSION_ID"))
-  );
-
-  if (!hasHook) {
-    settings.hooks.SessionStart.push({
-      matcher: "*",
-      hooks: [{
-        type: "command",
-        command: `bash "${hookDest}"`,
-      }],
-    });
-
-    mkdirSync(dirname(settingsPath), { recursive: true });
-    writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-    console.log(`  Hook registered in ${settingsPath}`);
-  } else {
-    console.log(`  Hook already registered in ${settingsPath}`);
-  }
-
   console.log(`\nInstalled! The /canvas command is now available in Claude Code.`);
 }
 
 // ── push ──
 
 async function handlePush(args: string[]) {
-  const fromHook = args.includes("--from-hook");
-  let jsx: string;
-  let filePath: string | undefined;
-
-  if (fromHook) {
-    jsx = await readStdin();
-  } else {
-    filePath = args.find((a) => !a.startsWith("--"));
-    if (!filePath) {
-      console.error("Error: No file specified. Usage: agent-canvas push <file.jsx>");
-      process.exit(1);
-    }
-    filePath = resolve(filePath);
-    if (!existsSync(filePath)) {
-      console.error(`Error: File not found: ${filePath}`);
-      process.exit(1);
-    }
-    jsx = readFileSync(filePath, "utf-8");
+  const filePath = args.find((a) => !a.startsWith("--"));
+  if (!filePath) {
+    console.error("Error: No file specified. Usage: agent-canvas push <file.jsx>");
+    process.exit(1);
   }
+  const resolvedPath = resolve(filePath);
+  if (!existsSync(resolvedPath)) {
+    console.error(`Error: File not found: ${resolvedPath}`);
+    process.exit(1);
+  }
+  const jsx = readFileSync(resolvedPath, "utf-8");
 
   const sessionId = getSessionId(args);
   const projectRoot = process.env.CANVAS_PROJECT_ROOT || process.cwd();
@@ -178,14 +128,14 @@ async function handlePush(args: string[]) {
   // Extract --label flag
   const labelIdx = args.indexOf("--label");
   const label = labelIdx !== -1 && args[labelIdx + 1] ? args[labelIdx + 1] : undefined;
-  const autoLabel = !label && filePath ? filePath.split("/").pop()?.replace(/\.jsx$/, "") : undefined;
+  const autoLabel = !label ? resolvedPath.split("/").pop()?.replace(/\.jsx$/, "") : undefined;
 
   await ensureDaemon();
 
   const response = await fetch(`${BASE_URL}/api/session/${sessionId}/plan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsx, projectRoot, label: label || autoLabel, sourceFile: filePath ? filePath.split("/").pop() : undefined }),
+    body: JSON.stringify({ jsx, projectRoot, label: label || autoLabel, sourceFile: resolvedPath.split("/").pop() }),
   });
 
   const result = await response.json() as any;
@@ -355,13 +305,6 @@ async function waitForFeedback(sessionId: string): Promise<void> {
   });
 }
 
-async function readStdin(): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of Bun.stdin.stream()) {
-    chunks.push(Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks).toString("utf-8");
-}
 
 async function readLine(): Promise<string> {
   const buf: number[] = [];
