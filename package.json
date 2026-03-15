@@ -5,17 +5,7 @@
   "bin": {
     "agent-canvas": "bin/agent-canvas.js"
   },
-  "files": [
-    "bin/",
-    "daemon/src/",
-    "daemon/client/",
-    "daemon/dist/",
-    "daemon/build.ts",
-    "daemon/package.json",
-    "skills/",
-    "hooks/"
-  ],
-  "scripts": {
+"scripts": {
     "build": "bun daemon/build.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p daemon/tsconfig.json",
     "prepublishOnly": "bun daemon/build.ts"
