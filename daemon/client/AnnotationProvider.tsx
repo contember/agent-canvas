@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { AnnotationCtx } from "#canvas/runtime";
 import type { Annotation, AnnotationContext, PlanResponse, FeedbackEntry, AnnotationContextValue } from "#canvas/runtime";
+import { generateAnnotationId } from "./utils";
 
 // Re-export types for convenience
 export type { Annotation, AnnotationContext, PlanResponse, FeedbackEntry, AnnotationContextValue };
@@ -101,8 +102,7 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
   }, []);
 
   const addAnnotation = useCallback((snippet: string, note: string, filePath?: string) => {
-    const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    addAnnotationWithId(id, snippet, note, filePath);
+    addAnnotationWithId(generateAnnotationId(), snippet, note, filePath);
   }, [addAnnotationWithId]);
 
   const updateAnnotation = useCallback((id: string, note: string) => {

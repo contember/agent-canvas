@@ -99,13 +99,15 @@ export function setMarkActive(annotationId: string, active: boolean) {
 }
 
 /**
- * Update active state for all annotation marks.
+ * Update active state for annotation marks.
+ * Only touches marks for the previous and current active IDs to avoid full DOM scans.
  */
-export function updateAllMarkStates(activeId: string | null) {
-  const allMarks = document.querySelectorAll("[data-annotation-id]");
-  for (const mark of allMarks) {
-    const id = mark.getAttribute("data-annotation-id");
-    (mark as HTMLElement).style.cssText = id === activeId ? MARK_STYLE_ACTIVE : MARK_STYLE_INACTIVE;
+export function updateAllMarkStates(activeId: string | null, prevActiveId?: string | null) {
+  if (prevActiveId != null && prevActiveId !== activeId) {
+    setMarkActive(prevActiveId, false);
+  }
+  if (activeId != null) {
+    setMarkActive(activeId, true);
   }
 }
 

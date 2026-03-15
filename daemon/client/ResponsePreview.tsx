@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useAnnotations } from "./AnnotationProvider";
-import { generateMarkdown, getMissingRequired, getMissingRequiredFeedback } from "./generateMarkdown";
+import { generateMarkdown, getMissingRequiredLabels } from "./generateMarkdown";
 
 interface ResponsePreviewProps {
   open: boolean;
@@ -119,12 +119,7 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
           </button>
           <button
             onClick={() => {
-              const missingResponses = getMissingRequired(responses);
-              const missingFeedback = getMissingRequiredFeedback(feedbackEntries);
-              const allMissing = [
-                ...missingResponses.map((r) => r.label),
-                ...missingFeedback.map((e) => e.label || e.id),
-              ];
+              const allMissing = getMissingRequiredLabels(responses, feedbackEntries);
               if (allMissing.length > 0) {
                 setValidationError(`Please answer: ${allMissing.join(", ")}`);
                 return;

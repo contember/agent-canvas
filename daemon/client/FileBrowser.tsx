@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext, useCallback } from "react";
+import React, { useEffect, useState, useContext, useCallback, useMemo } from "react";
 import { SessionContext } from "#canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
 import { ActiveViewContext } from "./App";
@@ -14,12 +14,13 @@ export function FileBrowser({ embedded }: { embedded?: boolean } = {}) {
   const [collapsed, setCollapsed] = useState(false);
   const [dirs, setDirs] = useState<Record<string, DirState>>({});
 
-  const fileAnnotations = annotations.filter((a) => a.filePath);
-  const annCountMap = new Map<string, number>();
-  for (const a of fileAnnotations) {
-    annCountMap.set(a.filePath!, (annCountMap.get(a.filePath!) || 0) + 1);
-  }
-  const annotatedFiles = [...annCountMap.keys()];
+  const { annCountMap, annotatedFiles } = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of annotations) {
+      if (a.filePath) map.set(a.filePath, (map.get(a.filePath) || 0) + 1);
+    }
+    return { annCountMap: map, annotatedFiles: [...map.keys()] };
+  }, [annotations]);
 
   const loadDir = async (path: string) => {
     const res = await fetch(`/api/tree?session=${sessionId}&path=${encodeURIComponent(path)}`);

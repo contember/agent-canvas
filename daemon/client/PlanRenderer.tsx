@@ -5,6 +5,7 @@ import { useAnnotations } from "./AnnotationProvider";
 import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, restoreMarks } from "./highlightRange";
 import { extractContext } from "./annotationContext";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
+import { generateAnnotationId } from "./utils";
 
 /** All navigable blocks (keyboard arrows) */
 const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='choice-option'], [data-md='multichoice-option'], [data-md='userinput'], [data-md='rangeinput'], [data-md='image']";
@@ -58,8 +59,10 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
   }, [PlanComponent]);
 
   // Update mark active states when activeAnnotationId changes
+  const prevActiveRef = useRef<string | null>(null);
   useEffect(() => {
-    updateAllMarkStates(activeAnnotationId);
+    updateAllMarkStates(activeAnnotationId, prevActiveRef.current);
+    prevActiveRef.current = activeAnnotationId;
   }, [activeAnnotationId]);
 
   // Click handler for marks in plan
@@ -383,7 +386,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
           snippet={createPopover.snippet}
           truncateAt={80}
           onAdd={(note) => {
-            const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            const id = generateAnnotationId();
             renameMarkId(createPopover.tempId, id);
             addAnnotationWithId(id, createPopover.snippet, note, undefined, createPopover.ctx);
             setCreatePopover(null);
@@ -421,7 +424,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
           snippet={blockPopover.snippet}
           truncateAt={80}
           onAdd={(note) => {
-            const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            const id = generateAnnotationId();
             addAnnotationWithId(id, blockPopover.snippet, note);
             setBlockPopover(null);
           }}

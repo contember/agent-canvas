@@ -1,11 +1,12 @@
 import React, { useRef, useEffect, useCallback, useState, useContext } from "react";
 import { useAnnotations, Annotation } from "./AnnotationProvider";
 import { setMarkActive } from "./highlightRange";
-import { generateMarkdown, hasValue, getMissingRequired, getMissingRequiredFeedback } from "./generateMarkdown";
+import { generateMarkdown, hasValue, getMissingRequiredLabels } from "./generateMarkdown";
 import { RevisionContext, ActiveViewContext } from "./App";
 import { SessionContext } from "#canvas/runtime";
 import { MarkdownPreview } from "./ResponsePreview";
 import { FileIcon } from "./FileIcon";
+import { autoResizeTextarea } from "./utils";
 
 interface AnnotationSidebarProps {
   onPreview: () => void;
@@ -159,17 +160,8 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
         className="w-full bg-transparent text-[13px] font-body text-text-primary resize-none focus:outline-none leading-relaxed p-0 border-none min-h-[20px]"
         rows={1}
         style={{ height: "auto", overflow: "hidden" }}
-        onInput={(e) => {
-          const t = e.target as HTMLTextAreaElement;
-          t.style.height = "auto";
-          t.style.height = t.scrollHeight + "px";
-        }}
-        ref={(el) => {
-          if (el) {
-            el.style.height = "auto";
-            el.style.height = el.scrollHeight + "px";
-          }
-        }}
+        onInput={(e) => autoResizeTextarea(e.target as HTMLTextAreaElement)}
+        ref={(el) => { if (el) autoResizeTextarea(el); }}
       />
 
       {/* Delete — top right on hover */}
@@ -236,17 +228,8 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
           onChange={(e) => setGeneralNote(e.target.value)}
           className="w-full bg-transparent text-[13px] font-body text-text-primary resize-none leading-relaxed p-0 border-none ring-0 shadow-none outline-none focus:outline-none focus:ring-0 focus:border-none placeholder:text-text-disabled min-h-[40px]"
           placeholder="General notes..."
-          onInput={(e) => {
-            const t = e.target as HTMLTextAreaElement;
-            t.style.height = "auto";
-            t.style.height = Math.max(40, t.scrollHeight) + "px";
-          }}
-          ref={(el) => {
-            if (el) {
-              el.style.height = "auto";
-              el.style.height = Math.max(40, el.scrollHeight) + "px";
-            }
-          }}
+          onInput={(e) => autoResizeTextarea(e.target as HTMLTextAreaElement, 40)}
+          ref={(el) => { if (el) autoResizeTextarea(el, 40); }}
         />
       </div>
 
@@ -279,12 +262,7 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
             </button>
             <button
               onClick={() => {
-                const missingResponses = getMissingRequired(responses);
-                const missingFeedback = getMissingRequiredFeedback(feedbackEntries);
-                const allMissing = [
-                  ...missingResponses.map((r) => r.label),
-                  ...missingFeedback.map((e) => e.label || e.id),
-                ];
+                const allMissing = getMissingRequiredLabels(responses, feedbackEntries);
                 if (allMissing.length > 0) {
                   setValidationError(`Please answer: ${allMissing.join(", ")}`);
                   return;

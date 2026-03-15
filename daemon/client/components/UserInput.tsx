@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useAnnotations } from "#canvas/runtime";
 import { ResponseNote } from "./ResponseNote";
+import { autoResizeTextarea } from "../utils";
 
 /** Free text input from user */
 interface UserInputProps {
@@ -29,10 +30,7 @@ export function UserInput({ id, label, placeholder, multiline, required }: UserI
     setResponse(id, { ...current!, value: v });
   };
 
-  const autoResize = (el: HTMLTextAreaElement) => {
-    el.style.height = "auto";
-    el.style.height = Math.max(multiline ? 60 : 32, el.scrollHeight) + "px";
-  };
+  const autoResize = (el: HTMLTextAreaElement) => autoResizeTextarea(el, multiline ? 60 : 32);
 
   const showError = current?.required && !value.trim();
 

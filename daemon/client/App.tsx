@@ -11,6 +11,7 @@ import { SessionSwitcher } from "./SessionSwitcher";
 import { exportCanvasToMarkdown } from "./exportMarkdown";
 import { CompareView } from "./CompareView";
 import { RevisionSelect } from "./RevisionSelect";
+import { generateAnnotationId } from "./utils";
 
 export type ActiveView = { type: "plan" } | { type: "file"; path: string };
 
@@ -595,7 +596,7 @@ function ContentTabs() {
                 const data = await res.json() as any;
                 if (!data.error) {
                   const preview = data.content.split("\n").slice(0, 3).join("\n") + (data.content.split("\n").length > 3 ? "\n..." : "");
-                  const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+                  const id = generateAnnotationId();
                   addAnnotationWithId(id, preview, "", path);
                   setActiveAnnotationId(id);
                 }

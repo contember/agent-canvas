@@ -99,6 +99,16 @@ export function getMissingRequiredFeedback(entries: Map<string, FeedbackEntry>):
   return missing;
 }
 
+/** Returns list of missing required field labels, or empty if all valid */
+export function getMissingRequiredLabels(responses: Map<string, PlanResponse>, feedbackEntries: Map<string, FeedbackEntry>): string[] {
+  const missingResponses = getMissingRequired(responses);
+  const missingFeedback = getMissingRequiredFeedback(feedbackEntries);
+  return [
+    ...missingResponses.map((r) => r.label),
+    ...missingFeedback.map((e) => e.label || e.id),
+  ];
+}
+
 function renderResponse(r: PlanResponse): string {
   const lines: string[] = [];
   lines.push(`**${r.label}**`);

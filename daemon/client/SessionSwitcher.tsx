@@ -29,7 +29,11 @@ export function SessionSwitcher({ currentSessionId, projectRoot }: SessionSwitch
     const fetchSessions = async () => {
       try {
         const res = await fetch("/api/sessions");
-        setSessions(await res.json() as SessionInfo[]);
+        const data = await res.json() as SessionInfo[];
+        setSessions((prev) => {
+          const next = JSON.stringify(data);
+          return JSON.stringify(prev) === next ? prev : data;
+        });
       } catch {}
     };
     fetchSessions();

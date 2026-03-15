@@ -4,6 +4,7 @@ import { useAnnotations } from "./AnnotationProvider";
 import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, restoreMarks } from "./highlightRange";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 import { LANG_MAP } from "../langMap";
+import { generateAnnotationId } from "./utils";
 
 interface FileViewerProps {
   path: string;
@@ -51,7 +52,11 @@ export function FileViewer({ path }: FileViewerProps) {
   }, [content, path]);
 
   // Update mark active states
-  useEffect(() => { updateAllMarkStates(activeAnnotationId); }, [activeAnnotationId]);
+  const prevActiveRef = useRef<string | null>(null);
+  useEffect(() => {
+    updateAllMarkStates(activeAnnotationId, prevActiveRef.current);
+    prevActiveRef.current = activeAnnotationId;
+  }, [activeAnnotationId]);
 
   // Click handler for marks
   useEffect(() => {
@@ -143,7 +148,7 @@ export function FileViewer({ path }: FileViewerProps) {
 
   const addWholeFileWithPopup = () => {
     const preview = content!.split("\n").slice(0, 3).join("\n") + (lines.length > 3 ? "\n..." : "");
-    const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const id = generateAnnotationId();
     addAnnotationWithId(id, preview, "", path);
     // Focus the new annotation's note in sidebar by activating it
     setActiveAnnotationId(id);
@@ -188,7 +193,7 @@ export function FileViewer({ path }: FileViewerProps) {
           scrollContainer={scrollContainer}
           snippet={createPopover.snippet}
           onAdd={(note) => {
-            const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            const id = generateAnnotationId();
             renameMarkId(createPopover.tempId, id);
             addAnnotationWithId(id, createPopover.snippet, note, path);
             setPendingMarkId(null);
