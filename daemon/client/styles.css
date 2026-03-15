@@ -258,6 +258,132 @@ input[type="range"]::-moz-range-track {
   background: transparent;
 }
 
+/* Prose (Markdown component) */
+.prose-canvas {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+.prose-canvas h1, .prose-canvas h2, .prose-canvas h3,
+.prose-canvas h4, .prose-canvas h5, .prose-canvas h6 {
+  color: var(--color-text-primary);
+  font-weight: 600;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+.prose-canvas h1 { font-size: 1.5rem; }
+.prose-canvas h2 { font-size: 1.25rem; }
+.prose-canvas h3 { font-size: 1.1rem; }
+
+.prose-canvas h1:first-child, .prose-canvas h2:first-child,
+.prose-canvas h3:first-child {
+  margin-top: 0;
+}
+
+.prose-canvas p {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+.prose-canvas p:first-child {
+  margin-top: 0;
+}
+
+.prose-canvas a {
+  color: var(--color-accent-blue);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-accent-blue) 40%, transparent);
+  text-underline-offset: 2px;
+}
+
+.prose-canvas a:hover {
+  text-decoration-color: var(--color-accent-blue);
+}
+
+.prose-canvas strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.prose-canvas code {
+  font-size: 0.8em;
+  background: var(--color-bg-code);
+  color: var(--color-text-code);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+}
+
+.prose-canvas pre {
+  background: var(--color-bg-code);
+  border-radius: 8px;
+  padding: 1em;
+  overflow-x: auto;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+.prose-canvas pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.8rem;
+}
+
+.prose-canvas ul, .prose-canvas ol {
+  padding-left: 1.5em;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose-canvas ul { list-style-type: disc; }
+.prose-canvas ol { list-style-type: decimal; }
+.prose-canvas li { margin-top: 0.25em; }
+.prose-canvas li > ul, .prose-canvas li > ol { margin-top: 0.25em; margin-bottom: 0; }
+
+.prose-canvas blockquote {
+  border-left: 3px solid var(--color-border-strong);
+  padding-left: 1em;
+  margin-left: 0;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+  color: var(--color-text-tertiary);
+}
+
+.prose-canvas hr {
+  border: none;
+  border-top: 1px solid var(--color-border-subtle);
+  margin: 1.5em 0;
+}
+
+.prose-canvas table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+  font-size: 0.8rem;
+}
+
+.prose-canvas th, .prose-canvas td {
+  border: 1px solid var(--color-border-subtle);
+  padding: 0.5em 0.75em;
+  text-align: left;
+}
+
+.prose-canvas th {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.prose-canvas img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
 /* highlight.js overrides */
 .hljs {
   background: transparent !important;

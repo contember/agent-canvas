@@ -12,13 +12,14 @@ import * as C from '#canvas/components';
 const { Section, Item, Task, FilePreview, CodeBlock, Callout,
         Mermaid, Table, Priority, Checklist, Note, Diff,
         Choice, MultiChoice, UserInput, RangeInput, ImageView,
-        useFeedback, useAnnotations } = C;
+        Markdown, useFeedback, useAnnotations } = C;
 `;
 
 export async function compilePlan(jsx: string, projectRoot?: string): Promise<CompileResult> {
-  // Resolve FilePreview contents at compile time
+  // Resolve file contents at compile time
   if (projectRoot) {
     jsx = resolveFilePreviews(jsx, projectRoot);
+    jsx = resolveMarkdownFiles(jsx, projectRoot);
   }
 
   const hasDefaultExport = /export\s+default\b/.test(jsx);
@@ -53,6 +54,31 @@ export async function compilePlan(jsx: string, projectRoot?: string): Promise<Co
   } finally {
     try { unlinkSync(tmpFile); } catch {}
   }
+}
+
+/**
+ * Find <Markdown file="..." /> tags and inject __content with the file contents
+ * resolved at compile time.
+ */
+function resolveMarkdownFiles(jsx: string, projectRoot: string): string {
+  return jsx.replace(
+    /<Markdown\b([^>]*?)\/>/g,
+    (match, attrs: string) => {
+      const fileMatch = attrs.match(/file=["']([^"']+)["']/);
+      if (!fileMatch) return match;
+
+      const filePath = fileMatch[1];
+      const absPath = join(projectRoot, filePath);
+
+      try {
+        const content = readFileSync(absPath, "utf-8");
+        const escaped = JSON.stringify(content);
+        return `<Markdown${attrs} __content={${escaped}} />`;
+      } catch {
+        return match;
+      }
+    }
+  );
 }
 
 /**

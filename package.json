@@ -21,6 +21,7 @@
     "prepublishOnly": "bun daemon/build.ts"
   },
   "dependencies": {
+    "marked": "^17.0.4",
     "preact": "^10.25.0"
   },
   "devDependencies": {
