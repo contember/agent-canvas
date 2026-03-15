@@ -351,6 +351,43 @@ export default function Plan() {
         </Callout>
       </Section>
 
+      <Section title="Markdown Rendering">
+        Inline markdown with full GFM support:
+
+        <Markdown>{`
+### Key Features
+
+The **Markdown** component supports all standard GitHub-Flavored Markdown:
+
+- **Bold**, *italic*, and \`inline code\`
+- Ordered and unordered lists
+- [Links](https://example.com) and images
+- Tables, blockquotes, and horizontal rules
+
+> This is a blockquote — useful for highlighting important notes or quotes.
+
+| Feature       | Status  |
+|---------------|---------|
+| Headings      | Done    |
+| Lists         | Done    |
+| Code blocks   | Done    |
+| Tables        | Done    |
+
+\`\`\`typescript
+// Code blocks with syntax highlighting
+interface Canvas {
+  id: string;
+  title: string;
+  render(): JSX.Element;
+}
+\`\`\`
+`}</Markdown>
+
+        File reference mode (loads content at compile time):
+
+        <Markdown file="README.md" />
+      </Section>
+
       <Section title="Custom Interactive Components">
         Plans can define custom React components inline — with full hooks, state, and interactivity.
         These are defined as functions inside the <code className="text-[12px] font-mono bg-bg-base px-1.5 py-0.5 rounded border border-border-subtle">export default</code> plan component.
