@@ -2,7 +2,7 @@
 
 Each flow is a sequence of canvas rounds. Phases can be skipped or combined based on context.
 
-**Tooling reminder**: Write all `.jsx` files using the **Write** tool to `.claude/agent-canvas/${CLAUDE_SESSION_ID}/`. Edit them with the **Edit** tool. Push with `bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/<file>.jsx --session ${CLAUDE_SESSION_ID} --label "<Label>"`, then `bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}` to block for feedback. The JSX blocks below show what to write — they are the file content, not bash commands.
+**Tooling reminder**: Write all `.jsx` files using the **Write** tool to `.claude/agent-canvas/${CLAUDE_SESSION_ID}/`. Edit them with the **Edit** tool. Push with `bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/<file>.jsx --session ${CLAUDE_SESSION_ID} --label "<Label>"`, then run `bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}` with `run_in_background: true` — you'll be notified when the user submits feedback. The JSX blocks below show what to write — they are the file content, not bash commands.
 
 ---
 

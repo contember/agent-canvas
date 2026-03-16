@@ -57,32 +57,37 @@ This opens the canvas in the user's browser (first time) and exits immediately. 
 
 ### Waiting for feedback
 
-After pushing, wait for the user to review and submit:
+After pushing, start the watch command **in the background** using the Bash tool's `run_in_background` parameter:
 
 ```bash
+# Use Bash tool with run_in_background: true
 bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
 ```
 
-This **blocks until the user submits feedback**, then prints feedback markdown to stdout. If feedback was already submitted but not yet consumed, it returns immediately with the existing feedback.
+This runs the watch process in the background. You will be **automatically notified** when the user submits feedback — the output will contain the feedback markdown. Do NOT poll, sleep, or proactively check on it. Just stop and wait for the notification.
 
-**Timeout handling**: The watch command may time out if the user takes a while to review. If it times out, don't retry automatically — wait for the user to tell you they've submitted feedback, then run the watch command again (or use `fetch`) to retrieve it.
+If feedback was already submitted but not yet consumed, the command returns immediately with the existing feedback.
+
+**Important**: After starting the background watch, do not continue with other work unless instructed. Wait for the notification that feedback has arrived before proceeding.
 
 ### Checking for feedback without blocking
 
-Use `fetch` to check for feedback without waiting:
+Use `fetch` to retrieve feedback if the user tells you they've already submitted:
 
 ```bash
 bunx agent-canvas fetch --session ${CLAUDE_SESSION_ID}
 ```
 
-Returns immediately — prints feedback to stdout if available, otherwise produces no output. Use this to retry after a timeout or when the user tells you they've submitted.
+Returns immediately — prints feedback to stdout if available, otherwise produces no output. Use this when the user tells you they've submitted feedback (e.g. after a reconnect or if the background watch was lost).
 
 ### Iterating
 
-Use the **Edit** tool to modify the existing JSX based on feedback — targeted edits, not full rewrites. Then push and wait again:
+Use the **Edit** tool to modify the existing JSX based on feedback — targeted edits, not full rewrites. Then push and watch again:
 
 ```bash
 bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/plan.jsx --session ${CLAUDE_SESSION_ID} --label "Implementation Plan (revised)"
+
+# Use Bash tool with run_in_background: true
 bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
 ```
 
@@ -109,12 +114,15 @@ Maintain separate files for different phases:
 
 ```bash
 bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/discovery.jsx --session ${CLAUDE_SESSION_ID} --label "Discovery"
+# watch with run_in_background: true, wait for notification
 bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
 # ... process feedback ...
 bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/requirements.jsx --session ${CLAUDE_SESSION_ID} --label "Requirements"
+# watch with run_in_background: true, wait for notification
 bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
 # ... process feedback ...
 bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/plan.jsx --session ${CLAUDE_SESSION_ID} --label "Implementation Plan"
+# watch with run_in_background: true, wait for notification
 bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
 ```
 
@@ -156,7 +164,7 @@ User wants to make a decision?
 2. **Announce** briefly: "I'll start with discovery, then create a detailed plan."
 3. **Write canvas JSX** with the Write tool to `.claude/agent-canvas/${CLAUDE_SESSION_ID}/<name>.jsx`
 4. **Push + tell the user**: Push the canvas and show the `browserUrl` from the output so the user can open it
-5. **IMMEDIATELY watch** — run `bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}` right after push, in the same response. Never stop after pushing. The push→watch sequence is atomic: no push without a watch. The watch blocks until the user submits feedback.
+5. **IMMEDIATELY watch in background** — run `bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}` with `run_in_background: true` right after push. Never stop after pushing. The push→watch sequence is atomic: no push without a watch. You will be notified when feedback arrives — do not poll or sleep.
 6. **Read feedback** — check for annotations, answers, added context files, approval
 7. **Edit with the Edit tool and re-push + watch**, or advance to next phase
 8. **After implementation**, push a summary canvas
