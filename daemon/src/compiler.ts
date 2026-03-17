@@ -33,26 +33,54 @@ export async function compilePlan(jsx: string, projectRoot?: string): Promise<Co
   try {
     writeFileSync(tmpFile, source);
 
-    const result = await Bun.build({
-      entrypoints: [tmpFile],
-      format: "esm",
-      external: ["react", "react-dom", "#canvas/components", "#canvas/runtime"],
-    });
+    try {
+      const result = await Bun.build({
+        entrypoints: [tmpFile],
+        format: "esm",
+        external: ["react", "react-dom", "#canvas/components", "#canvas/runtime"],
+      });
 
-    if (!result.success) {
-      const errors = result.logs
-        .filter((l) => l.level === "error")
-        .map((l) => l.message)
-        .join("\n");
-      return { ok: false, error: errors || "Compilation failed" };
+      if (!result.success) {
+        const errors = result.logs
+          .filter((l) => l.level === "error")
+          .map((l) => l.message)
+          .join("\n");
+        return { ok: false, error: errors || "Compilation failed" };
+      }
+
+      const js = await result.outputs[0].text();
+      return { ok: true, js };
+    } catch {
+      // Bun.build() can throw "Unknown Error, TODO" in long-running processes
+      // when its internal bundler state gets corrupted. Fall back to subprocess.
+      return await compilePlanSubprocess(tmpFile);
     }
-
-    const js = await result.outputs[0].text();
-    return { ok: true, js };
   } catch (e: any) {
     return { ok: false, error: e.message };
   } finally {
     try { unlinkSync(tmpFile); } catch {}
+  }
+}
+
+async function compilePlanSubprocess(tmpFile: string): Promise<CompileResult> {
+  const outFile = `${tmpFile}.out.js`;
+  const proc = Bun.spawn(
+    ["bun", "build", tmpFile, "--format=esm",
+      "--external=react", "--external=react-dom",
+      "--external=#canvas/components", "--external=#canvas/runtime",
+      "--outfile", outFile],
+    { stdout: "pipe", stderr: "pipe" },
+  );
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    const stderr = await new Response(proc.stderr).text();
+    return { ok: false, error: stderr || "Compilation failed" };
+  }
+  try {
+    const js = readFileSync(outFile, "utf-8");
+    return { ok: true, js };
+  } finally {
+    try { unlinkSync(outFile); } catch {}
   }
 }
 
