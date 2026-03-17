@@ -1,6 +1,6 @@
 {
   "name": "agent-canvas",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "Interactive visual canvas for Claude Code — rich annotatable documents in the browser",
   "bin": {
     "agent-canvas": "bin/agent-canvas.js"
