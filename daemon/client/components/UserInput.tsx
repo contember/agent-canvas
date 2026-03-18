@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { useAnnotations } from "#canvas/runtime";
 import { ResponseNote } from "./ResponseNote";
 import { autoResizeTextarea } from "../utils";
@@ -20,11 +20,9 @@ export function UserInput({ id, label, placeholder, multiline, required }: UserI
   const [showNote, setShowNote] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    if (!responses.has(id)) {
-      setResponse(id, { id, type: "text", label, value: "", required });
-    }
-  }, [id]);
+  if (!responses.has(id)) {
+    setResponse(id, { id, type: "text", label, value: "", required });
+  }
 
   const handleChange = (v: string) => {
     setResponse(id, { ...current!, value: v });
@@ -75,11 +73,9 @@ export function RangeInput({ id, label, min = 1, max = 10, step = 1, required, m
   const note = current?.note || "";
   const [showNote, setShowNote] = useState(false);
 
-  useEffect(() => {
-    if (!responses.has(id)) {
-      setResponse(id, { id, type: "range", label, value: null, required });
-    }
-  }, [id]);
+  if (!responses.has(id)) {
+    setResponse(id, { id, type: "range", label, value: null, required });
+  }
 
   const handleChange = (v: number) => {
     setResponse(id, { ...current!, value: v });

@@ -18,11 +18,9 @@ export function Choice({ id, label, options, required }: ChoiceProps) {
   const [showNote, setShowNote] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!responses.has(id)) {
-      setResponse(id, { id, type: "radio", label, value: null, options, required });
-    }
-  }, [id]);
+  if (!responses.has(id)) {
+    setResponse(id, { id, type: "radio", label, value: null, options, required });
+  }
 
   const handleSelect = (opt: string) => {
     setResponse(id, { ...current!, value: opt });
@@ -39,7 +37,7 @@ export function Choice({ id, label, options, required }: ChoiceProps) {
     };
     el.addEventListener("kb-select", handler);
     return () => el.removeEventListener("kb-select", handler);
-  });
+  }, [options, handleSelect]);
 
   const showError = current?.required && !selected;
 
@@ -95,11 +93,9 @@ export function MultiChoice({ id, label, options, required }: MultiChoiceProps) 
   const [showNote, setShowNote] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!responses.has(id)) {
-      setResponse(id, { id, type: "checkbox", label, value: [], options, required });
-    }
-  }, [id]);
+  if (!responses.has(id)) {
+    setResponse(id, { id, type: "checkbox", label, value: [], options, required });
+  }
 
   const toggle = (opt: string) => {
     const next = selected.includes(opt) ? selected.filter((o) => o !== opt) : [...selected, opt];
@@ -117,7 +113,7 @@ export function MultiChoice({ id, label, options, required }: MultiChoiceProps) 
     };
     el.addEventListener("kb-select", handler);
     return () => el.removeEventListener("kb-select", handler);
-  });
+  }, [options, toggle]);
 
   const showError = current?.required && selected.length === 0;
 

@@ -153,7 +153,12 @@ export function AnnotationPopover({
     return idx + row;
   };
 
-  useEffect(() => { setSelectedIdx(null); setSuppressed(isEditMode); }, [note]);
+  const [prevNote, setPrevNote] = useState(note);
+  if (note !== prevNote) {
+    setPrevNote(note);
+    setSelectedIdx(null);
+    setSuppressed(isEditMode);
+  }
 
   const applySuggestion = useCallback((s: string) => {
     setNote(s);

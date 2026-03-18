@@ -564,7 +564,11 @@ function ResponseBanner({ markdown }: { markdown: string }) {
   const responseAnnotations = useMemo(() => annotations.filter((a) => a.filePath === RESPONSE_ANNOTATION_PATH), [annotations]);
 
   // Reset dismissed state when markdown changes
-  useEffect(() => { setDismissed(false); }, [markdown]);
+  const [prevMarkdown, setPrevMarkdown] = useState(markdown);
+  if (markdown !== prevMarkdown) {
+    setPrevMarkdown(markdown);
+    setDismissed(false);
+  }
 
   // Restore marks after content renders
   useEffect(() => {

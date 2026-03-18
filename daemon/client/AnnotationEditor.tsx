@@ -59,9 +59,7 @@ export function AnnotationEditor({
   const openFilePicker = useCallback(() => fileInputRef.current?.click(), []);
 
   // Expose file picker to parent
-  useEffect(() => {
-    if (openFilePickerRef) openFilePickerRef.current = openFilePicker;
-  }, [openFilePickerRef, openFilePicker]);
+  if (openFilePickerRef) openFilePickerRef.current = openFilePicker;
 
   const setRef = useCallback((el: HTMLTextAreaElement | null) => {
     internalRef.current = el;

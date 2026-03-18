@@ -48,7 +48,6 @@ function clearPersisted(sessionId: string, revision: number) {
 }
 
 export function AnnotationProvider({ sessionId, revision, isReadOnly, children }: AnnotationProviderProps) {
-  const prevKeyRef = useRef(`${sessionId}:${revision}`);
   const [annotations, setAnnotations] = useState<Annotation[]>(() => {
     const saved = loadPersisted(sessionId, revision);
     return saved?.annotations ?? [];
@@ -66,20 +65,6 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
     const saved = loadPersisted(sessionId, revision);
     return saved?.feedbackEntries ? new Map(saved.feedbackEntries) : new Map();
   });
-
-  // Reset state when session/revision changes
-  useEffect(() => {
-    const key = `${sessionId}:${revision}`;
-    if (key === prevKeyRef.current) return;
-    prevKeyRef.current = key;
-
-    const saved = loadPersisted(sessionId, revision);
-    setAnnotations(saved?.annotations ?? []);
-    setGeneralNote(saved?.generalNote ?? "");
-    setResponses(saved?.responses ? new Map(saved.responses) : new Map());
-    setFeedbackEntries(saved?.feedbackEntries ? new Map(saved.feedbackEntries) : new Map());
-    setActiveAnnotationId(null);
-  }, [sessionId, revision]);
 
   // Persist to localStorage (debounced)
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

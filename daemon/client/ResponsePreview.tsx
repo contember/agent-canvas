@@ -11,17 +11,32 @@ interface ResponsePreviewProps {
 
 export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProps) {
   const { annotations, generalNote, responses, feedbackEntries } = useAnnotations();
-  const [text, setText] = useState("");
+  const [editedText, setEditedText] = useState("");
   const [manuallyEdited, setManuallyEdited] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [prevOpen, setPrevOpen] = useState(false);
 
-  useEffect(() => {
-    if (!open) { setManuallyEdited(false); setEditMode(false); setValidationError(null); return; }
-    if (manuallyEdited) return;
-    setText(generateMarkdown(annotations, generalNote, responses, feedbackEntries));
-  }, [annotations, generalNote, responses, feedbackEntries, manuallyEdited, open]);
+  if (open && !prevOpen) {
+    setManuallyEdited(false);
+    setEditMode(false);
+    setValidationError(null);
+  }
+  if (!open && prevOpen) {
+    setManuallyEdited(false);
+    setEditMode(false);
+    setValidationError(null);
+  }
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+  }
+
+  const generatedText = useMemo(
+    () => generateMarkdown(annotations, generalNote, responses, feedbackEntries),
+    [annotations, generalNote, responses, feedbackEntries]
+  );
+  const text = manuallyEdited ? editedText : generatedText;
 
   useEffect(() => {
     if (open && editMode && textareaRef.current) {
@@ -86,7 +101,7 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
           <textarea
             ref={textareaRef}
             value={text}
-            onChange={(e) => { setText(e.target.value); setManuallyEdited(true); }}
+            onChange={(e) => { setEditedText(e.target.value); setManuallyEdited(true); }}
             className="flex-1 w-full bg-bg-base p-5 text-[13px] font-mono text-text-code resize-none focus:outline-none leading-relaxed placeholder:text-text-disabled"
             placeholder="Your feedback will appear here..."
           />
