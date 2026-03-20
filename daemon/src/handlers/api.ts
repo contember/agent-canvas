@@ -81,7 +81,11 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
           if (result.ok) {
             sessionManager.saveCompiled(sessionId, result.js, rev);
             compiled = result.js;
+          } else {
+            console.warn(`[plan.js] compilation failed for ${sessionId} rev ${rev}: ${result.error}`);
           }
+        } else {
+          console.warn(`[plan.js] no JSX found for ${sessionId} rev ${rev}`);
         }
       }
     }
