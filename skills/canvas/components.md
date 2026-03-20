@@ -3,6 +3,20 @@
 All components are available globally in canvas JSX — no imports needed.
 For inline styling use `style={{ ... }}`. Tailwind classes are NOT available.
 
+## Theming
+
+**Never hardcode hex colors** — canvas supports light/dark themes. Use CSS variables in `style={{ }}`:
+
+- **Text:** `--color-text-primary`, `--color-text-secondary`, `--color-text-tertiary`, `--color-text-code`, `--color-text-inverse`
+- **Backgrounds:** `--color-bg-base`, `--color-bg-surface`, `--color-bg-elevated`, `--color-bg-code`, `--color-bg-input`
+- **Accents:** `--color-accent-{green,amber,red,blue}`, `--color-accent-{green,amber,red,blue}-muted`
+- **Borders:** `--color-border-subtle`, `--color-border-medium`, `--color-border-hover`
+- **Fonts:** `--font-heading`, `--font-body`, `--font-mono`
+
+```jsx
+<span style={{ color: 'var(--color-text-tertiary)', fontSize: '0.75rem' }}>meta text</span>
+```
+
 ---
 
 ## Layout
@@ -333,10 +347,10 @@ When you use the full module format (`export default function Canvas()`), you ca
 
 ```jsx
 function Metric({ label, value, trend }) {
-  const color = trend === 'up' ? '#4a9e6d' : trend === 'down' ? '#c45a5a' : '#a09a92';
+  const color = trend === 'up' ? 'var(--color-accent-green)' : trend === 'down' ? 'var(--color-accent-red)' : 'var(--color-text-secondary)';
   return (
     <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
-      <span style={{ color: '#6b6560', fontSize: '0.75rem' }}>{label}</span>
+      <span style={{ color: 'var(--color-text-tertiary)', fontSize: '0.75rem' }}>{label}</span>
       <span style={{ color, fontSize: '1.25rem', fontWeight: 600 }}>{value}</span>
     </div>
   );
@@ -360,27 +374,27 @@ Standard components remain available without import even in full module format.
 ## Diagrams with Raw SVG
 
 For custom visuals that Mermaid can't express, write `<svg>` directly.
-Use Canvas CSS variables for colors to match the theme:
+Use CSS variables for colors to match the theme automatically:
 
 ```jsx
 <svg viewBox="0 0 400 200" style={{ width: '100%', maxWidth: 400 }}>
-  <rect x="10" y="10" width="120" height="50" rx="8" 
-        fill="rgba(90, 142, 196, 0.12)" stroke="rgba(90, 142, 196, 0.3)" />
-  <text x="70" y="40" textAnchor="middle" fill="#e8e4df" fontSize="13" 
-        fontFamily="Inter, sans-serif">API Gateway</text>
-  
-  <line x1="130" y1="35" x2="180" y2="35" stroke="#6b6560" strokeWidth="1.5"
+  <rect x="10" y="10" width="120" height="50" rx="8"
+        fill="var(--color-accent-blue-muted)" stroke="var(--color-accent-blue)" strokeOpacity="0.3" />
+  <text x="70" y="40" textAnchor="middle" fill="var(--color-text-primary)" fontSize="13"
+        fontFamily="var(--font-body)">API Gateway</text>
+
+  <line x1="130" y1="35" x2="180" y2="35" stroke="var(--color-text-tertiary)" strokeWidth="1.5"
         markerEnd="url(#arrow)" />
-  
+
   <rect x="180" y="10" width="120" height="50" rx="8"
-        fill="rgba(74, 158, 109, 0.12)" stroke="rgba(74, 158, 109, 0.3)" />
-  <text x="240" y="40" textAnchor="middle" fill="#e8e4df" fontSize="13"
-        fontFamily="Inter, sans-serif">Auth Service</text>
-  
+        fill="var(--color-accent-green-muted)" stroke="var(--color-accent-green)" strokeOpacity="0.3" />
+  <text x="240" y="40" textAnchor="middle" fill="var(--color-text-primary)" fontSize="13"
+        fontFamily="var(--font-body)">Auth Service</text>
+
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
             orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6b6560" />
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--color-text-tertiary)" />
     </marker>
   </defs>
 </svg>
