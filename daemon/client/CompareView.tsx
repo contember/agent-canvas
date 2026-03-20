@@ -134,6 +134,9 @@ function UnifiedView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProps) 
   const [leftReady, setLeftReady] = useState(false);
   const [rightReady, setRightReady] = useState(false);
   const [done, setDone] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [slow, setSlow] = useState(false);
 
   const { annotations } = useAnnotations();
   const planAnnotations = annotations.filter(a => !a.filePath);
@@ -144,23 +147,45 @@ function UnifiedView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProps) 
     extractContext: (range) => extractContext(range, unifiedRef.current!),
   });
 
+  // Detect stuck loading — log diagnostic state after 10s
+  useEffect(() => {
+    if (done || loadError) return;
+    const id = setTimeout(() => {
+      console.warn("[unified-diff] still loading after 10s", {
+        leftReady, rightReady, oldRef: !!oldRef.current, newRef: !!newRef.current,
+      });
+      setSlow(true);
+    }, 10_000);
+    return () => clearTimeout(id);
+  }, [done, loadError, leftReady, rightReady]);
+
   useEffect(() => {
     if (!leftReady || !rightReady || done) return;
     if (!oldRef.current || !newRef.current) return;
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (!oldRef.current || !newRef.current || !unifiedRef.current) return;
+        if (!oldRef.current || !newRef.current || !unifiedRef.current) {
+          console.warn("[unified-diff] refs lost between rAF frames", {
+            old: !!oldRef.current, new: !!newRef.current, unified: !!unifiedRef.current,
+          });
+          return;
+        }
 
-        const oldTree = extractBlockTree(oldRef.current);
-        const newTree = extractBlockTree(newRef.current);
-        const matches = matchBlocks(oldTree, newTree);
-        const { fragment, hasChanges } = buildUnifiedDom(matches);
+        try {
+          const oldTree = extractBlockTree(oldRef.current);
+          const newTree = extractBlockTree(newRef.current);
+          const matches = matchBlocks(oldTree, newTree);
+          const { fragment, hasChanges } = buildUnifiedDom(matches);
 
-        unifiedRef.current.innerHTML = "";
-        unifiedRef.current.appendChild(fragment);
-        setDone(true);
-        onDiffResult(true, hasChanges);
+          unifiedRef.current.innerHTML = "";
+          unifiedRef.current.appendChild(fragment);
+          setDone(true);
+          onDiffResult(true, hasChanges);
+        } catch (e) {
+          console.error("[unified-diff] diff computation failed", e);
+          setLoadError(e instanceof Error ? e.message : String(e));
+        }
       });
     });
   }, [leftReady, rightReady, done]);
@@ -168,28 +193,41 @@ function UnifiedView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProps) 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto">
       {/* Offscreen source panels — unmount after diff is built */}
-      {!done && (
+      {!done && !loadError && (
         <div style={{ position: "absolute", left: -9999, visibility: "hidden" as const, pointerEvents: "none" as const, width: 720 }}>
           <ComparePanelRenderer
             ref={oldRef}
             sessionId={sessionId}
             revision={leftRev}
             onReady={() => setLeftReady(true)}
+            onError={(msg) => setLoadError(`Rev ${leftRev}: ${msg}`)}
           />
           <ComparePanelRenderer
             ref={newRef}
             sessionId={sessionId}
             revision={rightRev}
             onReady={() => setRightReady(true)}
+            onError={(msg) => setLoadError(`Rev ${rightRev}: ${msg}`)}
           />
         </div>
       )}
 
       {/* Visible output */}
       <div className="max-w-[720px] mx-auto px-6 pt-8 pb-32">
-        {!done && (
-          <div className="flex items-center justify-center h-64 text-text-tertiary font-body text-body">
-            Loading...
+        {!done && !loadError && (
+          <div className="flex flex-col items-center justify-center h-64 text-text-tertiary font-body text-body gap-2">
+            <span>Loading...</span>
+            {slow && (
+              <span className="text-[11px]">
+                Taking longer than expected — check Network tab for pending requests
+              </span>
+            )}
+          </div>
+        )}
+        {loadError && (
+          <div className="bg-accent-red-muted rounded-lg p-5 mt-8">
+            <h3 className="font-body font-semibold text-accent-red mb-2">Failed to load revision</h3>
+            <pre className="text-code font-mono text-text-secondary whitespace-pre-wrap">{loadError}</pre>
           </div>
         )}
         <div ref={unifiedRef} />
@@ -301,10 +339,11 @@ interface ComparePanelRendererProps {
   sessionId: string;
   revision: number;
   onReady: () => void;
+  onError?: (message: string) => void;
 }
 
 const ComparePanelRenderer = React.memo(React.forwardRef<HTMLDivElement, ComparePanelRendererProps>(
-  ({ sessionId, revision, onReady }, ref) => {
+  ({ sessionId, revision, onReady, onError }, ref) => {
     const [PlanComponent, setPlanComponent] = useState<React.ComponentType | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -314,12 +353,20 @@ const ComparePanelRenderer = React.memo(React.forwardRef<HTMLDivElement, Compare
       setError(null);
       import(`/api/session/${sessionId}/plan.js?rev=${revision}&t=${Date.now()}`)
         .then((mod) => {
+          if (!mod.default) {
+            const msg = "Module has no default export";
+            setError(msg);
+            setLoading(false);
+            onError?.(msg);
+            return;
+          }
           setPlanComponent(() => mod.default);
           setLoading(false);
         })
         .catch((e) => {
           setError(e.message);
           setLoading(false);
+          onError?.(e.message);
         });
     }, [sessionId, revision]);
 
