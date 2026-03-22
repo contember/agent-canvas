@@ -390,20 +390,43 @@ function App() {
                     responseBanner={selectedRevInfo?.response ? <ResponseBanner markdown={selectedRevInfo.response} /> : undefined}
                   />
                 )}
-                {/* Individual canvas views — stay mounted, hidden when inactive */}
-                {canvasFiles.map((filename) => (
-                  <div key={filename} style={{ display: activeView.type === "canvas" && activeView.filename === filename ? undefined : "none" }}>
-                    <div className="relative max-w-[720px] mx-auto px-6 pt-12 pb-32">
-                      {/* Show response banner on individual canvas only when there's no overview (single canvas) */}
-                      {canvasFiles.length <= 1 && selectedRevInfo?.response && (
-                        <ResponseBanner markdown={selectedRevInfo.response} />
-                      )}
-                      <div data-canvas-file={filename}>
-                        <PlanRenderer revision={selectedRevision} filename={filename} />
-                      </div>
+                {/* Individual canvas view — only mounted when active */}
+                {activeView.type === "canvas" && canvasFiles.includes(activeView.filename) && (
+                  <div className="relative max-w-[720px] mx-auto px-6 pt-12 pb-32">
+                    <button
+                      onClick={() => {
+                        const planContent = document.querySelector(`[data-canvas-file="${activeView.filename}"] .plan-content`);
+                        if (!planContent) return;
+                        const md = exportCanvasToMarkdown(planContent as HTMLElement);
+                        navigator.clipboard.writeText(md).then(() => {
+                          const btn = document.getElementById("export-md-btn");
+                          if (btn) {
+                            btn.setAttribute("data-copied", "true");
+                            setTimeout(() => { btn.removeAttribute("data-copied"); }, 1500);
+                          }
+                        });
+                      }}
+                      id="export-md-btn"
+                      className="group absolute top-3 right-6 p-1.5 text-text-tertiary hover:text-text-secondary transition-colors z-10"
+                      title="Copy as Markdown"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-[[data-copied=true]]:hidden">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                      </svg>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="hidden group-[[data-copied=true]]:block text-green-500">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    </button>
+                    {/* Show response banner on individual canvas only when there's no overview (single canvas) */}
+                    {canvasFiles.length <= 1 && selectedRevInfo?.response && (
+                      <ResponseBanner markdown={selectedRevInfo.response} />
+                    )}
+                    <div data-canvas-file={activeView.filename}>
+                      <PlanRenderer key={activeView.filename} revision={selectedRevision} filename={activeView.filename} />
                     </div>
                   </div>
-                ))}
+                )}
                 {openFiles.map((filePath) => (
                   <div key={filePath} style={{ display: activeView.type === "file" && activeView.path === filePath ? undefined : "none" }}>
                     <FileViewer path={filePath} />

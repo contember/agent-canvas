@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useContext, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { SessionContext } from "#canvas/runtime";
+import { SessionContext, CanvasFileCtx } from "#canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
 import { extractContext } from "./annotationContext";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
@@ -262,7 +262,7 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
   }
 
   return (
-    <>
+    <CanvasFileCtx.Provider value={filename}>
       <div ref={containerRef} className="plan-content plan-updated">
         {planElement}
       </div>
@@ -333,7 +333,7 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
           />
         );
       })()}
-    </>
+    </CanvasFileCtx.Provider>
   );
 }
 

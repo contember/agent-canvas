@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import ReactDOM from "react-dom";
-import { useAnnotations, Annotation } from "#canvas/runtime";
+import { useAnnotations, useCanvasFile, Annotation } from "#canvas/runtime";
 import { AnnotationCreatePopover } from "../Popover";
 
 interface MermaidProps {
@@ -159,6 +159,7 @@ export function Mermaid({ children }: MermaidProps) {
   const [svgHtml, setSvgHtml] = useState("");
   const source = typeof children === "string" ? children : String(children ?? "");
   const { annotations, addAnnotationWithId, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
+  const canvasFile = useCanvasFile();
   const [nodePopover, setNodePopover] = useState<NodePopoverState | null>(null);
   const { zoom, zoomIn, zoomOut, zoomReset, setZoom } = useZoom(1);
 
@@ -278,7 +279,7 @@ export function Mermaid({ children }: MermaidProps) {
           }
           onAdd={(note, images) => {
             const id = `ann-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-            addAnnotationWithId(id, `[Diagram ${nodePopover.prefix.toLowerCase()}] ${nodePopover.snippet}`, note, undefined, undefined, images);
+            addAnnotationWithId(id, `[Diagram ${nodePopover.prefix.toLowerCase()}] ${nodePopover.snippet}`, note, undefined, undefined, images, canvasFile || undefined);
             setNodePopover(null);
           }}
           onCancel={() => setNodePopover(null)}

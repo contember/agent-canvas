@@ -85,6 +85,12 @@ export function useFeedback(
 
 export { SessionContext } from "./SessionContext";
 
+// CanvasFile context — tells components which canvas file they belong to
+export const CanvasFileCtx = createContext<string>("");
+export function useCanvasFile(): string {
+  return useContext(CanvasFileCtx);
+}
+
 // ActiveView navigation — allows components (e.g. FilePreview) to open files
 export type ActiveView = { type: "overview" } | { type: "canvas"; filename: string } | { type: "file"; path: string };
 

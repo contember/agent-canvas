@@ -99,6 +99,25 @@ export class SessionManager {
     return join(this.sessionDir(id), "revisions", String(rev));
   }
 
+  /** Compute file order from revision history: first-appearance order, alpha for ties */
+  private deriveFileOrder(revisions: RevisionInfo[], currentFiles: string[]): string[] {
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const rev of revisions) {
+      for (const cf of rev.canvasFiles) {
+        if (!seen.has(cf.filename)) {
+          seen.add(cf.filename);
+          ordered.push(cf.filename);
+        }
+      }
+    }
+    // Keep only files that still exist, then append any unknown ones
+    const current = new Set(currentFiles);
+    const result = ordered.filter(f => current.has(f));
+    const remaining = currentFiles.filter(f => !seen.has(f)).sort();
+    return [...result, ...remaining];
+  }
+
   /** List *.jsx filenames in a revision directory */
   getRevisionCanvasFiles(id: string, rev: number): string[] {
     const dir = this.revisionDir(id, rev);
@@ -154,8 +173,10 @@ export class SessionManager {
           writeFileSync(metaPath, JSON.stringify(meta, null, 2));
         }
 
-        const canvasFiles = this.getRevisionCanvasFiles(name.name, meta.currentRevision);
-        if (canvasFiles.length === 0) continue;
+        const diskFiles = this.getRevisionCanvasFiles(name.name, meta.currentRevision);
+        if (diskFiles.length === 0) continue;
+        // Derive file order from revision history (first-appearance order)
+        const canvasFiles = this.deriveFileOrder(meta.revisions, diskFiles);
 
         this.sessions.set(name.name, {
           id: name.name,
@@ -270,7 +291,13 @@ export class SessionManager {
       ...(response ? { response } : {}),
     };
     const revisions = existing ? [...existing.revisions, revInfo] : [revInfo];
-    const filenames = [...canvasFiles.keys()].sort();
+    // Order: files from previous revision first (preserving their order), then new files alphabetically
+    const prevOrder = existing?.canvasFiles ?? [];
+    const currentNames = new Set(canvasFiles.keys());
+    const filenames = [
+      ...prevOrder.filter(f => currentNames.has(f)),
+      ...[...currentNames].filter(f => !prevOrder.includes(f)).sort(),
+    ];
 
     const session: SessionData = {
       id,
