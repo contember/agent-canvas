@@ -12,13 +12,14 @@ import { FileViewer } from "./FileViewer";
 import { SessionSwitcher } from "./SessionSwitcher";
 import { exportCanvasToMarkdown } from "./exportMarkdown";
 import { CompareView } from "./CompareView";
+import { OverviewView, categorizeChanges, getAffectedFiles } from "./OverviewView";
 import { RevisionSelect } from "./RevisionSelect";
 import { generateAnnotationId, RESPONSE_ANNOTATION_PATH } from "./utils";
 import { wrapRangeWithMark, restoreMarks, renameMarkId, unwrapMarks, updateAllMarkStates } from "./highlightRange";
 import { extractContext } from "./annotationContext";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 
-export type ActiveView = { type: "canvas"; filename: string } | { type: "file"; path: string };
+export type ActiveView = { type: "overview" } | { type: "canvas"; filename: string } | { type: "file"; path: string };
 
 export interface CanvasFileInfo {
   filename: string;
@@ -41,7 +42,7 @@ export const ActiveViewContext = createContext<{
   closeFile: (path: string) => void;
   canvasFiles: string[];
 }>({
-  activeView: { type: "canvas", filename: "" },
+  activeView: { type: "overview" },
   setActiveView: () => {},
   openFiles: [],
   closeFile: () => {},
@@ -200,6 +201,8 @@ function App() {
     }
     if (activeView.type === "file") {
       parts.push(activeView.path.split("/").pop() || activeView.path);
+    } else if (activeView.type === "overview") {
+      parts.push("Overview");
     } else if (activeView.type === "canvas" && canvasFiles.length > 1 && activeView.filename) {
       parts.push(activeView.filename.replace(/\.jsx$/, ""));
     } else if (compareRevision) {
@@ -216,7 +219,7 @@ function App() {
 
   const setActiveView = useCallback((v: ActiveView) => {
     // Save current scroll position before switching
-    const key = activeView.type === "canvas" ? `canvas:${activeView.filename}` : `file:${activeView.path}`;
+    const key = activeView.type === "overview" ? "overview" : activeView.type === "canvas" ? `canvas:${activeView.filename}` : `file:${activeView.path}`;
     scrollPositions.current.set(key, window.scrollY);
     setActiveViewRaw(v);
     if (v.type === "file") {
@@ -229,7 +232,7 @@ function App() {
     setOpenFiles((prev) => prev.filter((p) => p !== path));
     setActiveViewRaw((prev) => {
       if (prev.type === "file" && prev.path === path) {
-        return { type: "canvas", filename: canvasFiles[0] || "" };
+        return canvasFiles.length > 1 ? { type: "overview" } : { type: "canvas", filename: canvasFiles[0] || "" };
       }
       return prev;
     });
@@ -237,7 +240,7 @@ function App() {
 
   // Restore scroll synchronously after DOM update (before paint)
   useLayoutEffect(() => {
-    const key = activeView.type === "canvas" ? `canvas:${activeView.filename}` : `file:${activeView.path}`;
+    const key = activeView.type === "overview" ? "overview" : activeView.type === "canvas" ? `canvas:${activeView.filename}` : `file:${activeView.path}`;
     window.scrollTo(0, scrollPositions.current.get(key) || 0);
   }, [activeView]);
 
@@ -256,6 +259,10 @@ function App() {
           const files = (data.canvasFiles as string[]).sort();
           setCanvasFiles(files);
           setActiveViewRaw((prev) => {
+            if (prev.type === "overview") {
+              // On initial load: overview if multiple files, direct if single
+              return files.length > 1 ? prev : { type: "canvas", filename: files[0] || "" };
+            }
             if (prev.type === "canvas" && (!prev.filename || !files.includes(prev.filename))) {
               return { type: "canvas", filename: files[0] || "" };
             }
@@ -284,18 +291,23 @@ function App() {
             setSelectedRevision(data.currentRevision);
             setCompareRevision(null);
             if (data.revisions) {
-              setRevisions(data.revisions);
-              // Update canvasFiles from the latest revision
-              const latest = (data.revisions as RevisionInfo[]).find((r: RevisionInfo) => r.revision === data.currentRevision);
+              const allRevisions = data.revisions as RevisionInfo[];
+              setRevisions(allRevisions);
+              const latest = allRevisions.find((r: RevisionInfo) => r.revision === data.currentRevision);
               if (latest?.canvasFiles) {
                 const files = latest.canvasFiles.map((cf: CanvasFileInfo) => cf.filename).sort();
                 setCanvasFiles(files);
-                setActiveViewRaw((prev) => {
-                  if (prev.type === "canvas" && !files.includes(prev.filename)) {
-                    return { type: "canvas", filename: files[0] || "" };
-                  }
-                  return prev;
-                });
+                // Determine what changed and auto-navigate
+                const previous = allRevisions.find((r: RevisionInfo) => r.revision === data.currentRevision - 1);
+                const changes = categorizeChanges(latest, previous);
+                const affected = getAffectedFiles(changes);
+                if (affected.length === 1) {
+                  setActiveViewRaw({ type: "canvas", filename: affected[0] });
+                } else if (affected.length > 1 || files.length > 1) {
+                  setActiveViewRaw({ type: "overview" });
+                } else {
+                  setActiveViewRaw({ type: "canvas", filename: files[0] || "" });
+                }
               }
             }
           }
@@ -371,42 +383,19 @@ function App() {
                 </div>
 
                 <ContentTabs />
-                {/* All views stay mounted; inactive ones are hidden */}
+                {/* Overview — shows all affected canvases inline */}
+                {activeView.type === "overview" && (
+                  <OverviewView
+                    revision={selectedRevision}
+                    responseBanner={selectedRevInfo?.response ? <ResponseBanner markdown={selectedRevInfo.response} /> : undefined}
+                  />
+                )}
+                {/* Individual canvas views — stay mounted, hidden when inactive */}
                 {canvasFiles.map((filename) => (
                   <div key={filename} style={{ display: activeView.type === "canvas" && activeView.filename === filename ? undefined : "none" }}>
                     <div className="relative max-w-[720px] mx-auto px-6 pt-12 pb-32">
-                      {/* Only show copy button and response banner on the first canvas */}
-                      {filename === canvasFiles[0] && (
-                        <>
-                          <button
-                            onClick={() => {
-                              const planContent = document.querySelector(`[data-canvas-file="${filename}"] .plan-content`);
-                              if (!planContent) return;
-                              const md = exportCanvasToMarkdown(planContent as HTMLElement);
-                              navigator.clipboard.writeText(md).then(() => {
-                                const btn = document.getElementById("export-md-btn");
-                                if (btn) {
-                                  btn.setAttribute("data-copied", "true");
-                                  setTimeout(() => { btn.removeAttribute("data-copied"); }, 1500);
-                                }
-                              });
-                            }}
-                            id="export-md-btn"
-                            className="group absolute top-3 right-6 p-1.5 text-text-tertiary hover:text-text-secondary transition-colors z-10"
-                            title="Copy as Markdown"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-[[data-copied=true]]:hidden">
-                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
-                            </svg>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="hidden group-[[data-copied=true]]:block text-green-500">
-                              <polyline points="20 6 9 17 4 12"/>
-                            </svg>
-                          </button>
-                          {selectedRevInfo?.response && (
-                            <ResponseBanner markdown={selectedRevInfo.response} />
-                          )}
-                        </>
+                      {selectedRevInfo?.response && (
+                        <ResponseBanner markdown={selectedRevInfo.response} />
                       )}
                       <div data-canvas-file={filename}>
                         <PlanRenderer revision={selectedRevision} filename={filename} />
@@ -760,6 +749,29 @@ function ContentTabs() {
 
   return (
     <div className="flex items-center border-b border-border-medium bg-bg-surface overflow-x-auto sticky top-0 z-10">
+      {/* Overview tab — only when multiple canvases */}
+      {canvasFiles.length > 1 && (
+        <>
+          <button
+            onClick={() => setActiveView({ type: "overview" })}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-body whitespace-nowrap transition-colors relative ${
+              activeView.type === "overview"
+                ? "text-text-primary"
+                : "text-text-tertiary hover:text-text-secondary"
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="opacity-60">
+              <path d="M12 7L2 12l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Overview
+            {activeView.type === "overview" && (
+              <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-text-primary rounded-full" />
+            )}
+          </button>
+          <span className="w-px h-4 bg-border-medium flex-shrink-0" />
+        </>
+      )}
+
       {/* Canvas tabs */}
       {canvasFiles.map((filename, i) => {
         const label = filename.replace(/\.jsx$/, "");
@@ -774,11 +786,6 @@ function ContentTabs() {
                   : "text-text-tertiary hover:text-text-secondary"
               }`}
             >
-              {i === 0 && (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="opacity-60">
-                  <path d="M12 7L2 12l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              )}
               {label}
               {isActive && (
                 <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-text-primary rounded-full" />

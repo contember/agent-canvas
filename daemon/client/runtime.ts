@@ -86,7 +86,7 @@ export function useFeedback(
 export { SessionContext } from "./SessionContext";
 
 // ActiveView navigation — allows components (e.g. FilePreview) to open files
-export type ActiveView = { type: "canvas"; filename: string } | { type: "file"; path: string };
+export type ActiveView = { type: "overview" } | { type: "canvas"; filename: string } | { type: "file"; path: string };
 
 export const ActiveViewCtx = createContext<{
   setActiveView: (v: ActiveView) => void;
