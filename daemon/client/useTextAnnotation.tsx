@@ -16,12 +16,14 @@ interface UseTextAnnotationOptions {
   extractContext: (range: Range) => AnnotationContext | undefined;
   /** Optional filePath to associate with created annotations */
   filePath?: string;
+  /** Optional canvasFile to associate with created annotations */
+  canvasFile?: string;
   /** Scroll container for popover positioning */
   scrollContainer?: HTMLElement | null;
 }
 
 export function useTextAnnotation(options: UseTextAnnotationOptions) {
-  const { containerRef, restoreKey, restoreAnnotations, extractContext, filePath, scrollContainer } = options;
+  const { containerRef, restoreKey, restoreAnnotations, extractContext, filePath, canvasFile, scrollContainer } = options;
   const { annotations: allAnnotations, addAnnotationWithId, removeAnnotation, updateAnnotation, addAnnotationImage, removeAnnotationImage, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
 
   const [editPopover, setEditPopover] = useState<{ anchorEl: HTMLElement; annId: string } | null>(null);
@@ -32,6 +34,8 @@ export function useTextAnnotation(options: UseTextAnnotationOptions) {
   extractContextRef.current = extractContext;
   const filePathRef = useRef(filePath);
   filePathRef.current = filePath;
+  const canvasFileRef = useRef(canvasFile);
+  canvasFileRef.current = canvasFile;
   const addAnnotationRef = useRef(addAnnotationWithId);
   addAnnotationRef.current = addAnnotationWithId;
   const activeAnnotationIdRef = useRef(activeAnnotationId);
@@ -167,7 +171,7 @@ export function useTextAnnotation(options: UseTextAnnotationOptions) {
           onAdd={(note, images) => {
             const id = generateAnnotationId();
             renameMarkId(createPopover.tempId, id);
-            addAnnotationRef.current(id, createPopover.snippet, note, filePathRef.current, createPopover.ctx, images);
+            addAnnotationRef.current(id, createPopover.snippet, note, filePathRef.current, createPopover.ctx, images, canvasFileRef.current);
             setCreatePopover(null);
           }}
           onCancel={() => {

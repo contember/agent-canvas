@@ -82,8 +82,8 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
     return () => { if (persistTimerRef.current) clearTimeout(persistTimerRef.current); };
   }, [annotations, generalNote, responses, feedbackEntries, sessionId, revision, isReadOnly]);
 
-  const addAnnotationWithId = useCallback((id: string, snippet: string, note: string, filePath?: string, context?: AnnotationContext, images?: string[]) => {
-    setAnnotations((prev) => [...prev, { id, snippet, note, createdAt: new Date().toISOString(), filePath, context, ...(images?.length ? { images } : {}) }]);
+  const addAnnotationWithId = useCallback((id: string, snippet: string, note: string, filePath?: string, context?: AnnotationContext, images?: string[], canvasFile?: string) => {
+    setAnnotations((prev) => [...prev, { id, snippet, note, createdAt: new Date().toISOString(), filePath, context, ...(images?.length ? { images } : {}), ...(canvasFile ? { canvasFile } : {}) }]);
   }, []);
 
   const addAnnotation = useCallback((snippet: string, note: string, filePath?: string) => {

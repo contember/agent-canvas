@@ -18,16 +18,20 @@ import { wrapRangeWithMark, restoreMarks, renameMarkId, unwrapMarks, updateAllMa
 import { extractContext } from "./annotationContext";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 
-export type ActiveView = { type: "plan" } | { type: "file"; path: string };
+export type ActiveView = { type: "canvas"; filename: string } | { type: "file"; path: string };
+
+export interface CanvasFileInfo {
+  filename: string;
+  diffStats?: { added: number; removed: number };
+}
 
 export interface RevisionInfo {
   revision: number;
   label?: string;
-  sourceFile?: string;
+  canvasFiles: CanvasFileInfo[];
   createdAt: string;
   hasFeedback: boolean;
   response?: string;
-  diffStats?: { added: number; removed: number };
 }
 
 export const ActiveViewContext = createContext<{
@@ -35,11 +39,13 @@ export const ActiveViewContext = createContext<{
   setActiveView: (v: ActiveView) => void;
   openFiles: string[];
   closeFile: (path: string) => void;
+  canvasFiles: string[];
 }>({
-  activeView: { type: "plan" },
+  activeView: { type: "canvas", filename: "" },
   setActiveView: () => {},
   openFiles: [],
   closeFile: () => {},
+  canvasFiles: [],
 });
 
 export const RevisionContext = createContext<{
@@ -146,14 +152,11 @@ function RevisionSelector() {
       />
       <button
         onClick={() => {
-          const current = revisions.find((r) => r.revision === selectedRevision);
-          const sourceFile = current?.sourceFile;
           let left: number;
           if (selectedRevision === currentRevision) {
-            // Find previous revision with same sourceFile
             const prev = [...revisions]
               .reverse()
-              .find((r) => r.revision < currentRevision && (!sourceFile || r.sourceFile === sourceFile));
+              .find((r) => r.revision < currentRevision);
             left = prev?.revision ?? Math.max(1, currentRevision - 1);
           } else {
             left = selectedRevision;
@@ -176,7 +179,8 @@ function App() {
   const [compareRevision, setCompareRevision] = useState<{ left: number; right: number } | null>(null);
   const [connected, setConnected] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [activeView, setActiveViewRaw] = useState<ActiveView>({ type: "plan" });
+  const [canvasFiles, setCanvasFiles] = useState<string[]>([]);
+  const [activeView, setActiveViewRaw] = useState<ActiveView>({ type: "canvas", filename: "" });
   const [openFiles, setOpenFiles] = useState<string[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -196,6 +200,8 @@ function App() {
     }
     if (activeView.type === "file") {
       parts.push(activeView.path.split("/").pop() || activeView.path);
+    } else if (activeView.type === "canvas" && canvasFiles.length > 1 && activeView.filename) {
+      parts.push(activeView.filename.replace(/\.jsx$/, ""));
     } else if (compareRevision) {
       parts.push("Compare");
     }
@@ -210,10 +216,8 @@ function App() {
 
   const setActiveView = useCallback((v: ActiveView) => {
     // Save current scroll position before switching
-    scrollPositions.current.set(
-      activeView.type === "plan" ? "plan" : `file:${activeView.path}`,
-      window.scrollY
-    );
+    const key = activeView.type === "canvas" ? `canvas:${activeView.filename}` : `file:${activeView.path}`;
+    scrollPositions.current.set(key, window.scrollY);
     setActiveViewRaw(v);
     if (v.type === "file") {
       setOpenFiles((prev) => prev.includes(v.path) ? prev : [...prev, v.path]);
@@ -225,16 +229,15 @@ function App() {
     setOpenFiles((prev) => prev.filter((p) => p !== path));
     setActiveViewRaw((prev) => {
       if (prev.type === "file" && prev.path === path) {
-        scrollPositions.current.set(`file:${path}`, window.scrollY);
-        return { type: "plan" };
+        return { type: "canvas", filename: canvasFiles[0] || "" };
       }
       return prev;
     });
-  }, []);
+  }, [canvasFiles]);
 
   // Restore scroll synchronously after DOM update (before paint)
   useLayoutEffect(() => {
-    const key = activeView.type === "plan" ? "plan" : `file:${activeView.path}`;
+    const key = activeView.type === "canvas" ? `canvas:${activeView.filename}` : `file:${activeView.path}`;
     window.scrollTo(0, scrollPositions.current.get(key) || 0);
   }, [activeView]);
 
@@ -248,6 +251,16 @@ function App() {
           setCurrentRevision(data.currentRevision);
           setSelectedRevision(data.currentRevision);
           setRevisions(data.revisions || []);
+        }
+        if (data.canvasFiles) {
+          const files = (data.canvasFiles as string[]).sort();
+          setCanvasFiles(files);
+          setActiveViewRaw((prev) => {
+            if (prev.type === "canvas" && (!prev.filename || !files.includes(prev.filename))) {
+              return { type: "canvas", filename: files[0] || "" };
+            }
+            return prev;
+          });
         }
         if (data.projectRoot) setProjectRoot(data.projectRoot);
       })
@@ -270,7 +283,21 @@ function App() {
             setCurrentRevision(data.currentRevision);
             setSelectedRevision(data.currentRevision);
             setCompareRevision(null);
-            if (data.revisions) setRevisions(data.revisions);
+            if (data.revisions) {
+              setRevisions(data.revisions);
+              // Update canvasFiles from the latest revision
+              const latest = (data.revisions as RevisionInfo[]).find((r: RevisionInfo) => r.revision === data.currentRevision);
+              if (latest?.canvasFiles) {
+                const files = latest.canvasFiles.map((cf: CanvasFileInfo) => cf.filename).sort();
+                setCanvasFiles(files);
+                setActiveViewRaw((prev) => {
+                  if (prev.type === "canvas" && !files.includes(prev.filename)) {
+                    return { type: "canvas", filename: files[0] || "" };
+                  }
+                  return prev;
+                });
+              }
+            }
           }
           if (data.type === "revision-updated") {
             if (data.revisions) setRevisions(data.revisions);
@@ -299,7 +326,7 @@ function App() {
     <SessionContext.Provider value={sessionId}>
       <RevisionContext.Provider value={{ currentRevision, selectedRevision, revisions, setSelectedRevision, isReadOnly, compareRevision, setCompareRevision }}>
         <AnnotationProvider key={`${sessionId}:${selectedRevision}`} sessionId={sessionId} revision={selectedRevision} isReadOnly={isReadOnly}>
-          <ActiveViewContext.Provider value={{ activeView, setActiveView, openFiles, closeFile }}>
+          <ActiveViewContext.Provider value={{ activeView, setActiveView, openFiles, closeFile, canvasFiles }}>
           <ActiveViewCtx.Provider value={{ setActiveView }}>
             <div className="min-h-screen bg-bg-base">
               {/* Left panel — fixed to viewport */}
@@ -345,39 +372,48 @@ function App() {
 
                 <ContentTabs />
                 {/* All views stay mounted; inactive ones are hidden */}
-                <div style={{ display: activeView.type === "plan" ? undefined : "none" }}>
-                  <div className="relative max-w-[720px] mx-auto px-6 pt-12 pb-32">
-                    <button
-                      onClick={() => {
-                        const planContent = document.querySelector(".plan-content");
-                        if (!planContent) return;
-                        const md = exportCanvasToMarkdown(planContent as HTMLElement);
-                        navigator.clipboard.writeText(md).then(() => {
-                          const btn = document.getElementById("export-md-btn");
-                          if (btn) {
-                            btn.setAttribute("data-copied", "true");
-                            setTimeout(() => { btn.removeAttribute("data-copied"); }, 1500);
-                          }
-                        });
-                      }}
-                      id="export-md-btn"
-                      className="group absolute top-3 right-6 p-1.5 text-text-tertiary hover:text-text-secondary transition-colors z-10"
-                      title="Copy as Markdown"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-[[data-copied=true]]:hidden">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
-                      </svg>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="hidden group-[[data-copied=true]]:block text-green-500">
-                        <polyline points="20 6 9 17 4 12"/>
-                      </svg>
-                    </button>
-                    {selectedRevInfo?.response && (
-                      <ResponseBanner markdown={selectedRevInfo.response} />
-                    )}
-                    <PlanRenderer revision={selectedRevision} />
+                {canvasFiles.map((filename) => (
+                  <div key={filename} style={{ display: activeView.type === "canvas" && activeView.filename === filename ? undefined : "none" }}>
+                    <div className="relative max-w-[720px] mx-auto px-6 pt-12 pb-32">
+                      {/* Only show copy button and response banner on the first canvas */}
+                      {filename === canvasFiles[0] && (
+                        <>
+                          <button
+                            onClick={() => {
+                              const planContent = document.querySelector(`[data-canvas-file="${filename}"] .plan-content`);
+                              if (!planContent) return;
+                              const md = exportCanvasToMarkdown(planContent as HTMLElement);
+                              navigator.clipboard.writeText(md).then(() => {
+                                const btn = document.getElementById("export-md-btn");
+                                if (btn) {
+                                  btn.setAttribute("data-copied", "true");
+                                  setTimeout(() => { btn.removeAttribute("data-copied"); }, 1500);
+                                }
+                              });
+                            }}
+                            id="export-md-btn"
+                            className="group absolute top-3 right-6 p-1.5 text-text-tertiary hover:text-text-secondary transition-colors z-10"
+                            title="Copy as Markdown"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-[[data-copied=true]]:hidden">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                            </svg>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="hidden group-[[data-copied=true]]:block text-green-500">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          </button>
+                          {selectedRevInfo?.response && (
+                            <ResponseBanner markdown={selectedRevInfo.response} />
+                          )}
+                        </>
+                      )}
+                      <div data-canvas-file={filename}>
+                        <PlanRenderer revision={selectedRevision} filename={filename} />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
                 {openFiles.map((filePath) => (
                   <div key={filePath} style={{ display: activeView.type === "file" && activeView.path === filePath ? undefined : "none" }}>
                     <FileViewer path={filePath} />
@@ -715,37 +751,48 @@ function ResponseBanner({ markdown }: { markdown: string }) {
 }
 
 function ContentTabs() {
-  const { activeView, setActiveView, openFiles, closeFile } = React.useContext(ActiveViewContext);
+  const { activeView, setActiveView, openFiles, closeFile, canvasFiles } = React.useContext(ActiveViewContext);
   const sessionId = React.useContext(SessionContext);
   const { addAnnotationWithId, setActiveAnnotationId } = useAnnotations();
 
-  const showTabs = openFiles.length > 0;
+  const showTabs = canvasFiles.length > 1 || openFiles.length > 0;
   if (!showTabs) return null;
 
   return (
     <div className="flex items-center border-b border-border-medium bg-bg-surface overflow-x-auto sticky top-0 z-10">
-      {/* Plan tab — only show when file tabs exist */}
-      {showTabs && (
-        <button
-          onClick={() => setActiveView({ type: "plan" })}
-          className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-body whitespace-nowrap transition-colors relative ${
-            activeView.type === "plan"
-              ? "text-text-primary"
-              : "text-text-tertiary hover:text-text-secondary"
-          }`}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="opacity-60">
-            <path d="M12 7L2 12l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Canvas
-          {activeView.type === "plan" && (
-            <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-text-primary rounded-full" />
-          )}
-        </button>
-      )}
+      {/* Canvas tabs */}
+      {canvasFiles.map((filename, i) => {
+        const label = filename.replace(/\.jsx$/, "");
+        const isActive = activeView.type === "canvas" && activeView.filename === filename;
+        return (
+          <React.Fragment key={filename}>
+            <button
+              onClick={() => setActiveView({ type: "canvas", filename })}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-body whitespace-nowrap transition-colors relative ${
+                isActive
+                  ? "text-text-primary"
+                  : "text-text-tertiary hover:text-text-secondary"
+              }`}
+            >
+              {i === 0 && (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="opacity-60">
+                  <path d="M12 7L2 12l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+              {label}
+              {isActive && (
+                <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-text-primary rounded-full" />
+              )}
+            </button>
+            {i < canvasFiles.length - 1 && (
+              <span className="w-px h-4 bg-border-medium flex-shrink-0" />
+            )}
+          </React.Fragment>
+        );
+      })}
 
-      {showTabs && <>
-      {/* Separator */}
+      {openFiles.length > 0 && <>
+      {/* Separator between canvas and file tabs */}
       <span className="w-px h-4 bg-border-medium flex-shrink-0" />
 
       {/* File tabs */}

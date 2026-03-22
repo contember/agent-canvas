@@ -14,15 +14,18 @@ const ANNOTATABLE_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='t
 
 interface PlanRendererProps {
   revision: number;
+  filename: string;
 }
 
-export function PlanRenderer({ revision }: PlanRendererProps) {
+export function PlanRenderer({ revision, filename }: PlanRendererProps) {
   const sessionId = useContext(SessionContext);
   const [PlanComponent, setPlanComponent] = useState<React.ComponentType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { annotations, addAnnotationWithId, removeAnnotation, updateAnnotation, addAnnotationImage, removeAnnotationImage, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
+  const { annotations: allAnnotations, addAnnotationWithId, removeAnnotation, updateAnnotation, addAnnotationImage, removeAnnotationImage, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
+  // Filter annotations to this canvas file
+  const annotations = useMemo(() => allAnnotations.filter(a => !a.filePath && (!a.canvasFile || a.canvasFile === filename)), [allAnnotations, filename]);
   const [editingAnn, setEditingAnn] = useState<{ id: string; note: string } | null>(null);
 
   // Block annotation hover state
@@ -37,10 +40,11 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
     setLoading(true);
     setError(null);
     setFocusedBlockIndex(null);
-    import(`/api/session/${sessionId}/plan.js?rev=${revision}&t=${Date.now()}`)
+    const jsName = filename.replace(/\.jsx$/, ".js");
+    import(`/api/session/${sessionId}/canvas/${encodeURIComponent(jsName)}?rev=${revision}&t=${Date.now()}`)
       .then((mod) => { setPlanComponent(() => mod.default); setLoading(false); })
       .catch((e) => { setError(e.message); setLoading(false); });
-  }, [sessionId, revision]);
+  }, [sessionId, revision, filename]);
 
   const scrollContainer = document.getElementById("plan-scroll-container");
 
@@ -49,6 +53,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
     restoreKey: PlanComponent,
     restoreAnnotations: annotations,
     extractContext: (range) => extractContext(range, containerRef.current!),
+    canvasFile: filename,
     scrollContainer,
   });
 
@@ -298,7 +303,7 @@ export function PlanRenderer({ revision }: PlanRendererProps) {
           truncateAt={80}
           onAdd={(note, images) => {
             const id = generateAnnotationId();
-            addAnnotationWithId(id, blockPopover.snippet, note, undefined, undefined, images);
+            addAnnotationWithId(id, blockPopover.snippet, note, undefined, undefined, images, filename);
             setBlockPopover(null);
           }}
           onCancel={() => setBlockPopover(null)}

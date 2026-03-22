@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, renameSync } from "fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, renameSync, copyFileSync } from "fs";
 import { join } from "path";
 import { SESSIONS_DIR } from "./paths";
 
@@ -7,21 +7,25 @@ export interface DiffStats {
   removed: number;
 }
 
+export interface CanvasFileInfo {
+  filename: string;
+  diffStats?: DiffStats;
+}
+
 export interface RevisionInfo {
   revision: number;
   label?: string;
-  sourceFile?: string;
+  canvasFiles: CanvasFileInfo[];
   createdAt: string;
   hasFeedback: boolean;
   feedbackConsumed: boolean;
   response?: string;
-  diffStats?: DiffStats;
 }
 
 export interface SessionData {
   id: string;
   projectRoot: string;
-  jsx: string;
+  canvasFiles: string[];
   currentRevision: number;
   revisions: RevisionInfo[];
   createdAt: string;
@@ -36,12 +40,24 @@ interface SessionMeta {
   revisions: RevisionInfo[];
 }
 
-// Legacy format
+// Legacy format (flat files, pre-revision)
 interface LegacyMeta {
   projectRoot: string;
   createdAt: string;
   updatedAt: string;
   version: number;
+}
+
+// Previous format (single sourceFile per revision)
+interface LegacyRevisionInfo {
+  revision: number;
+  label?: string;
+  sourceFile?: string;
+  createdAt: string;
+  hasFeedback: boolean;
+  feedbackConsumed: boolean;
+  response?: string;
+  diffStats?: DiffStats;
 }
 
 const STALE_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -83,6 +99,13 @@ export class SessionManager {
     return join(this.sessionDir(id), "revisions", String(rev));
   }
 
+  /** List *.jsx filenames in a revision directory */
+  getRevisionCanvasFiles(id: string, rev: number): string[] {
+    const dir = this.revisionDir(id, rev);
+    if (!existsSync(dir)) return [];
+    return readdirSync(dir).filter(f => f.endsWith(".jsx")).sort();
+  }
+
   private loadFromDisk() {
     if (!existsSync(SESSIONS_DIR)) return;
     for (const name of readdirSync(SESSIONS_DIR, { withFileTypes: true })) {
@@ -94,17 +117,16 @@ export class SessionManager {
       try {
         const raw = JSON.parse(readFileSync(metaPath, "utf-8"));
 
-        // Detect and migrate legacy format
+        // Detect and migrate legacy flat-file format
         if ("version" in raw && !("currentRevision" in raw)) {
           this.migrateLegacy(name.name, raw as LegacyMeta);
-          // Re-read after migration
           const migrated: SessionMeta = JSON.parse(readFileSync(metaPath, "utf-8"));
-          const jsx = this.readRevisionJsx(name.name, migrated.currentRevision);
-          if (!jsx) continue;
+          const canvasFiles = this.getRevisionCanvasFiles(name.name, migrated.currentRevision);
+          if (canvasFiles.length === 0) continue;
           this.sessions.set(name.name, {
             id: name.name,
             projectRoot: migrated.projectRoot,
-            jsx,
+            canvasFiles,
             currentRevision: migrated.currentRevision,
             revisions: migrated.revisions,
             createdAt: migrated.createdAt,
@@ -113,14 +135,32 @@ export class SessionManager {
           continue;
         }
 
-        const meta = raw as SessionMeta;
-        const jsx = this.readRevisionJsx(name.name, meta.currentRevision);
-        if (!jsx) continue;
+        let meta = raw as SessionMeta;
+
+        // Migrate single-sourceFile revision format to canvasFiles
+        if (meta.revisions.length > 0 && !("canvasFiles" in meta.revisions[0])) {
+          meta = {
+            ...meta,
+            revisions: (meta.revisions as unknown as LegacyRevisionInfo[]).map(r => ({
+              revision: r.revision,
+              label: r.label,
+              canvasFiles: [{ filename: r.sourceFile || "plan.jsx", diffStats: r.diffStats }],
+              createdAt: r.createdAt,
+              hasFeedback: r.hasFeedback,
+              feedbackConsumed: r.feedbackConsumed,
+              response: r.response,
+            })),
+          };
+          writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+        }
+
+        const canvasFiles = this.getRevisionCanvasFiles(name.name, meta.currentRevision);
+        if (canvasFiles.length === 0) continue;
 
         this.sessions.set(name.name, {
           id: name.name,
           projectRoot: meta.projectRoot,
-          jsx,
+          canvasFiles,
           currentRevision: meta.currentRevision,
           revisions: meta.revisions,
           createdAt: meta.createdAt,
@@ -136,7 +176,6 @@ export class SessionManager {
     const flatCompiled = join(dir, "plan.compiled.js");
     const historyDir = join(dir, "history");
 
-    // Collect all historical revisions + current
     const revisions: RevisionInfo[] = [];
 
     // Migrate history files
@@ -148,7 +187,13 @@ export class SessionManager {
         const revDir = this.revisionDir(id, num);
         mkdirSync(revDir, { recursive: true });
         renameSync(join(historyDir, file), join(revDir, "plan.jsx"));
-        revisions.push({ revision: num, createdAt: legacy.createdAt, hasFeedback: false, feedbackConsumed: false });
+        revisions.push({
+          revision: num,
+          canvasFiles: [{ filename: "plan.jsx" }],
+          createdAt: legacy.createdAt,
+          hasFeedback: false,
+          feedbackConsumed: false,
+        });
       }
       rmSync(historyDir, { recursive: true, force: true });
     }
@@ -163,9 +208,14 @@ export class SessionManager {
     if (existsSync(flatCompiled)) {
       renameSync(flatCompiled, join(revDir, "plan.compiled.js"));
     }
-    revisions.push({ revision: currentRev, createdAt: legacy.updatedAt, hasFeedback: false, feedbackConsumed: false });
+    revisions.push({
+      revision: currentRev,
+      canvasFiles: [{ filename: "plan.jsx" }],
+      createdAt: legacy.updatedAt,
+      hasFeedback: false,
+      feedbackConsumed: false,
+    });
 
-    // Write new meta
     const meta: SessionMeta = {
       projectRoot: legacy.projectRoot,
       createdAt: legacy.createdAt,
@@ -176,37 +226,56 @@ export class SessionManager {
     writeFileSync(join(dir, "meta.json"), JSON.stringify(meta, null, 2));
   }
 
-  private readRevisionJsx(id: string, rev: number): string | null {
+  readRevisionJsx(id: string, rev: number, filename: string): string | null {
     try {
-      return readFileSync(join(this.revisionDir(id, rev), "plan.jsx"), "utf-8");
+      return readFileSync(join(this.revisionDir(id, rev), filename), "utf-8");
     } catch {
       return null;
     }
   }
 
-  upsert(id: string, jsx: string, projectRoot: string, label?: string, sourceFile?: string, response?: string): SessionData {
+  /**
+   * Create or update a session with a set of canvas files.
+   * @param canvasFiles Map of filename -> JSX content
+   */
+  upsert(id: string, canvasFiles: Map<string, string>, projectRoot: string, label?: string, response?: string): SessionData {
     const existing = this.sessions.get(id);
     const now = new Date().toISOString();
     const revision = existing ? existing.currentRevision + 1 : 1;
 
-    let diffStats: DiffStats | undefined;
-    if (existing && sourceFile) {
-      const prev = [...existing.revisions]
-        .reverse()
-        .find((r) => r.sourceFile === sourceFile);
-      if (prev) {
-        const prevJsx = this.readRevisionJsx(id, prev.revision);
-        if (prevJsx) diffStats = computeLineDiffStats(prevJsx, jsx);
+    // Compute per-file diffStats against the previous revision
+    const prevRev = existing ? existing.currentRevision : 0;
+    const canvasFileInfos: CanvasFileInfo[] = [];
+    for (const [filename, jsx] of canvasFiles) {
+      let diffStats: DiffStats | undefined;
+      if (prevRev > 0) {
+        const prevJsx = this.readRevisionJsx(id, prevRev, filename);
+        if (prevJsx) {
+          diffStats = computeLineDiffStats(prevJsx, jsx);
+        }
       }
+      canvasFileInfos.push({
+        filename,
+        ...(diffStats ? { diffStats } : {}),
+      });
     }
 
-    const revInfo: RevisionInfo = { revision, createdAt: now, hasFeedback: false, feedbackConsumed: false, ...(label ? { label } : {}), ...(sourceFile ? { sourceFile } : {}), ...(response ? { response } : {}), ...(diffStats ? { diffStats } : {}) };
+    const revInfo: RevisionInfo = {
+      revision,
+      canvasFiles: canvasFileInfos,
+      createdAt: now,
+      hasFeedback: false,
+      feedbackConsumed: false,
+      ...(label ? { label } : {}),
+      ...(response ? { response } : {}),
+    };
     const revisions = existing ? [...existing.revisions, revInfo] : [revInfo];
+    const filenames = [...canvasFiles.keys()].sort();
 
     const session: SessionData = {
       id,
       projectRoot,
-      jsx,
+      canvasFiles: filenames,
       currentRevision: revision,
       revisions,
       createdAt: existing?.createdAt ?? now,
@@ -214,7 +283,7 @@ export class SessionManager {
     };
 
     this.sessions.set(id, session);
-    this.persistToDisk(session);
+    this.persistToDisk(session, canvasFiles);
     return session;
   }
 
@@ -229,10 +298,12 @@ export class SessionManager {
     writeFileSync(join(this.sessionDir(session.id), "meta.json"), JSON.stringify(meta, null, 2));
   }
 
-  private persistToDisk(session: SessionData) {
+  private persistToDisk(session: SessionData, canvasFiles: Map<string, string>) {
     const revDir = this.revisionDir(session.id, session.currentRevision);
     mkdirSync(revDir, { recursive: true });
-    writeFileSync(join(revDir, "plan.jsx"), session.jsx);
+    for (const [filename, jsx] of canvasFiles) {
+      writeFileSync(join(revDir, filename), jsx);
+    }
     this.persistMeta(session);
   }
 
@@ -249,21 +320,23 @@ export class SessionManager {
     rmSync(this.sessionDir(id), { recursive: true, force: true });
   }
 
-  saveCompiled(id: string, js: string, rev?: number) {
+  saveCompiled(id: string, filename: string, js: string, rev?: number) {
     const session = this.sessions.get(id);
     const revision = rev ?? session?.currentRevision;
     if (!revision) return;
     const revDir = this.revisionDir(id, revision);
     mkdirSync(revDir, { recursive: true });
-    writeFileSync(join(revDir, "plan.compiled.js"), js);
+    const compiledName = filename.replace(/\.jsx$/, ".compiled.js");
+    writeFileSync(join(revDir, compiledName), js);
   }
 
-  getCompiled(id: string, rev?: number): string | null {
+  getCompiled(id: string, filename: string, rev?: number): string | null {
     const session = this.sessions.get(id);
     const revision = rev ?? session?.currentRevision;
     if (!revision) return null;
+    const compiledName = filename.replace(/\.jsx$/, ".compiled.js");
     try {
-      return readFileSync(join(this.revisionDir(id, revision), "plan.compiled.js"), "utf-8");
+      return readFileSync(join(this.revisionDir(id, revision), compiledName), "utf-8");
     } catch {
       return null;
     }
@@ -305,7 +378,6 @@ export class SessionManager {
   getLatestUnconsumedFeedback(id: string): { revision: number; feedback: string } | null {
     const session = this.sessions.get(id);
     if (!session) return null;
-    // Search from newest to oldest
     for (let i = session.revisions.length - 1; i >= 0; i--) {
       const ri = session.revisions[i];
       if (ri.hasFeedback && !ri.feedbackConsumed) {
@@ -316,8 +388,8 @@ export class SessionManager {
     return null;
   }
 
-  getRevisionJsxPath(id: string, rev: number): string {
-    return join(this.revisionDir(id, rev), "plan.jsx");
+  getRevisionJsxPath(id: string, rev: number, filename: string): string {
+    return join(this.revisionDir(id, rev), filename);
   }
 
   cleanupStale(maxAge = STALE_TIMEOUT_MS) {

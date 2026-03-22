@@ -13,7 +13,7 @@ export function generateMarkdown(
 ): string {
   const parts: string[] = [];
   const responseAnns = annotations.filter((a) => a.filePath === RESPONSE_ANNOTATION_PATH);
-  const planAnns = annotations.filter((a) => !a.filePath);
+  const canvasAnns = annotations.filter((a) => !a.filePath);
   const fileAnns = annotations.filter((a) => a.filePath && a.filePath !== RESPONSE_ANNOTATION_PATH);
   const resps = responses ? Array.from(responses.values()).filter((r) => hasValue(r)) : [];
   const fbEntries = feedbackEntries
@@ -43,12 +43,31 @@ export function generateMarkdown(
     }
   }
 
-  // Plan annotations grouped by hierarchy
-  if (planAnns.length > 0) {
+  // Canvas annotations grouped by canvas file, then hierarchy
+  if (canvasAnns.length > 0) {
     parts.push("## Canvas annotations");
     parts.push("");
-    const grouped = groupByHierarchy(planAnns);
-    parts.push(renderHierarchyGroup(grouped));
+
+    // Group by canvasFile
+    const byCanvas = new Map<string, Annotation[]>();
+    for (const ann of canvasAnns) {
+      const key = ann.canvasFile || "";
+      if (!byCanvas.has(key)) byCanvas.set(key, []);
+      byCanvas.get(key)!.push(ann);
+    }
+
+    const canvasKeys = [...byCanvas.keys()].sort();
+    const multipleCanvases = canvasKeys.length > 1 || (canvasKeys.length === 1 && canvasKeys[0] !== "");
+
+    for (const canvasKey of canvasKeys) {
+      const anns = byCanvas.get(canvasKey)!;
+      if (multipleCanvases && canvasKey) {
+        parts.push(`### ${canvasKey.replace(/\.jsx$/, "")}`);
+        parts.push("");
+      }
+      const grouped = groupByHierarchy(anns);
+      parts.push(renderHierarchyGroup(grouped));
+    }
   }
 
   // File annotations grouped by path

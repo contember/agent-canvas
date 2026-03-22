@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync, existsSync } from "fs";
 import type { SessionManager } from "../session";
 import { compilePlan } from "../compiler";
 import { watchSession } from "../watcher";
@@ -11,24 +11,36 @@ export interface ApiContext {
   port: number;
 }
 
-function readRevisionJsx(sessionManager: SessionManager, sessionId: string, rev: number): string | null {
-  try {
-    const path = sessionManager.getRevisionJsxPath(sessionId, rev);
-    return readFileSync(path, "utf-8");
-  } catch {
-    return null;
-  }
-}
-
 export function createApiHandlers(ctx: ApiContext): Route[] {
   const { sessionManager, broadcastPlanUpdate, port } = ctx;
+
+  /**
+   * Read *.jsx canvas files from a directory.
+   * Returns a Map of filename -> JSX content.
+   */
+  function resolveCanvasFiles(directory: string): Map<string, string> | null {
+    if (!existsSync(directory)) return null;
+    const files = readdirSync(directory).filter(f => f.endsWith(".jsx")).sort();
+    if (files.length === 0) return null;
+    const map = new Map<string, string>();
+    for (const f of files) {
+      map.set(f, readFileSync(`${directory}/${f}`, "utf-8"));
+    }
+    return map;
+  }
 
   async function handlePlanPost(req: Request, _url: URL, match: URLPatternResult): Promise<Response> {
     const sessionId = match.pathname.groups.id!;
     try {
       const body = await req.json();
-      const { jsx, projectRoot, label, sourceFile, response } = body;
-      if (!jsx) return jsonResponse({ error: "Missing jsx" }, 400);
+
+      if (!body.directory) {
+        return jsonResponse({ error: "Missing directory" }, 400);
+      }
+      const canvasFiles = resolveCanvasFiles(body.directory);
+      if (!canvasFiles) {
+        return jsonResponse({ error: "No .jsx files found in directory" }, 400);
+      }
 
       const unconsumed = sessionManager.getLatestUnconsumedFeedback(sessionId);
       if (unconsumed) {
@@ -41,12 +53,26 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
         }, 409);
       }
 
+      const projectRoot = body.projectRoot || process.cwd();
       const isNew = !sessionManager.get(sessionId);
-      const session = sessionManager.upsert(sessionId, jsx, projectRoot || process.cwd(), label, sourceFile, response);
+      const session = sessionManager.upsert(sessionId, canvasFiles, projectRoot, body.label, body.response);
 
-      const result = await compilePlan(jsx, session.projectRoot);
-      if (result.ok) {
-        sessionManager.saveCompiled(sessionId, result.js, session.currentRevision);
+      // Compile all canvas files in parallel
+      const errors: Record<string, string> = {};
+      let anyOk = false;
+      await Promise.all(
+        [...canvasFiles.entries()].map(async ([filename, jsx]) => {
+          const result = await compilePlan(jsx, session.projectRoot);
+          if (result.ok) {
+            sessionManager.saveCompiled(sessionId, filename, result.js, session.currentRevision);
+            anyOk = true;
+          } else {
+            errors[filename] = result.error;
+          }
+        }),
+      );
+
+      if (anyOk) {
         broadcastPlanUpdate(sessionId);
       }
 
@@ -54,43 +80,47 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
 
       const browserUrl = `http://localhost:${port}/s/${sessionId}`;
       return jsonResponse({
-        ok: result.ok,
+        ok: anyOk,
         browserUrl,
         isNew,
         revision: session.currentRevision,
-        error: result.ok ? undefined : result.error,
+        sessionId,
+        canvasFiles: [...canvasFiles.keys()],
+        ...(Object.keys(errors).length > 0 ? { errors } : {}),
       });
     } catch (e: any) {
       return jsonResponse({ error: e.message }, 500);
     }
   }
 
-  async function handlePlanJs(_req: Request, url: URL, match: URLPatternResult): Promise<Response> {
+  async function handleCanvasJs(_req: Request, url: URL, match: URLPatternResult): Promise<Response> {
     const sessionId = match.pathname.groups.id!;
+    const jsFilename = match.pathname.groups.filename!;
+    const jsxFilename = jsFilename.replace(/\.js$/, ".jsx");
     const revParam = url.searchParams.get("rev");
     const rev = revParam ? parseInt(revParam, 10) : undefined;
 
-    let compiled = sessionManager.getCompiled(sessionId, rev);
+    let compiled = sessionManager.getCompiled(sessionId, jsxFilename, rev);
 
     if (!compiled && rev) {
       const session = sessionManager.get(sessionId);
       if (session) {
-        const jsx = readRevisionJsx(sessionManager, sessionId, rev);
+        const jsx = sessionManager.readRevisionJsx(sessionId, rev, jsxFilename);
         if (jsx) {
           const result = await compilePlan(jsx, session.projectRoot);
           if (result.ok) {
-            sessionManager.saveCompiled(sessionId, result.js, rev);
+            sessionManager.saveCompiled(sessionId, jsxFilename, result.js, rev);
             compiled = result.js;
           } else {
-            console.warn(`[plan.js] compilation failed for ${sessionId} rev ${rev}: ${result.error}`);
+            console.warn(`[canvas.js] compilation failed for ${sessionId}/${jsxFilename} rev ${rev}: ${result.error}`);
           }
         } else {
-          console.warn(`[plan.js] no JSX found for ${sessionId} rev ${rev}`);
+          console.warn(`[canvas.js] no JSX found for ${sessionId}/${jsxFilename} rev ${rev}`);
         }
       }
     }
 
-    if (!compiled) return jsonResponse({ error: "No compiled plan" }, 404);
+    if (!compiled) return jsonResponse({ error: "No compiled canvas" }, 404);
     return new Response(compiled, {
       headers: {
         "Content-Type": "application/javascript",
@@ -112,6 +142,7 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
       projectRoot: session.projectRoot,
       currentRevision: session.currentRevision,
       revisions: session.revisions,
+      canvasFiles: session.canvasFiles,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
     });
@@ -145,7 +176,7 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
   return [
     { method: "GET", pattern: new URLPattern({ pathname: "/health" }), handler: handleHealth },
     { method: "POST", pattern: new URLPattern({ pathname: "/api/session/:id/plan" }), handler: handlePlanPost },
-    { method: "GET", pattern: new URLPattern({ pathname: "/api/session/:id/plan.js" }), handler: handlePlanJs },
+    { method: "GET", pattern: new URLPattern({ pathname: "/api/session/:id/canvas/:filename" }), handler: handleCanvasJs },
     { method: "GET", pattern: new URLPattern({ pathname: "/api/session/:id/meta" }), handler: handleMeta },
     { method: "GET", pattern: new URLPattern({ pathname: "/api/session/:id/revision/:rev/feedback" }), handler: handleFeedbackGet },
     { method: "POST", pattern: new URLPattern({ pathname: "/api/session/:id/feedback/consume" }), handler: handleFeedbackConsume },

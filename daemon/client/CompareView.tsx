@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo, useContext } from "react";
 import { RevisionSelect } from "./RevisionSelect";
+import { RevisionContext, type RevisionInfo, type CanvasFileInfo } from "./App";
 import { runDomDiff } from "./domDiff";
 import { extractBlockTree, matchBlocks, buildUnifiedDom } from "./unifiedDiff";
 import { useAnnotations } from "./AnnotationProvider";
@@ -15,12 +16,43 @@ interface CompareViewProps {
 
 type CompareMode = "unified" | "side-by-side";
 
+/** Get union of canvas filenames from two revisions */
+function getCompareFiles(revisions: RevisionInfo[], leftRev: number, rightRev: number): string[] {
+  const left = revisions.find(r => r.revision === leftRev);
+  const right = revisions.find(r => r.revision === rightRev);
+  const files = new Set<string>();
+  for (const cf of left?.canvasFiles || []) files.add(cf.filename);
+  for (const cf of right?.canvasFiles || []) files.add(cf.filename);
+  return [...files].sort();
+}
+
 export function CompareView({ initialLeft, initialRight, sessionId, onExit }: CompareViewProps) {
   const [leftRev, setLeftRev] = useState(initialLeft);
   const [rightRev, setRightRev] = useState(initialRight);
   const [mode, setMode] = useState<CompareMode>("unified");
   const [hasChanges, setHasChanges] = useState(true);
   const [diffDone, setDiffDone] = useState(false);
+  const { revisions } = useContext(RevisionContext);
+
+  const compareFiles = useMemo(() => getCompareFiles(revisions, leftRev, rightRev), [revisions, leftRev, rightRev]);
+  const [selectedFile, setSelectedFile] = useState<string>(() => compareFiles[0] || "plan.jsx");
+
+  // Reset selected file when revisions change
+  useEffect(() => {
+    if (!compareFiles.includes(selectedFile)) {
+      setSelectedFile(compareFiles[0] || "plan.jsx");
+    }
+  }, [compareFiles, selectedFile]);
+
+  // Check if file exists in each revision
+  const leftHasFile = useMemo(() => {
+    const rev = revisions.find(r => r.revision === leftRev);
+    return rev?.canvasFiles.some(cf => cf.filename === selectedFile) ?? false;
+  }, [revisions, leftRev, selectedFile]);
+  const rightHasFile = useMemo(() => {
+    const rev = revisions.find(r => r.revision === rightRev);
+    return rev?.canvasFiles.some(cf => cf.filename === selectedFile) ?? false;
+  }, [revisions, rightRev, selectedFile]);
 
   return (
     <div className="flex flex-col h-screen">
@@ -74,20 +106,65 @@ export function CompareView({ initialLeft, initialRight, sessionId, onExit }: Co
         </div>
       </div>
 
-      {mode === "unified" ? (
+      {/* Canvas file selector — only show when multiple files */}
+      {compareFiles.length > 1 && (
+        <div className="flex items-center gap-1 px-6 py-2 border-b border-border-subtle bg-bg-surface flex-shrink-0 overflow-x-auto">
+          {compareFiles.map(filename => {
+            const label = filename.replace(/\.jsx$/, "");
+            const isSelected = filename === selectedFile;
+            const inLeft = revisions.find(r => r.revision === leftRev)?.canvasFiles.some(cf => cf.filename === filename);
+            const inRight = revisions.find(r => r.revision === rightRev)?.canvasFiles.some(cf => cf.filename === filename);
+            const statusLabel = !inLeft ? " (added)" : !inRight ? " (removed)" : "";
+            return (
+              <button
+                key={filename}
+                onClick={() => setSelectedFile(filename)}
+                className={`text-[12px] font-body px-3 py-1 rounded-md transition-colors whitespace-nowrap ${
+                  isSelected
+                    ? "bg-bg-elevated text-text-primary font-medium"
+                    : "text-text-tertiary hover:text-text-secondary hover:bg-bg-elevated"
+                }`}
+              >
+                {label}
+                {statusLabel && (
+                  <span className={`ml-1 text-[10px] ${!inLeft ? "text-accent-green" : "text-accent-red"}`}>
+                    {statusLabel}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Show placeholder for files that only exist in one revision */}
+      {!leftHasFile || !rightHasFile ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center text-text-tertiary font-body">
+            <div className="text-lg mb-2">
+              {!leftHasFile ? "New file" : "Removed file"}
+            </div>
+            <div className="text-[13px]">
+              {selectedFile.replace(/\.jsx$/, "")} {!leftHasFile ? "was added" : "was removed"} in this revision
+            </div>
+          </div>
+        </div>
+      ) : mode === "unified" ? (
         <UnifiedView
-          key={`unified-${leftRev}-${rightRev}`}
+          key={`unified-${leftRev}-${rightRev}-${selectedFile}`}
           sessionId={sessionId}
           leftRev={leftRev}
           rightRev={rightRev}
+          filename={selectedFile}
           onDiffResult={(done, changes) => { setDiffDone(done); setHasChanges(changes); }}
         />
       ) : (
         <SideBySideView
-          key={`sbs-${leftRev}-${rightRev}`}
+          key={`sbs-${leftRev}-${rightRev}-${selectedFile}`}
           sessionId={sessionId}
           leftRev={leftRev}
           rightRev={rightRev}
+          filename={selectedFile}
           onDiffResult={(done, changes) => { setDiffDone(done); setHasChanges(changes); }}
         />
       )}
@@ -99,7 +176,6 @@ export function CompareView({ initialLeft, initialRight, sessionId, onExit }: Co
 
 function SyncScrollCheckbox() {
   const [checked, setChecked] = useState(true);
-  // Store in a ref accessible to SideBySideView via DOM attribute
   useEffect(() => {
     document.documentElement.dataset.syncScroll = checked ? "1" : "0";
     return () => { delete document.documentElement.dataset.syncScroll; };
@@ -124,10 +200,11 @@ interface ViewProps {
   sessionId: string;
   leftRev: number;
   rightRev: number;
+  filename: string;
   onDiffResult: (done: boolean, hasChanges: boolean) => void;
 }
 
-function UnifiedView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProps) {
+function UnifiedView({ sessionId, leftRev, rightRev, filename, onDiffResult }: ViewProps) {
   const oldRef = useRef<HTMLDivElement>(null);
   const newRef = useRef<HTMLDivElement>(null);
   const unifiedRef = useRef<HTMLDivElement>(null);
@@ -139,15 +216,15 @@ function UnifiedView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProps) 
   const [slow, setSlow] = useState(false);
 
   const { annotations } = useAnnotations();
-  const planAnnotations = annotations.filter(a => !a.filePath);
+  const canvasAnnotations = annotations.filter(a => !a.filePath && (!a.canvasFile || a.canvasFile === filename));
   const { popovers } = useTextAnnotation({
     containerRef: unifiedRef,
     restoreKey: done,
-    restoreAnnotations: planAnnotations,
+    restoreAnnotations: canvasAnnotations,
     extractContext: (range) => extractContext(range, unifiedRef.current!),
   });
 
-  // Detect stuck loading — log diagnostic state after 10s
+  // Detect stuck loading
   useEffect(() => {
     if (done || loadError) return;
     const id = setTimeout(() => {
@@ -192,13 +269,14 @@ function UnifiedView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProps) 
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto">
-      {/* Offscreen source panels — unmount after diff is built */}
+      {/* Offscreen source panels */}
       {!done && !loadError && (
         <div style={{ position: "absolute", left: -9999, visibility: "hidden" as const, pointerEvents: "none" as const, width: 720 }}>
           <ComparePanelRenderer
             ref={oldRef}
             sessionId={sessionId}
             revision={leftRev}
+            filename={filename}
             onReady={() => setLeftReady(true)}
             onError={(msg) => setLoadError(`Rev ${leftRev}: ${msg}`)}
           />
@@ -206,6 +284,7 @@ function UnifiedView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProps) 
             ref={newRef}
             sessionId={sessionId}
             revision={rightRev}
+            filename={filename}
             onReady={() => setRightReady(true)}
             onError={(msg) => setLoadError(`Rev ${rightRev}: ${msg}`)}
           />
@@ -239,7 +318,7 @@ function UnifiedView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProps) 
 
 /* ── Side-by-side view ── */
 
-function SideBySideView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProps) {
+function SideBySideView({ sessionId, leftRev, rightRev, filename, onDiffResult }: ViewProps) {
   const oldRef = useRef<HTMLDivElement>(null);
   const newRef = useRef<HTMLDivElement>(null);
   const [leftReady, setLeftReady] = useState(false);
@@ -255,11 +334,11 @@ function SideBySideView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProp
   const handleRightReady = useCallback(() => setRightReady(true), []);
 
   const { annotations } = useAnnotations();
-  const planAnnotations = annotations.filter(a => !a.filePath);
+  const canvasAnnotations = annotations.filter(a => !a.filePath && (!a.canvasFile || a.canvasFile === filename));
   const { popovers } = useTextAnnotation({
     containerRef: viewRef,
     restoreKey: done,
-    restoreAnnotations: planAnnotations,
+    restoreAnnotations: canvasAnnotations,
     extractContext: (range) => extractContext(range, viewRef.current!),
   });
 
@@ -314,6 +393,7 @@ function SideBySideView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProp
             ref={oldRef}
             sessionId={sessionId}
             revision={leftRev}
+            filename={filename}
             onReady={handleLeftReady}
           />
         </div>
@@ -324,6 +404,7 @@ function SideBySideView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProp
             ref={newRef}
             sessionId={sessionId}
             revision={rightRev}
+            filename={filename}
             onReady={handleRightReady}
           />
         </div>
@@ -338,12 +419,13 @@ function SideBySideView({ sessionId, leftRev, rightRev, onDiffResult }: ViewProp
 interface ComparePanelRendererProps {
   sessionId: string;
   revision: number;
+  filename: string;
   onReady: () => void;
   onError?: (message: string) => void;
 }
 
 const ComparePanelRenderer = React.memo(React.forwardRef<HTMLDivElement, ComparePanelRendererProps>(
-  ({ sessionId, revision, onReady, onError }, ref) => {
+  ({ sessionId, revision, filename, onReady, onError }, ref) => {
     const [PlanComponent, setPlanComponent] = useState<React.ComponentType | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -351,7 +433,8 @@ const ComparePanelRenderer = React.memo(React.forwardRef<HTMLDivElement, Compare
     useEffect(() => {
       setLoading(true);
       setError(null);
-      import(`/api/session/${sessionId}/plan.js?rev=${revision}&t=${Date.now()}`)
+      const jsName = filename.replace(/\.jsx$/, ".js");
+      import(`/api/session/${sessionId}/canvas/${encodeURIComponent(jsName)}?rev=${revision}&t=${Date.now()}`)
         .then((mod) => {
           if (!mod.default) {
             const msg = "Module has no default export";
@@ -368,7 +451,7 @@ const ComparePanelRenderer = React.memo(React.forwardRef<HTMLDivElement, Compare
           setLoading(false);
           onError?.(e.message);
         });
-    }, [sessionId, revision]);
+    }, [sessionId, revision, filename]);
 
     useEffect(() => {
       if (!PlanComponent) return;

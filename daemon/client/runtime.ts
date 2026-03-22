@@ -18,6 +18,7 @@ export interface Annotation {
   note: string;
   createdAt: string;
   filePath?: string;
+  canvasFile?: string;
   context?: AnnotationContext;
   images?: string[];
 }
@@ -42,7 +43,7 @@ export interface FeedbackEntry {
 export interface AnnotationContextValue {
   annotations: Annotation[];
   addAnnotation: (snippet: string, note: string, filePath?: string) => void;
-  addAnnotationWithId: (id: string, snippet: string, note: string, filePath?: string, context?: AnnotationContext, images?: string[]) => void;
+  addAnnotationWithId: (id: string, snippet: string, note: string, filePath?: string, context?: AnnotationContext, images?: string[], canvasFile?: string) => void;
   updateAnnotation: (id: string, note: string) => void;
   removeAnnotation: (id: string) => void;
   addAnnotationImage: (id: string, imagePath: string) => void;
@@ -85,7 +86,7 @@ export function useFeedback(
 export { SessionContext } from "./SessionContext";
 
 // ActiveView navigation — allows components (e.g. FilePreview) to open files
-export type ActiveView = { type: "plan" } | { type: "file"; path: string };
+export type ActiveView = { type: "canvas"; filename: string } | { type: "file"; path: string };
 
 export const ActiveViewCtx = createContext<{
   setActiveView: (v: ActiveView) => void;

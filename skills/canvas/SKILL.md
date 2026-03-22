@@ -47,13 +47,13 @@ Components are auto-available — no imports needed. The file is a JSX fragment 
 
 ### Pushing
 
-After writing the file, push it to open the canvas in the browser:
+After writing canvas files, push the directory to open all canvases in the browser:
 
 ```bash
-bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/plan.jsx --session ${CLAUDE_SESSION_ID} --label "Implementation Plan"
+bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/ --session ${CLAUDE_SESSION_ID} --label "Implementation Plan"
 ```
 
-This opens the canvas in the user's browser (first time) and exits immediately. The round label defaults to the filename if `--label` is omitted. **Always show the `browserUrl` from the push output to the user** so they can open the canvas manually if auto-open didn't work.
+This pushes all `*.jsx` files in the directory as a snapshot (like a git commit). Each file appears as a separate tab in the browser. The canvas opens in the user's browser (first time) and the command exits immediately. **Always show the `browserUrl` from the push output to the user** so they can open the canvas manually if auto-open didn't work.
 
 ### Waiting for feedback
 
@@ -85,20 +85,20 @@ Returns immediately — prints feedback to stdout if available, otherwise produc
 Use the **Edit** tool to modify the existing JSX based on feedback — targeted edits, not full rewrites. Then push and watch again:
 
 ```bash
-bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/plan.jsx --session ${CLAUDE_SESSION_ID} --label "Implementation Plan (revised)"
+bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/ --session ${CLAUDE_SESSION_ID} --label "Implementation Plan (revised)"
 
 # Use Bash tool with run_in_background: true
 bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
 ```
 
-Each push creates a new **round** — the user sees previous rounds and their feedback in the UI.
+Each push creates a new **round** (revision) — all canvas files are snapshotted. The user sees which files changed in the revision selector.
 
 ### Responding to feedback
 
 When pushing a revised canvas after receiving user feedback, use `--response` to tell the user how you addressed their feedback. The response renders as a short banner at the top of the canvas.
 
 ```bash
-bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/plan.jsx --session ${CLAUDE_SESSION_ID} --label "Plan (revised)" --response "Incorporated all feedback. Switched to connection pooling as suggested. I kept the sync approach for writes — see the note in Phase 2 for my reasoning."
+bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/ --session ${CLAUDE_SESSION_ID} --label "Plan (revised)" --response "Incorporated all feedback. Switched to connection pooling as suggested. I kept the sync approach for writes — see the note in Phase 2 for my reasoning."
 ```
 
 Use `--response` to:
@@ -110,20 +110,25 @@ Keep it concise (2-4 sentences). The user can see the diff in the canvas UI, so 
 
 ### Multiple Canvases
 
-Maintain separate files for different phases:
+All `*.jsx` files in the canvas directory are pushed together as a snapshot. Each file appears as a separate tab in the browser. Use different files for different phases or concerns:
+
+```
+.claude/agent-canvas/${CLAUDE_SESSION_ID}/
+  discovery.jsx    # Discovery interview
+  requirements.jsx # Requirements spec
+  plan.jsx         # Implementation plan
+```
+
+Write new files as phases progress, then push the directory. Previous phase files remain visible as context. The user can annotate any canvas and submit one combined feedback per revision.
 
 ```bash
-bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/discovery.jsx --session ${CLAUDE_SESSION_ID} --label "Discovery"
-# watch with run_in_background: true, wait for notification
-bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
-# ... process feedback ...
-bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/requirements.jsx --session ${CLAUDE_SESSION_ID} --label "Requirements"
-# watch with run_in_background: true, wait for notification
-bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
-# ... process feedback ...
-bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/plan.jsx --session ${CLAUDE_SESSION_ID} --label "Implementation Plan"
-# watch with run_in_background: true, wait for notification
-bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}
+# Write discovery.jsx first, push and get feedback
+bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/ --session ${CLAUDE_SESSION_ID} --label "Discovery"
+bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}  # run_in_background: true
+
+# Later, add requirements.jsx, push again — both files visible as tabs
+bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/ --session ${CLAUDE_SESSION_ID} --label "Requirements"
+bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}  # run_in_background: true
 ```
 
 ### File Location
@@ -163,7 +168,7 @@ User wants to make a decision?
 1. **Determine flow** from user intent
 2. **Announce** briefly: "I'll start with discovery, then create a detailed plan."
 3. **Write canvas JSX** with the Write tool to `.claude/agent-canvas/${CLAUDE_SESSION_ID}/<name>.jsx`
-4. **Push + tell the user**: Push the canvas and show the `browserUrl` from the output so the user can open it
+4. **Push the directory + tell the user**: Push with `bunx agent-canvas push .claude/agent-canvas/${CLAUDE_SESSION_ID}/ --session ${CLAUDE_SESSION_ID}` and show the `browserUrl` from the output so the user can open it
 5. **IMMEDIATELY watch in background** — run `bunx agent-canvas watch --session ${CLAUDE_SESSION_ID}` with `run_in_background: true` right after push. Never stop after pushing. The push→watch sequence is atomic: no push without a watch. You will be notified when feedback arrives — do not poll or sleep.
 6. **Read feedback** — check for annotations, answers, added context files, approval
 7. **Edit with the Edit tool and re-push + watch**, or advance to next phase
