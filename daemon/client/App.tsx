@@ -181,7 +181,7 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [canvasFiles, setCanvasFiles] = useState<string[]>([]);
-  const [activeView, setActiveViewRaw] = useState<ActiveView>({ type: "canvas", filename: "" });
+  const [activeView, setActiveViewRaw] = useState<ActiveView>({ type: "overview" });
   const [openFiles, setOpenFiles] = useState<string[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -394,7 +394,8 @@ function App() {
                 {canvasFiles.map((filename) => (
                   <div key={filename} style={{ display: activeView.type === "canvas" && activeView.filename === filename ? undefined : "none" }}>
                     <div className="relative max-w-[720px] mx-auto px-6 pt-12 pb-32">
-                      {selectedRevInfo?.response && (
+                      {/* Show response banner on individual canvas only when there's no overview (single canvas) */}
+                      {canvasFiles.length <= 1 && selectedRevInfo?.response && (
                         <ResponseBanner markdown={selectedRevInfo.response} />
                       )}
                       <div data-canvas-file={filename}>
