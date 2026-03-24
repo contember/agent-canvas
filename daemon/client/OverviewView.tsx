@@ -264,12 +264,12 @@ function InlineSideBySideDiff({ sessionId, filename, leftRev, rightRev }: { sess
   }, [leftReady, rightReady, done]);
 
   return (
-    <div className="flex gap-0 border border-border-subtle rounded-lg overflow-hidden">
+    <div className="flex gap-0 border-y border-border-subtle overflow-hidden w-screen relative left-1/2 -translate-x-1/2">
       <div className="w-1/2 border-r border-border-subtle">
         <div className="px-2 py-1 text-[10px] font-body font-medium text-text-tertiary bg-bg-elevated border-b border-border-subtle">
           Rev {leftRev}
         </div>
-        <div className="p-4">
+        <div className="px-6 py-4 max-w-[600px] mx-auto">
           <ComparePanelRenderer ref={oldRef} sessionId={sessionId} revision={leftRev} filename={filename} onReady={handleLeftReady} />
         </div>
       </div>
@@ -277,7 +277,7 @@ function InlineSideBySideDiff({ sessionId, filename, leftRev, rightRev }: { sess
         <div className="px-2 py-1 text-[10px] font-body font-medium text-text-tertiary bg-bg-elevated border-b border-border-subtle">
           Rev {rightRev}
         </div>
-        <div className="p-4">
+        <div className="px-6 py-4 max-w-[600px] mx-auto">
           <ComparePanelRenderer ref={newRef} sessionId={sessionId} revision={rightRev} filename={filename} onReady={handleRightReady} />
         </div>
       </div>
