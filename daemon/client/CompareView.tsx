@@ -424,7 +424,7 @@ interface ComparePanelRendererProps {
   onError?: (message: string) => void;
 }
 
-const ComparePanelRenderer = React.memo(React.forwardRef<HTMLDivElement, ComparePanelRendererProps>(
+export const ComparePanelRenderer = React.memo(React.forwardRef<HTMLDivElement, ComparePanelRendererProps>(
   ({ sessionId, revision, filename, onReady, onError }, ref) => {
     const [PlanComponent, setPlanComponent] = useState<React.ComponentType | null>(null);
     const [error, setError] = useState<string | null>(null);
