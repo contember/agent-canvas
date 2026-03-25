@@ -21,7 +21,7 @@ const sessionManager = new SessionManager();
 const wsManager = createWebSocketManager(sessionManager);
 
 const routes = [
-  ...createApiHandlers({ sessionManager, broadcastPlanUpdate: wsManager.broadcastPlanUpdate, port: PORT }),
+  ...createApiHandlers({ sessionManager, broadcastPlanUpdate: wsManager.broadcastPlanUpdate, broadcastRevisionUpdate: wsManager.broadcastRevisionUpdate, port: PORT }),
   ...createFileHandlers(sessionManager),
   ...createUploadHandlers(sessionManager),
   ...createStaticHandlers(),

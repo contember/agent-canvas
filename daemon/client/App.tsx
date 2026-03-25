@@ -32,6 +32,7 @@ export interface RevisionInfo {
   canvasFiles: CanvasFileInfo[];
   createdAt: string;
   hasFeedback: boolean;
+  feedbackConsumed: boolean;
   response?: string;
 }
 
@@ -57,6 +58,7 @@ export const RevisionContext = createContext<{
   isReadOnly: boolean;
   compareRevision: { left: number; right: number } | null;
   setCompareRevision: (rev: { left: number; right: number } | null) => void;
+  agentWatching: boolean;
 }>({
   currentRevision: 1,
   selectedRevision: 1,
@@ -65,6 +67,7 @@ export const RevisionContext = createContext<{
   isReadOnly: false,
   compareRevision: null,
   setCompareRevision: () => {},
+  agentWatching: false,
 });
 
 function resolveTheme(pref: string): "light" | "dark" {
@@ -179,6 +182,7 @@ function App() {
   const [revisions, setRevisions] = useState<RevisionInfo[]>([]);
   const [compareRevision, setCompareRevision] = useState<{ left: number; right: number } | null>(null);
   const [connected, setConnected] = useState(false);
+  const [agentWatching, setAgentWatching] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [canvasFiles, setCanvasFiles] = useState<string[]>([]);
   const [activeView, setActiveViewRaw] = useState<ActiveView>({ type: "overview" });
@@ -314,6 +318,9 @@ function App() {
           if (data.type === "revision-updated") {
             if (data.revisions) setRevisions(data.revisions);
           }
+          if (data.type === "watcher-status") {
+            setAgentWatching(!!data.watching);
+          }
         } catch {}
       };
     };
@@ -336,7 +343,7 @@ function App() {
 
   return (
     <SessionContext.Provider value={sessionId}>
-      <RevisionContext.Provider value={{ currentRevision, selectedRevision, revisions, setSelectedRevision, isReadOnly, compareRevision, setCompareRevision }}>
+      <RevisionContext.Provider value={{ currentRevision, selectedRevision, revisions, setSelectedRevision, isReadOnly, compareRevision, setCompareRevision, agentWatching }}>
         <AnnotationProvider key={`${sessionId}:${selectedRevision}`} sessionId={sessionId} revision={selectedRevision} isReadOnly={isReadOnly}>
           <ActiveViewContext.Provider value={{ activeView, setActiveView, openFiles, closeFile, canvasFiles }}>
           <ActiveViewCtx.Provider value={{ setActiveView }}>

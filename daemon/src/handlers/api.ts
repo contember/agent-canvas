@@ -8,11 +8,12 @@ import type { Route } from "../router";
 export interface ApiContext {
   sessionManager: SessionManager;
   broadcastPlanUpdate: (id: string) => void;
+  broadcastRevisionUpdate: (id: string) => void;
   port: number;
 }
 
 export function createApiHandlers(ctx: ApiContext): Route[] {
-  const { sessionManager, broadcastPlanUpdate, port } = ctx;
+  const { sessionManager, broadcastPlanUpdate, broadcastRevisionUpdate, port } = ctx;
 
   /**
    * Read *.jsx canvas files from a directory.
@@ -170,6 +171,7 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
     const result = sessionManager.getLatestUnconsumedFeedback(sessionId);
     if (!result) return jsonResponse({ found: false });
     sessionManager.consumeFeedback(sessionId, result.revision);
+    broadcastRevisionUpdate(sessionId);
     return jsonResponse({ found: true, revision: result.revision, feedback: result.feedback });
   }
 

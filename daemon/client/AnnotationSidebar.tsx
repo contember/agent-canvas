@@ -17,20 +17,21 @@ interface AnnotationSidebarProps {
 }
 
 export function AnnotationSidebar({ onPreview, onSubmit, collapseButton }: AnnotationSidebarProps) {
-  const { isReadOnly, selectedRevision, currentRevision, revisions } = useContext(RevisionContext);
+  const { isReadOnly, selectedRevision, currentRevision, revisions, agentWatching } = useContext(RevisionContext);
   const sessionId = useContext(SessionContext);
-  const isCurrentButSubmitted = isReadOnly && selectedRevision === currentRevision;
   const selectedRevInfo = revisions.find((r) => r.revision === selectedRevision);
+  const isCurrentButSubmitted = isReadOnly && selectedRevision === currentRevision;
+  const feedbackConsumed = !!selectedRevInfo?.feedbackConsumed;
   const roundLabel = selectedRevInfo?.label || `Round ${selectedRevision}`;
 
   if (isReadOnly) {
-    return <ReadOnlyAnnotationSidebar sessionId={sessionId} revision={selectedRevision} label={roundLabel} waitingForUpdate={isCurrentButSubmitted} collapseButton={collapseButton} />;
+    return <ReadOnlyAnnotationSidebar sessionId={sessionId} revision={selectedRevision} label={roundLabel} waitingForUpdate={isCurrentButSubmitted} feedbackConsumed={feedbackConsumed} agentWatching={agentWatching} collapseButton={collapseButton} />;
   }
 
-  return <AnnotationSidebarInner onPreview={onPreview} onSubmit={onSubmit} collapseButton={collapseButton} />;
+  return <AnnotationSidebarInner onPreview={onPreview} onSubmit={onSubmit} agentWatching={agentWatching} collapseButton={collapseButton} />;
 }
 
-function FeedbackDisplay({ sessionId, revision, label, waitingForUpdate, collapseButton }: { sessionId: string; revision: number; label: string; waitingForUpdate?: boolean; collapseButton?: React.ReactNode }) {
+function FeedbackDisplay({ sessionId, revision, label, waitingForUpdate, feedbackConsumed, agentWatching, collapseButton }: { sessionId: string; revision: number; label: string; waitingForUpdate?: boolean; feedbackConsumed?: boolean; agentWatching?: boolean; collapseButton?: React.ReactNode }) {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -51,12 +52,7 @@ function FeedbackDisplay({ sessionId, revision, label, waitingForUpdate, collaps
         {collapseButton}
       </div>
 
-      {waitingForUpdate && (
-        <div className="mx-4 mb-3 px-3 py-2.5 rounded-lg bg-accent-green-muted flex items-center gap-2 flex-shrink-0">
-          <span className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />
-          <span className="text-[12px] font-body text-accent-green">Waiting for next revision...</span>
-        </div>
-      )}
+      {waitingForUpdate && <WaitingBanner feedbackConsumed={feedbackConsumed} agentWatching={agentWatching} />}
 
       <div className="flex-1 overflow-y-auto px-4">
         {loading ? (
@@ -71,9 +67,34 @@ function FeedbackDisplay({ sessionId, revision, label, waitingForUpdate, collaps
   );
 }
 
+function WaitingBanner({ feedbackConsumed, agentWatching }: { feedbackConsumed?: boolean; agentWatching?: boolean }) {
+  if (feedbackConsumed) {
+    return (
+      <div className="mx-4 mb-3 px-3 py-2.5 rounded-lg bg-accent-green-muted flex items-center gap-2 flex-shrink-0">
+        <span className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />
+        <span className="text-[12px] font-body text-accent-green">Feedback received — waiting for next revision...</span>
+      </div>
+    );
+  }
+  if (agentWatching) {
+    return (
+      <div className="mx-4 mb-3 px-3 py-2.5 rounded-lg bg-accent-blue-muted flex items-center gap-2 flex-shrink-0">
+        <span className="w-2 h-2 rounded-full bg-accent-blue animate-pulse" />
+        <span className="text-[12px] font-body text-accent-blue">Waiting for agent to pick up feedback...</span>
+      </div>
+    );
+  }
+  return (
+    <div className="mx-4 mb-3 px-3 py-2.5 rounded-lg bg-accent-amber-muted flex items-center gap-2 flex-shrink-0">
+      <span className="w-2 h-2 rounded-full bg-accent-amber" />
+      <span className="text-[12px] font-body text-accent-amber">Agent disconnected — tell Claude to check feedback</span>
+    </div>
+  );
+}
+
 type ReadOnlyTab = "feedback" | "annotations";
 
-function ReadOnlyAnnotationSidebar({ sessionId, revision, label, waitingForUpdate, collapseButton }: { sessionId: string; revision: number; label: string; waitingForUpdate?: boolean; collapseButton?: React.ReactNode }) {
+function ReadOnlyAnnotationSidebar({ sessionId, revision, label, waitingForUpdate, feedbackConsumed, agentWatching, collapseButton }: { sessionId: string; revision: number; label: string; waitingForUpdate?: boolean; feedbackConsumed?: boolean; agentWatching?: boolean; collapseButton?: React.ReactNode }) {
   const { annotations, generalNote, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
   const { setActiveView } = useContext(ActiveViewContext);
   const hasAnnotations = annotations.length > 0 || generalNote.trim().length > 0;
@@ -81,7 +102,7 @@ function ReadOnlyAnnotationSidebar({ sessionId, revision, label, waitingForUpdat
 
   // If no annotations in localStorage, just show feedback
   if (!hasAnnotations) {
-    return <FeedbackDisplay sessionId={sessionId} revision={revision} label={label} waitingForUpdate={waitingForUpdate} collapseButton={collapseButton} />;
+    return <FeedbackDisplay sessionId={sessionId} revision={revision} label={label} waitingForUpdate={waitingForUpdate} feedbackConsumed={feedbackConsumed} agentWatching={agentWatching} collapseButton={collapseButton} />;
   }
 
   return (
@@ -114,12 +135,7 @@ function ReadOnlyAnnotationSidebar({ sessionId, revision, label, waitingForUpdat
         {collapseButton}
       </div>
 
-      {waitingForUpdate && (
-        <div className="mx-4 mb-3 px-3 py-2.5 rounded-lg bg-accent-green-muted flex items-center gap-2 flex-shrink-0">
-          <span className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />
-          <span className="text-[12px] font-body text-accent-green">Waiting for next revision...</span>
-        </div>
-      )}
+      {waitingForUpdate && <WaitingBanner feedbackConsumed={feedbackConsumed} agentWatching={agentWatching} />}
 
       {activeTab === "feedback" ? (
         <FeedbackDisplayContent sessionId={sessionId} revision={revision} />
@@ -287,7 +303,7 @@ function ReadOnlyAnnotationList({ annotations, generalNote, activeAnnotationId, 
   );
 }
 
-function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: AnnotationSidebarProps) {
+function AnnotationSidebarInner({ onPreview, onSubmit, agentWatching, collapseButton }: AnnotationSidebarProps & { agentWatching: boolean }) {
   const {
     annotations, updateAnnotation, removeAnnotation,
     addAnnotationImage, removeAnnotationImage,
@@ -422,6 +438,10 @@ function AnnotationSidebarInner({ onPreview, onSubmit, collapseButton }: Annotat
           {annotations.length > 0 && (
             <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-border-subtle text-[10px] font-medium text-text-secondary">{annotations.length}</span>
           )}
+          <span
+            className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${agentWatching ? "bg-accent-green" : "bg-accent-amber"}`}
+            title={agentWatching ? "Agent connected" : "Agent disconnected"}
+          />
         </span>
         {collapseButton}
       </div>
