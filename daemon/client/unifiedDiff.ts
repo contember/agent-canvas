@@ -250,7 +250,9 @@ function processBlockWithChildren(
     } else if (cm.kind === "removed") {
       hasChanges = true;
       const ghost = ghostBlock(cm.oldBlock!.element);
-      const insertBefore = findInsertionPoint(childMatches, cm, cloneMap.newMap);
+      const refNode = findInsertionPoint(childMatches, cm, cloneMap.newMap);
+      // refNode may be deeply nested — walk up to find a direct child of the container
+      const insertBefore = refNode ? directChildOf(newContainer, refNode) : null;
       newContainer.insertBefore(ghost, insertBefore);
     } else if (cm.kind === "added") {
       hasChanges = true;
@@ -372,6 +374,15 @@ function findInsertionPoint(
     }
   }
   return null;
+}
+
+/** Walk up from `el` to find the ancestor that is a direct child of `container`. */
+function directChildOf(container: HTMLElement, el: HTMLElement): HTMLElement | null {
+  let node: HTMLElement | null = el;
+  while (node && node.parentElement !== container) {
+    node = node.parentElement;
+  }
+  return node;
 }
 
 /* ── Element-level diff for blocks with rich internal structure (e.g. markdown) ── */
