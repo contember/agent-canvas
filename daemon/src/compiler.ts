@@ -1,6 +1,8 @@
 import { writeFileSync, unlinkSync, readFileSync } from "fs";
 import { join } from "path";
 import { randomUUID } from "crypto";
+import { h, Fragment } from "preact";
+import renderToString from "preact-render-to-string";
 import { COMPILE_TEMP_DIR } from "./paths";
 
 type CompileResult =
@@ -14,6 +16,96 @@ const { Section, Item, Task, FilePreview, CodeBlock, Callout,
         Choice, MultiChoice, UserInput, RangeInput, ImageView,
         Markdown, useFeedback, useAnnotations } = C;
 `;
+
+// --- Validation via Preact --------------------------------------------------
+// After Bun.build() succeeds we strip ESM syntax from the compiled output,
+// provide Preact as the React implementation with lightweight stub components,
+// and actually render the component tree.  Any runtime error (undefined vars,
+// broken template literals, …) is caught and reported back to the CLI.
+
+/** jsxDEV(type, props, key, isStaticChildren, source, self) → VNode */
+function mockJsxDEV(type: any, props: any, key?: any) {
+  const { children, ...rest } = props || {};
+  return h(type, { ...rest, key }, children);
+}
+
+/** Passthrough component — just renders its children */
+const Stub = ({ children }: any) => h(Fragment, null, children);
+
+const STUB_COMPONENTS: Record<string, any> = {};
+for (const name of [
+  "Section", "Item", "Task", "FilePreview", "CodeBlock", "Callout",
+  "Mermaid", "Table", "Priority", "Checklist", "Note", "Diff",
+  "Choice", "MultiChoice", "UserInput", "RangeInput", "ImageView", "Markdown",
+]) {
+  STUB_COMPONENTS[name] = Stub;
+}
+// Hook stubs — return shapes that won't blow up when destructured
+STUB_COMPONENTS.useFeedback = () => ({ submit: () => {}, value: null });
+STUB_COMPONENTS.useAnnotations = () => ({ annotations: [], addAnnotation: () => {} });
+
+const MOCK_REACT = {
+  createElement: h,
+  Fragment,
+  useState: (init: any) => [init, () => {}],
+  useEffect: () => {},
+  useRef: (init: any) => ({ current: init }),
+  useMemo: (fn: any) => fn(),
+  useCallback: (fn: any) => fn,
+  useReducer: (r: any, init: any) => [init, () => {}],
+  useContext: () => ({}),
+  createContext: () => ({ Provider: Stub, Consumer: Stub }),
+  useLayoutEffect: () => {},
+  useImperativeHandle: () => {},
+  useDebugValue: () => {},
+  useDeferredValue: (v: any) => v,
+  useTransition: () => [false, (fn: any) => fn()],
+  useId: () => "mock",
+  useSyncExternalStore: (sub: any, get: any) => get(),
+  memo: (c: any) => c,
+  forwardRef: (c: any) => c,
+  lazy: (c: any) => c,
+  Children: { map: (c: any, fn: any) => (Array.isArray(c) ? c : [c]).map(fn), toArray: (c: any) => (Array.isArray(c) ? c : [c]) },
+  isValidElement: () => true,
+  cloneElement: h,
+  Suspense: Stub,
+  StrictMode: Stub,
+};
+
+function validateCompiledPlan(js: string): { ok: true } | { ok: false; error: string } {
+  let code = js;
+
+  // Strip ESM import statements
+  code = code.replace(/import\s+\w+\s+from\s+"[^"]+";?/g, "");
+  code = code.replace(/import\s+\*\s+as\s+\w+\s+from\s+"[^"]+";?/g, "");
+  code = code.replace(/import\s*\{[^}]*\}\s*from\s+"[^"]+";?/g, "");
+
+  // Strip export, extract default name
+  let defaultName: string | null = null;
+  code = code.replace(/export\s*\{\s*(\w+)\s+as\s+default\s*\};?/g, (_, name) => {
+    defaultName = name;
+    return "";
+  });
+  if (!defaultName) {
+    code = code.replace(/export\s+default\s+(\w+);?/g, (_, name) => {
+      defaultName = name;
+      return "";
+    });
+  }
+
+  const callDefault = defaultName
+    ? `\nreturn typeof ${defaultName} === "function" ? ${defaultName}() : null;`
+    : "\nreturn null;";
+
+  try {
+    const fn = new Function("React", "C", "jsxDEV", "jsx", "Fragment", code + callDefault);
+    const vnode = fn(MOCK_REACT, STUB_COMPONENTS, mockJsxDEV, mockJsxDEV, Fragment);
+    if (vnode) renderToString(vnode);
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
 
 export async function compilePlan(jsx: string, projectRoot?: string): Promise<CompileResult> {
   // Resolve file contents at compile time
@@ -49,6 +141,10 @@ export async function compilePlan(jsx: string, projectRoot?: string): Promise<Co
       }
 
       const js = await result.outputs[0].text();
+      const validation = validateCompiledPlan(js);
+      if (!validation.ok) {
+        return { ok: false, error: `Runtime error: ${validation.error}` };
+      }
       return { ok: true, js };
     } catch {
       // Bun.build() can throw "Unknown Error, TODO" in long-running processes
@@ -78,6 +174,10 @@ async function compilePlanSubprocess(tmpFile: string): Promise<CompileResult> {
   }
   try {
     const js = readFileSync(outFile, "utf-8");
+    const validation = validateCompiledPlan(js);
+    if (!validation.ok) {
+      return { ok: false, error: `Runtime error: ${validation.error}` };
+    }
     return { ok: true, js };
   } finally {
     try { unlinkSync(outFile); } catch {}
