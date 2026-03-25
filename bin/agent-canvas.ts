@@ -5,12 +5,14 @@ import { handleFetch } from "./lib/commands/fetch.ts";
 import { handleWatch } from "./lib/commands/watch.ts";
 import { handleDaemon } from "./lib/commands/daemon.ts";
 import { handleInstall } from "./lib/commands/install.ts";
+import { handleInstructions } from "./lib/commands/instructions.ts";
 
 function printUsage() {
   console.error(`agent-canvas — Interactive visual canvas for Claude Code
 
 Commands:
   agent-canvas install [local|global]  Install skill for Claude Code
+  agent-canvas instructions [topic]    Show usage instructions (for AI agents)
   agent-canvas push <file.jsx>         Push a canvas, open browser
   agent-canvas fetch [--session <id>]  Check for feedback (returns immediately)
   agent-canvas watch [--session <id>]  Wait for user feedback (blocks until submitted)
@@ -38,6 +40,7 @@ async function main() {
     case "push": return handlePush(rest);
     case "fetch": return handleFetch(rest);
     case "watch": return handleWatch(rest);
+    case "instructions": return handleInstructions(rest);
     case "install": return handleInstall(rest);
     case "daemon": return handleDaemon(rest);
     default:

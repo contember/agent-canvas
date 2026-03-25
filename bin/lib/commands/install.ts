@@ -1,5 +1,5 @@
 import { parseArgs } from "util";
-import { existsSync, mkdirSync, cpSync } from "fs";
+import { existsSync, mkdirSync, cpSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { PACKAGE_ROOT } from "../config.ts";
@@ -35,12 +35,12 @@ export async function handleInstall(args: string[]) {
   const skillTarget = join(targetBase, "skills", "canvas");
   mkdirSync(skillTarget, { recursive: true });
 
-  const skillSrc = join(PACKAGE_ROOT, "skills", "canvas");
-  for (const file of ["SKILL.md", "components.md", "flows.md"]) {
-    const src = join(skillSrc, file);
-    if (existsSync(src)) {
-      cpSync(src, join(skillTarget, file));
-    }
+  cpSync(join(PACKAGE_ROOT, "skills", "canvas", "SKILL.md"), join(skillTarget, "SKILL.md"));
+
+  // Clean up files from older versions
+  for (const old of ["components.md", "flows.md"]) {
+    const p = join(skillTarget, old);
+    if (existsSync(p)) unlinkSync(p);
   }
 
   console.log(`  Skill installed to ${skillTarget}`);
