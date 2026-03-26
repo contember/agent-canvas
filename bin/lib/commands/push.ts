@@ -2,7 +2,7 @@ import { parseArgs } from "util";
 import { existsSync, statSync } from "fs";
 import { resolve, basename } from "path";
 import { BASE_URL } from "../config.ts";
-import { ensureDaemon } from "../daemon-lifecycle.ts";
+import { ensureDaemon, stopDaemon, startDaemon } from "../daemon-lifecycle.ts";
 import { getSessionId, openBrowser } from "../helpers.ts";
 
 export async function handlePush(args: string[]) {
@@ -52,7 +52,26 @@ export async function handlePush(args: string[]) {
     }),
   });
 
-  const result = await response.json() as any;
+  let result = await response.json() as any;
+
+  // Bun.build() can corrupt internal state in long-running daemons,
+  // returning "Unknown Error, TODO". Restart daemon and retry once.
+  if (!result.ok && typeof result.error === "string" && result.error.includes("Unknown Error")) {
+    console.error("Daemon bundler crashed, restarting...");
+    stopDaemon();
+    await startDaemon();
+    const retryResponse = await fetch(`${BASE_URL}/api/session/${sessionId}/plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        directory: resolvedPath,
+        projectRoot,
+        label: label || autoLabel,
+        ...(values.response ? { response: values.response } : {}),
+      }),
+    });
+    result = await retryResponse.json() as any;
+  }
 
   if (!result.ok) {
     if (result.unconsumedFeedback) {

@@ -10,6 +10,7 @@ export interface ApiContext {
   broadcastPlanUpdate: (id: string) => void;
   broadcastRevisionUpdate: (id: string) => void;
   port: number;
+  version: string;
 }
 
 export function createApiHandlers(ctx: ApiContext): Route[] {
@@ -132,7 +133,7 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
 
   function handleHealth(): Response {
     const sessions = sessionManager.list().map((s) => s.id);
-    return jsonResponse({ ok: true, sessions });
+    return jsonResponse({ ok: true, sessions, version: ctx.version });
   }
 
   function handleMeta(_req: Request, _url: URL, match: URLPatternResult): Response {

@@ -1,7 +1,9 @@
 import { resolve, join, dirname } from "path";
+import { readFileSync } from "fs";
 import { tmpdir } from "os";
 
 export const PACKAGE_ROOT = resolve(join(dirname(import.meta.path), "../.."));
+export const VERSION = JSON.parse(readFileSync(join(PACKAGE_ROOT, "package.json"), "utf-8")).version as string;
 export const TEMP_DIR = join(tmpdir(), "agent-canvas");
 export const DAEMON_PORT = parseInt(process.env.CANVAS_PORT || "19400", 10);
 export const BASE_URL = `http://localhost:${DAEMON_PORT}`;

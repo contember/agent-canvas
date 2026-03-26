@@ -1,5 +1,5 @@
-import { writeFileSync, mkdirSync } from "fs";
-import { join } from "path";
+import { writeFileSync, mkdirSync, readFileSync } from "fs";
+import { join, dirname } from "path";
 import { tmpdir } from "os";
 import { SessionManager } from "./session";
 import { createWebSocketManager, type WSData } from "./websocket";
@@ -11,6 +11,7 @@ import { createStaticHandlers } from "./handlers/static";
 import { createUploadHandlers } from "./handlers/uploads";
 
 const PORT = parseInt(process.env.CANVAS_PORT || "19400", 10);
+const VERSION = JSON.parse(readFileSync(join(dirname(import.meta.dir), "..", "package.json"), "utf-8")).version as string;
 
 // Write PID file so CLI can find and stop us
 const pidDir = join(tmpdir(), "agent-canvas");
@@ -21,7 +22,7 @@ const sessionManager = new SessionManager();
 const wsManager = createWebSocketManager(sessionManager);
 
 const routes = [
-  ...createApiHandlers({ sessionManager, broadcastPlanUpdate: wsManager.broadcastPlanUpdate, broadcastRevisionUpdate: wsManager.broadcastRevisionUpdate, port: PORT }),
+  ...createApiHandlers({ sessionManager, broadcastPlanUpdate: wsManager.broadcastPlanUpdate, broadcastRevisionUpdate: wsManager.broadcastRevisionUpdate, port: PORT, version: VERSION }),
   ...createFileHandlers(sessionManager),
   ...createUploadHandlers(sessionManager),
   ...createStaticHandlers(),

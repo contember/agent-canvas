@@ -1,7 +1,7 @@
 import { spawn } from "child_process";
 import { openSync, closeSync, readFileSync, existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
-import { PACKAGE_ROOT, TEMP_DIR, BASE_URL, PID_FILE } from "./config.ts";
+import { PACKAGE_ROOT, TEMP_DIR, BASE_URL, PID_FILE, VERSION } from "./config.ts";
 
 export async function isDaemonRunning(): Promise<boolean> {
   try {
@@ -10,6 +10,16 @@ export async function isDaemonRunning(): Promise<boolean> {
     return data.ok === true;
   } catch {
     return false;
+  }
+}
+
+async function getDaemonVersion(): Promise<string | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/health`, { signal: AbortSignal.timeout(1000) });
+    const data = await res.json() as any;
+    return data.version || null;
+  } catch {
+    return null;
   }
 }
 
@@ -50,7 +60,15 @@ export async function startDaemon(): Promise<void> {
 }
 
 export async function ensureDaemon(): Promise<void> {
-  if (await isDaemonRunning()) return;
+  if (await isDaemonRunning()) {
+    const daemonVersion = await getDaemonVersion();
+    if (daemonVersion && daemonVersion !== VERSION) {
+      console.error(`Daemon version mismatch (daemon: ${daemonVersion}, CLI: ${VERSION}), restarting...`);
+      stopDaemon();
+      await startDaemon();
+    }
+    return;
+  }
   await startDaemon();
 }
 
