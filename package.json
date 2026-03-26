@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "marked": "^17.0.4",
+    "mermaid": "11.4.1",
     "preact": "^10.25.0",
     "preact-render-to-string": "^6.6.6"
   },

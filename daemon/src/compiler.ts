@@ -3,7 +3,10 @@ import { join } from "path";
 import { randomUUID } from "crypto";
 import { h, Fragment } from "preact";
 import renderToString from "preact-render-to-string";
+import mermaid from "mermaid";
 import { COMPILE_TEMP_DIR } from "./paths";
+
+mermaid.initialize({ startOnLoad: false });
 
 type CompileResult =
   | { ok: true; js: string }
@@ -35,11 +38,18 @@ const Stub = ({ children }: any) => h(Fragment, null, children);
 const STUB_COMPONENTS: Record<string, any> = {};
 for (const name of [
   "Section", "Item", "Task", "FilePreview", "CodeBlock", "Callout",
-  "Mermaid", "Table", "Priority", "Checklist", "Note", "Diff",
+  "Table", "Priority", "Checklist", "Note", "Diff",
   "Choice", "MultiChoice", "UserInput", "RangeInput", "ImageView", "Markdown",
 ]) {
   STUB_COMPONENTS[name] = Stub;
 }
+// Mermaid stub collects diagram sources for post-render validation
+let collectedMermaidSources: string[] = [];
+STUB_COMPONENTS.Mermaid = ({ children }: any) => {
+  const source = typeof children === "string" ? children : String(children ?? "");
+  if (source.trim()) collectedMermaidSources.push(source.trim());
+  return null;
+};
 // Hook stubs — return shapes that won't blow up when destructured
 STUB_COMPONENTS.useFeedback = () => ({ submit: () => {}, value: null });
 STUB_COMPONENTS.useAnnotations = () => ({ annotations: [], addAnnotation: () => {} });
@@ -72,7 +82,7 @@ const MOCK_REACT = {
   StrictMode: Stub,
 };
 
-function validateCompiledPlan(js: string): { ok: true } | { ok: false; error: string } {
+async function validateCompiledPlan(js: string): Promise<{ ok: true } | { ok: false; error: string }> {
   let code = js;
 
   // Strip ESM import statements
@@ -98,13 +108,24 @@ function validateCompiledPlan(js: string): { ok: true } | { ok: false; error: st
     : "\nreturn null;";
 
   try {
+    collectedMermaidSources = [];
     const fn = new Function("React", "C", "jsxDEV", "jsx", "Fragment", code + callDefault);
     const vnode = fn(MOCK_REACT, STUB_COMPONENTS, mockJsxDEV, mockJsxDEV, Fragment);
     if (vnode) renderToString(vnode);
-    return { ok: true };
   } catch (e: any) {
     return { ok: false, error: e?.message || String(e) };
   }
+
+  // Validate collected Mermaid diagram sources
+  for (const source of collectedMermaidSources) {
+    try {
+      await mermaid.parse(source);
+    } catch (e: any) {
+      return { ok: false, error: `Mermaid syntax error: ${e?.message || String(e)}` };
+    }
+  }
+
+  return { ok: true };
 }
 
 export async function compilePlan(jsx: string, projectRoot?: string): Promise<CompileResult> {
@@ -149,7 +170,7 @@ export async function compilePlan(jsx: string, projectRoot?: string): Promise<Co
       }
 
       const js = await result.outputs[0].text();
-      const validation = validateCompiledPlan(js);
+      const validation = await validateCompiledPlan(js);
       if (!validation.ok) {
         return { ok: false, error: `Runtime error: ${validation.error}` };
       }
