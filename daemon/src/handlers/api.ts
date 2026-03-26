@@ -58,7 +58,7 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
       const projectRoot = body.projectRoot || process.cwd();
       const isNew = !sessionManager.get(sessionId);
 
-      // Compile all canvas files first — only create a revision if at least one succeeds
+      // Compile all canvas files — fail if any file fails
       const compiled = new Map<string, string>();
       const errors: Record<string, string> = {};
       await Promise.all(
@@ -72,10 +72,10 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
         }),
       );
 
-      if (compiled.size === 0) {
+      if (Object.keys(errors).length > 0) {
         return jsonResponse({
           ok: false,
-          error: "All canvas files failed to compile",
+          error: "Canvas compilation failed",
           errors,
         }, 400);
       }
@@ -96,7 +96,6 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
         revision: session.currentRevision,
         sessionId,
         canvasFiles: [...canvasFiles.keys()],
-        ...(Object.keys(errors).length > 0 ? { errors } : {}),
       });
     } catch (e: any) {
       return jsonResponse({ error: e.message }, 500);
