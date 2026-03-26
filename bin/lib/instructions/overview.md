@@ -32,6 +32,10 @@ Use the **Write** tool to create `.jsx` files in `.claude/agent-canvas/<session-
 
 Components are auto-available — no imports needed. The file can be a JSX fragment (just tags) or a full module with `export default`.
 
+**Content is JSX, not markdown.** Children of components are plain JSX text and nested components — NOT markdown. If you want to render markdown (lists, bold, headings, etc.), use the `<Markdown>` component explicitly. Raw `**bold**` or `- list items` in JSX children will render as literal text.
+
+**JSX escaping rules.** Content is in a JSX context. You MUST escape: `<` as `{'<'}` or `&lt;`, `>` as `{'>'}` or `&gt;`, `{` as `{'{'}`  and `}` as `{'}'}`. This is critical when writing code snippets, type signatures like `Option<String>`, or any text containing angle brackets. Alternatively, put such content inside `<CodeBlock>` or `<Markdown>` which handle escaping for you.
+
 ### 2. Push
 
 Push the directory to open all canvases in the browser:
@@ -123,7 +127,13 @@ All components are globally available in canvas JSX — no imports needed. For i
 - **useFeedback** — hook for custom components to contribute computed data to feedback
 - **Custom components** — use `export default function Canvas()` module format to define helpers
 
-Run `bunx agent-canvas instructions <topic>` for detailed docs on any component or flow.
+**Before using any component or flow, you MUST read its detailed instructions** by running:
+
+```bash
+bunx agent-canvas instructions <topic>
+```
+
+For example: `bunx agent-canvas instructions component-item`, `bunx agent-canvas instructions flow-feature`. Run `bunx agent-canvas instructions --list` to see all available topics.
 
 ## Choosing a Flow
 
