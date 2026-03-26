@@ -130,6 +130,7 @@ export async function compilePlan(jsx: string, projectRoot?: string): Promise<Co
         entrypoints: [tmpFile],
         format: "esm",
         external: ["react", "react-dom", "#canvas/components", "#canvas/runtime"],
+        jsx: { runtime: "automatic", importSource: "react" },
       });
 
       if (!result.success) {
