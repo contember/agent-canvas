@@ -57,32 +57,40 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
 
       const projectRoot = body.projectRoot || process.cwd();
       const isNew = !sessionManager.get(sessionId);
-      const session = sessionManager.upsert(sessionId, canvasFiles, projectRoot, body.label, body.response);
 
-      // Compile all canvas files in parallel
+      // Compile all canvas files first — only create a revision if at least one succeeds
+      const compiled = new Map<string, string>();
       const errors: Record<string, string> = {};
-      let anyOk = false;
       await Promise.all(
         [...canvasFiles.entries()].map(async ([filename, jsx]) => {
-          const result = await compilePlan(jsx, session.projectRoot);
+          const result = await compilePlan(jsx, projectRoot);
           if (result.ok) {
-            sessionManager.saveCompiled(sessionId, filename, result.js, session.currentRevision);
-            anyOk = true;
+            compiled.set(filename, result.js);
           } else {
             errors[filename] = result.error;
           }
         }),
       );
 
-      if (anyOk) {
-        broadcastPlanUpdate(sessionId);
+      if (compiled.size === 0) {
+        return jsonResponse({
+          ok: false,
+          error: "All canvas files failed to compile",
+          errors,
+        }, 400);
       }
 
+      const session = sessionManager.upsert(sessionId, canvasFiles, projectRoot, body.label, body.response);
+      for (const [filename, js] of compiled) {
+        sessionManager.saveCompiled(sessionId, filename, js, session.currentRevision);
+      }
+
+      broadcastPlanUpdate(sessionId);
       watchSession(sessionId, sessionManager, broadcastPlanUpdate);
 
       const browserUrl = `http://localhost:${port}/s/${sessionId}`;
       return jsonResponse({
-        ok: anyOk,
+        ok: true,
         browserUrl,
         isNew,
         revision: session.currentRevision,
