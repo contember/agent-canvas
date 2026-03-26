@@ -114,7 +114,14 @@ export async function compilePlan(jsx: string, projectRoot?: string): Promise<Co
     jsx = resolveMarkdownFiles(jsx, projectRoot);
   }
 
-  const hasDefaultExport = /export\s+default\b/.test(jsx);
+  // Strip template literals and strings so `export default` inside CodeBlock
+  // content (e.g. {`export default defineConfig(...)`}) doesn't false-positive.
+  const strippedJsx = jsx
+    .replace(/\{`[^`]*`\}/gs, "")   // {`...`} template expressions
+    .replace(/`[^`]*`/gs, "")        // standalone template literals
+    .replace(/"[^"]*"/g, "")         // double-quoted strings
+    .replace(/'[^']*'/g, "");        // single-quoted strings
+  const hasDefaultExport = /export\s+default\b/.test(strippedJsx);
 
   const source = hasDefaultExport
     ? `${COMPONENT_IMPORTS}\n${jsx}`
