@@ -6,9 +6,10 @@ import { handleWatch } from "./lib/commands/watch.ts";
 import { handleDaemon } from "./lib/commands/daemon.ts";
 import { handleInstall } from "./lib/commands/install.ts";
 import { handleInstructions } from "./lib/commands/instructions.ts";
+import { VERSION } from "./lib/config.ts";
 
 function printUsage() {
-  console.error(`agent-canvas — Interactive visual canvas for Claude Code
+  console.log(`agent-canvas v${VERSION} — Interactive visual canvas for Claude Code
 
 Commands:
   agent-canvas install [local|global]  Install skill for Claude Code
@@ -27,6 +28,11 @@ Environment:
 
 async function main() {
   const args = process.argv.slice(2);
+
+  if (args[0] === "--version" || args[0] === "-v") {
+    console.log(VERSION);
+    return;
+  }
 
   if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
     printUsage();
