@@ -55,9 +55,10 @@ export async function handlePush(args: string[]) {
   let result = await response.json() as any;
 
   // Bun.build() can corrupt internal state in long-running daemons,
-  // returning "Unknown Error, TODO". Restart daemon and retry once.
-  if (!result.ok && typeof result.error === "string" && result.error.includes("Unknown Error")) {
-    console.error("Daemon bundler crashed, restarting...");
+  // causing compilation failures that look like user errors. Restart
+  // the daemon and retry once — if the retry also fails, it's a real error.
+  if (!result.ok && result.error === "Canvas compilation failed") {
+    console.error("Compilation failed, restarting daemon and retrying...");
     stopDaemon();
     await startDaemon();
     const retryResponse = await fetch(`${BASE_URL}/api/session/${sessionId}/plan`, {

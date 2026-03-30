@@ -166,7 +166,7 @@ export async function compilePlan(jsx: string, projectRoot?: string): Promise<Co
           .filter((l) => l.level === "error")
           .map((l) => l.message)
           .join("\n");
-        return { ok: false, error: errors || "Compilation failed" };
+        return { ok: false, error: errors || "Bundle failed" };
       }
 
       const js = await result.outputs[0].text();
