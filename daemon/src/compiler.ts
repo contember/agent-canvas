@@ -124,7 +124,11 @@ async function validateCompiledPlan(js: string): Promise<{ ok: true } | { ok: fa
     try {
       await mermaid.parse(source);
     } catch (e: any) {
-      return { ok: false, error: `Mermaid syntax error: ${e?.message || String(e)}` };
+      const msg = e?.message || String(e);
+      // DOMPurify doesn't work in Bun (no DOM) — mermaid.parse() triggers
+      // it for some diagram types even though it's just parsing. Skip these.
+      if (msg.includes("DOMPurify")) continue;
+      return { ok: false, error: `Mermaid syntax error: ${msg}` };
     }
   }
 
