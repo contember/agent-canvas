@@ -20,6 +20,9 @@ const { Section, Item, Task, FilePreview, CodeBlock, Callout,
         Markdown, useFeedback, useAnnotations } = C;
 `;
 
+/** Number of lines in COMPONENT_IMPORTS — used to adjust error line numbers */
+const COMPONENT_IMPORTS_LINES = COMPONENT_IMPORTS.split("\n").length - 1;
+
 // --- Validation via Preact --------------------------------------------------
 // After Bun.build() succeeds we strip ESM syntax from the compiled output,
 // provide Preact as the React implementation with lightweight stub components,
@@ -147,6 +150,20 @@ export async function compilePlan(jsx: string, projectRoot?: string): Promise<Co
   const source = hasDefaultExport
     ? `${COMPONENT_IMPORTS}\n${jsx}`
     : `${COMPONENT_IMPORTS}\nexport default function Plan() {\n  return (<>${jsx}</>);\n}\n`;
+
+  // Pre-validate syntax with Bun.Transpiler — gives precise error positions,
+  // unlike Bun.build() which throws opaque "Bundle failed" for syntax errors.
+  try {
+    const transpiler = new Bun.Transpiler({ loader: "jsx" });
+    transpiler.transformSync(source);
+  } catch (syntaxError: any) {
+    const pos = syntaxError?.position;
+    // Offset: COMPONENT_IMPORTS lines + wrapper lines (export default function Plan() + return)
+    const wrapperLines = hasDefaultExport ? 1 : 2;
+    const lineOffset = COMPONENT_IMPORTS_LINES + wrapperLines;
+    const loc = pos ? ` (line ${pos.line - lineOffset}, col ${pos.column})` : "";
+    return { ok: false, error: `${syntaxError?.message || "Syntax error"}${loc}` };
+  }
 
   const tmpFile = join(COMPILE_TEMP_DIR, `plan-${randomUUID()}.jsx`);
 

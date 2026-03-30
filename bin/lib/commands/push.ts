@@ -55,9 +55,13 @@ export async function handlePush(args: string[]) {
   let result = await response.json() as any;
 
   // Bun.build() can corrupt internal state in long-running daemons,
-  // causing compilation failures that look like user errors. Restart
-  // the daemon and retry once — if the retry also fails, it's a real error.
-  if (!result.ok && result.error === "Canvas compilation failed") {
+  // throwing opaque errors like "Bundle failed" or "Unknown Error".
+  // Restart and retry once — but not for clear syntax errors (which
+  // now have precise line/col info from the transpiler pre-check).
+  const isBundlerCrash = !result.ok && result.error === "Canvas compilation failed"
+    && result.errors && Object.values(result.errors).some((e: any) =>
+      typeof e === "string" && (e === "Bundle failed" || e.includes("Unknown Error")));
+  if (isBundlerCrash) {
     console.error("Compilation failed, restarting daemon and retrying...");
     stopDaemon();
     await startDaemon();
