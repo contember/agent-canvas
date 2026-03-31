@@ -54,14 +54,14 @@ export async function handlePush(args: string[]) {
 
   let result = await response.json() as any;
 
-  // Bun.build() can corrupt internal state in long-running daemons,
-  // throwing opaque errors like "Bundle failed" or "Unknown Error".
-  // Restart and retry once — but not for clear syntax errors (which
-  // now have precise line/col info from the transpiler pre-check).
-  const isBundlerCrash = !result.ok && result.error === "Canvas compilation failed"
-    && result.errors && Object.values(result.errors).some((e: any) =>
-      typeof e === "string" && (e === "Bundle failed" || e.includes("Unknown Error")));
-  if (isBundlerCrash) {
+  // Bun.build() / Bun.Transpiler can fail in long-running daemons due to
+  // internal state corruption, CWD unlinking, etc. Restart and retry once.
+  // Skip restart only for clear user errors (syntax errors with line/col,
+  // runtime validation errors) — those won't be fixed by a restart.
+  const isUserError = !result.ok && result.errors && Object.values(result.errors).every((e: any) =>
+    typeof e === "string" && (/\(line \d+, col \d+\)/.test(e) || e.startsWith("Runtime error:")));
+  const shouldRestart = !result.ok && result.error === "Canvas compilation failed" && !isUserError;
+  if (shouldRestart) {
     console.error("Compilation failed, restarting daemon and retrying...");
     stopDaemon();
     await startDaemon();
