@@ -174,6 +174,7 @@ User wants to make a decision? → DECISION flow
 
 ## Important Rules
 
+- **Never `cd`** before running `bunx agent-canvas` commands. The daemon uses the current working directory to resolve project file paths (`<FilePreview>`, file browser). Always run commands from the project root. Since canvas files are in `$TMPDIR`, use absolute paths to reference them — e.g. `bunx agent-canvas push $TMPDIR/agent-canvas/<session-id>/`.
 - **Write** canvas files using the Write tool. Never use bash heredocs.
 - **Edit** canvas files using the Edit tool. Never rewrite entire files.
 - Every `<Item>` and interactive component needs a unique `id`.
