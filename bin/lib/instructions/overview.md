@@ -10,10 +10,10 @@ Use it whenever structured visual communication beats inline chat: plans, review
 
 ### 1. Write JSX
 
-Use the **Write** tool to create `.jsx` files in `.claude/agent-canvas/<session-id>/`:
+Use the **Write** tool to create `.jsx` files in `$TMPDIR/agent-canvas/<session-id>/`:
 
 ```jsx
-// .claude/agent-canvas/<session-id>/plan.jsx
+// $TMPDIR/agent-canvas/<session-id>/plan.jsx
 
 <Section title="Authentication Redesign">
   A proposal to replace session-based auth with JWT tokens.
@@ -41,7 +41,7 @@ Components are auto-available — no imports needed. The file can be a JSX fragm
 Push the directory to open all canvases in the browser:
 
 ```bash
-bunx agent-canvas push .claude/agent-canvas/<session-id>/ --session <session-id> --label "Implementation Plan"
+bunx agent-canvas push $TMPDIR/agent-canvas/<session-id>/ --session <session-id> --label "Implementation Plan"
 ```
 
 All `*.jsx` files in the directory are pushed as a snapshot. Each file appears as a separate tab. **Always show the `browserUrl` from the output to the user.**
@@ -82,7 +82,7 @@ Returns immediately — prints feedback if available, otherwise no output.
 Use different files for different phases or concerns:
 
 ```
-.claude/agent-canvas/<session-id>/
+$TMPDIR/agent-canvas/<session-id>/
   discovery.jsx    # Discovery interview
   requirements.jsx # Requirements spec
   plan.jsx         # Implementation plan
@@ -92,7 +92,7 @@ Write new files as phases progress, then push the directory. Previous files rema
 
 ## File Location
 
-All canvas files go in `.claude/agent-canvas/<session-id>/` within the project root. Add `.claude/agent-canvas/` to `.gitignore`.
+All canvas files go in `$TMPDIR/agent-canvas/<session-id>/`. This is a system temp directory — no `.gitignore` needed.
 
 ## Components
 

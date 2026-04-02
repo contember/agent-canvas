@@ -16,7 +16,7 @@ disable-model-invocation: true
 Your canvas session ID is: `${CLAUDE_SESSION_ID}`
 
 Use this value for:
-- File paths: `.claude/agent-canvas/${CLAUDE_SESSION_ID}/`
+- File paths: `$TMPDIR/agent-canvas/${CLAUDE_SESSION_ID}/`
 - CLI flags: `--session ${CLAUDE_SESSION_ID}`
 
 ## Instructions
