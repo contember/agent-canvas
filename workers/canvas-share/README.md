@@ -10,6 +10,23 @@ Cloudflare Worker that hosts shared agent-canvas snapshots.
 
 Validation is enforced with [Zod](https://zod.dev). Limits are centralized in [`src/types.ts`](src/types.ts).
 
+## Infrastructure as code
+
+The Cloudflare config is defined programmatically in [`oblaka.ts`](oblaka.ts)
+using [`oblaka-iac`](https://github.com/contember/oblaka). The committed
+[`oblaka.ts`](oblaka.ts) is the source of truth; `wrangler.jsonc` is
+auto-generated and **gitignored** — never edit it by hand.
+
+| Command | Generates | Used for |
+|---|---|---|
+| `bun run oblaka` | `wrangler.jsonc` (env `local`) | local dev via Miniflare |
+| `bun run oblaka:stage` | `wrangler.jsonc` (env `stage`) | staging deploy |
+| `bun run oblaka:prod` | `wrangler.jsonc` (env `prod`) | production deploy |
+
+`oblaka-iac` auto-prefixes R2 bucket and KV namespace names with the env
+(e.g. `canvas-share-blobs` becomes `stage-canvas-share-blobs`) so the same
+config produces isolated stage and prod resources.
+
 ## Local development
 
 ```bash
@@ -20,13 +37,15 @@ bun install
 cd ../..
 bun run build
 
-# Start the worker locally via Miniflare (no Cloudflare account needed)
+# Start the worker locally via Miniflare (no Cloudflare account needed).
+# `bun run dev` runs `oblaka` first to regenerate wrangler.jsonc, then
+# starts wrangler dev --local.
 cd workers/canvas-share
-npx wrangler dev --local --port 19402
+bun run dev
 
 # Point the daemon at it
 cd ../..
-CANVAS_SHARE_ENDPOINT=http://127.0.0.1:19402 bun bin/agent-canvas.ts daemon restart
+CANVAS_SHARE_ENDPOINT=http://127.0.0.1:8787 bun bin/agent-canvas.ts daemon restart
 ```
 
 Then click **Share** on any revision in the canvas UI.
@@ -36,39 +55,35 @@ Then click **Share** on any revision in the canvas UI.
 ```bash
 cd workers/canvas-share
 bun test            # unit tests for validation, util
-bunx tsc --noEmit   # typecheck
+bun run typecheck   # typecheck src/
 ```
 
 ## Production deploy
 
-1. Create R2 bucket and KV namespace:
+1. (Recommended) Generate a shared bearer token to gate share creation:
    ```bash
-   npx wrangler r2 bucket create canvas-share-blobs
-   npx wrangler kv namespace create FEEDBACK
-   ```
-   Paste the KV namespace id into `wrangler.toml` under `[[kv_namespaces]]`.
-
-2. (Recommended) Generate a shared bearer token to gate share creation:
-   ```bash
-   openssl rand -hex 32 | npx wrangler secret put SHARE_AUTH_TOKEN
+   openssl rand -hex 32 | bunx wrangler secret put SHARE_AUTH_TOKEN --env prod
    ```
    Without this, anyone on the internet can pump shares into your R2 bucket.
    Set the same value as `CANVAS_SHARE_AUTH_TOKEN` on the daemon side.
 
-3. (Optional) Override default 30-day share expiration:
+2. (Optional) Override default 30-day share expiration:
    ```bash
-   echo "604800" | npx wrangler secret put SHARE_TTL_SECONDS  # 7 days
+   echo "604800" | bunx wrangler secret put SHARE_TTL_SECONDS --env prod  # 7 days
    ```
 
-4. Build daemon bundles + deploy:
+3. Build daemon bundles + deploy. The deploy script regenerates
+   `wrangler.jsonc` for the target env, then runs `wrangler deploy`.
+   The R2 bucket and KV namespace are created automatically by oblaka
+   on first deploy:
    ```bash
    cd ../..
    bun run build
    cd workers/canvas-share
-   npx wrangler deploy
+   bun run deploy:prod   # or deploy:stage
    ```
 
-5. Configure the daemon:
+4. Configure the daemon:
    ```bash
    export CANVAS_SHARE_ENDPOINT=https://canvas-share.<subdomain>.workers.dev
    export CANVAS_SHARE_AUTH_TOKEN=<the token you generated>
