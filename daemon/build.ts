@@ -128,6 +128,28 @@ ${themeCss}
 
   writeFileSync(join(DIST, "index.html"), indexHtml);
 
+  // 7. Mirror runtime bundles into the canvas-share worker's static assets
+  // dir so the worker serves the same version of the runtime as the daemon.
+  // This is critical: a version drift between worker assets and the
+  // compiled canvas JS in a share payload would silently break shared
+  // canvases. Doing the copy as part of the daemon build keeps them in
+  // lockstep automatically.
+  const WORKER_PUBLIC = join(ROOT, "..", "workers", "canvas-share", "public", "assets");
+  if (existsSync(join(ROOT, "..", "workers", "canvas-share"))) {
+    console.log("  Copying runtime bundles to canvas-share worker...");
+    mkdirSync(WORKER_PUBLIC, { recursive: true });
+    for (const f of [
+      "preact-compat.js",
+      "jsx-runtime.js",
+      "runtime.js",
+      "components.js",
+      "client.js",
+      "client.css",
+    ]) {
+      cpSync(join(DIST, f), join(WORKER_PUBLIC, f));
+    }
+  }
+
   console.log("Build complete! Output in dist/");
 }
 
