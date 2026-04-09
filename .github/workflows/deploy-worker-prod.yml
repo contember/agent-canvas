@@ -1,0 +1,20 @@
+name: Deploy worker to prod
+
+on:
+  # Triggered by version tags so the worker deploys alongside the npm
+  # release. This keeps the runtime bundles served by the worker in
+  # lockstep with the @agent-canvas package version users install.
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-worker.yml
+    with:
+      env: prod
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      SHARE_AUTH_TOKEN: ${{ secrets.SHARE_AUTH_TOKEN_PROD }}

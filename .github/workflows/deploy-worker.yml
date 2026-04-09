@@ -1,0 +1,77 @@
+name: Reusable Worker Deploy
+
+on:
+  workflow_call:
+    inputs:
+      env:
+        description: "Target environment (stage or prod)"
+        required: true
+        type: string
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
+      SHARE_AUTH_TOKEN:
+        description: "Bearer token the daemon must send to POST /shares. Optional but strongly recommended in production."
+        required: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install root dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install worker dependencies
+        working-directory: workers/canvas-share
+        run: bun install --frozen-lockfile
+
+      # Build the daemon bundles first. The root build script auto-mirrors
+      # them into workers/canvas-share/public/assets/ so the worker's
+      # `[assets]` binding always ships the exact runtime that was pushed
+      # to npm for this version — no risk of drift between the client code
+      # inside a share payload and the runtime bundles served by the worker.
+      - name: Build runtime bundles
+        run: bun run build
+
+      # Ask oblaka to create/update the Cloudflare resources (R2 bucket,
+      # KV namespace) for this environment and emit a fresh wrangler.jsonc
+      # pointed at them. `--remote` is what triggers the actual CF API
+      # calls; without it oblaka just regenerates the config file locally.
+      - name: Provision Cloudflare resources
+        working-directory: workers/canvas-share
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bunx oblaka oblaka.ts --env ${{ inputs.env }} --remote
+
+      # Push the bearer token as a Worker secret if it was provided. Using
+      # `secret bulk` lets us set multiple secrets in one API call and
+      # keeps the value out of the generated wrangler.jsonc. Skipped
+      # silently when no token is configured (dev envs).
+      - name: Set worker secrets
+        working-directory: workers/canvas-share
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SHARE_AUTH_TOKEN: ${{ secrets.SHARE_AUTH_TOKEN }}
+        run: |
+          if [ -z "$SHARE_AUTH_TOKEN" ]; then
+            echo "SHARE_AUTH_TOKEN not set — worker will run in open-share mode"
+            exit 0
+          fi
+          printf '{"SHARE_AUTH_TOKEN":"%s"}\n' "$SHARE_AUTH_TOKEN" \
+            | bunx wrangler secret bulk
+
+      - name: Deploy worker
+        working-directory: workers/canvas-share
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bunx wrangler deploy

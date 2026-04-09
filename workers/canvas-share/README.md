@@ -58,7 +58,38 @@ bun test            # unit tests for validation, util
 bun run typecheck   # typecheck src/
 ```
 
-## Production deploy
+## Continuous deployment
+
+The repo ships GitHub Actions workflows that deploy the worker automatically:
+
+| Workflow | Trigger | Env |
+|---|---|---|
+| `deploy-worker-stage.yml` | Push to `main` touching `workers/canvas-share/**`, `daemon/client/**`, or `daemon/build.ts` | `stage` |
+| `deploy-worker-prod.yml` | Version tag push (`v*`) | `prod` |
+
+Both call the reusable `deploy-worker.yml` which:
+
+1. Installs deps + builds the daemon runtime bundles (auto-mirrored into `public/assets/`)
+2. Runs `bunx oblaka oblaka.ts --env <env> --remote` to create or update the R2 bucket and KV namespace on Cloudflare
+3. Sets `SHARE_AUTH_TOKEN` via `wrangler secret bulk` (skipped if no token is configured for the env)
+4. Runs `bunx wrangler deploy`
+
+### Required GitHub secrets
+
+| Secret | Purpose |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | Token with Workers + R2 + KV permissions on the target account |
+| `CLOUDFLARE_ACCOUNT_ID` | Account id the worker deploys to |
+| `SHARE_AUTH_TOKEN_STAGE` | Bearer token daemons must use to POST to stage (optional) |
+| `SHARE_AUTH_TOKEN_PROD` | Bearer token daemons must use to POST to prod (optional) |
+
+Both stage and prod use the same Cloudflare account; oblaka auto-prefixes resource names so stage and prod get separate `stage-canvas-share-blobs` and `prod-canvas-share-blobs` buckets (same for KV).
+
+Use GitHub Environments (`Settings → Environments → stage / prod`) to gate prod deploys behind a manual approval if you want belt-and-suspenders safety.
+
+## Manual production deploy
+
+If you'd rather deploy by hand instead of via CI:
 
 1. (Recommended) Generate a shared bearer token to gate share creation:
    ```bash
