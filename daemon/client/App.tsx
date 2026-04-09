@@ -18,8 +18,48 @@ import { generateAnnotationId, RESPONSE_ANNOTATION_PATH } from "./utils";
 import { wrapRangeWithMark, restoreMarks, renameMarkId, unwrapMarks, updateAllMarkStates } from "./highlightRange";
 import { extractContext } from "./annotationContext";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
+import { ShareDialog, ShareButton, type ShareEntry } from "./ShareDialog";
+import { ReviewerIdentityDialog } from "./ReviewerIdentityDialog";
+import type { Annotation } from "#canvas/runtime";
+import { MODE, metaUrl, FS_AVAILABLE, WS_AVAILABLE, submitSharedFeedback, getReviewerIdentity, setReviewerIdentity } from "./clientApi";
 
 export type ActiveView = { type: "overview" } | { type: "canvas"; filename: string } | { type: "file"; path: string };
+
+/**
+ * Wire shape of a remote feedback entry as delivered by the daemon
+ * (polled from CF Worker). Mirrors RemoteFeedbackEntry on the server side.
+ */
+interface RemoteFeedbackEntry {
+  id: string;
+  shareId: string;
+  revision: number;
+  submittedAt: string;
+  author: { id: string; name: string };
+  annotations: Array<Omit<Annotation, "source" | "author">>;
+  generalNote?: string;
+}
+
+/**
+ * Flatten an array of remote feedback entries into a list of Annotations
+ * tagged with author + source so they can be rendered read-only alongside
+ * the local author's annotations. The `generalNote` field is intentionally
+ * dropped for now — the MVP surfaces only spatial (highlight-anchored)
+ * feedback. General notes could be surfaced in a "remote feedback" panel
+ * in a later iteration.
+ */
+function remoteFeedbackToAnnotations(entries: RemoteFeedbackEntry[]): Annotation[] {
+  const out: Annotation[] = [];
+  for (const entry of entries) {
+    for (const ann of entry.annotations) {
+      out.push({
+        ...ann,
+        source: "remote",
+        author: entry.author,
+      });
+    }
+  }
+  return out;
+}
 
 export interface CanvasFileInfo {
   filename: string;
@@ -176,7 +216,11 @@ function RevisionSelector() {
 }
 
 function App() {
-  const sessionId = window.location.pathname.replace("/s/", "") || "";
+  // In shared mode the "sessionId" as far as the annotation system cares is
+  // the shareId (stable identifier for localStorage scoping). In local mode
+  // it's the real daemon session id from the URL.
+  const sessionId = MODE.isShared ? MODE.shareId : MODE.sessionId;
+  const isSharedMode = MODE.isShared;
   const [currentRevision, setCurrentRevision] = useState(1);
   const [selectedRevision, setSelectedRevision] = useState(1);
   const [revisions, setRevisions] = useState<RevisionInfo[]>([]);
@@ -193,6 +237,21 @@ function App() {
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shares, setShares] = useState<ShareEntry[]>([]);
+  const [shareEnabled, setShareEnabled] = useState(false);
+  // Remote annotations keyed by revision — merged read-only into the
+  // annotation provider so reviewer feedback shows up as extra annotations.
+  const [remoteAnnotationsByRev, setRemoteAnnotationsByRev] = useState<Map<number, Annotation[]>>(new Map());
+  // Shared-mode state
+  const [reviewerDialogOpen, setReviewerDialogOpen] = useState(false);
+  const [pendingFeedback, setPendingFeedback] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ kind: "error" | "success"; message: string } | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   // Dynamic document title
   useEffect(() => {
@@ -251,7 +310,7 @@ function App() {
   // Fetch initial meta
   useEffect(() => {
     if (!sessionId) return;
-    fetch(`/api/session/${sessionId}/meta`)
+    fetch(metaUrl())
       .then((r) => r.json())
       .then((data: any) => {
         if (data.currentRevision) {
@@ -274,12 +333,42 @@ function App() {
           });
         }
         if (data.projectRoot) setProjectRoot(data.projectRoot);
+        if (Array.isArray(data.shares)) setShares(data.shares);
+        setShareEnabled(!!data.shareEnabled);
       })
       .catch(() => {});
   }, [sessionId]);
 
+  // Load any already-persisted remote feedback for the currently selected
+  // revision on first render. New entries arrive via WebSocket broadcast.
+  // This only runs in local (daemon) mode — shared mode has no notion of
+  // "previously polled remote feedback": the reviewer IS the remote.
+  useEffect(() => {
+    if (!sessionId || !selectedRevision || isSharedMode) return;
+    fetch(`/api/session/${sessionId}/revision/${selectedRevision}/remote-feedback`)
+      .then((r) => r.json())
+      .then((data: any) => {
+        if (!Array.isArray(data.entries)) return;
+        const anns = remoteFeedbackToAnnotations(data.entries);
+        setRemoteAnnotationsByRev((prev) => {
+          const next = new Map(prev);
+          next.set(selectedRevision, anns);
+          return next;
+        });
+      })
+      .catch(() => {});
+  }, [sessionId, selectedRevision, isSharedMode]);
+
   useEffect(() => {
     if (!sessionId) return;
+    if (!WS_AVAILABLE) {
+      // In shared mode there is no WebSocket — the worker only exposes HTTP.
+      // Live updates and watcher status are unavailable. The canvas is a
+      // static snapshot from the author's perspective, so "connected" is
+      // effectively always true.
+      setConnected(true);
+      return;
+    }
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     const connect = () => {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -321,6 +410,19 @@ function App() {
           if (data.type === "watcher-status") {
             setAgentWatching(!!data.watching);
           }
+          if (data.type === "remote-feedback") {
+            const rev = data.revision as number;
+            const entries = (data.entries || []) as RemoteFeedbackEntry[];
+            const anns = remoteFeedbackToAnnotations(entries);
+            setRemoteAnnotationsByRev((prev) => {
+              const next = new Map(prev);
+              const existing = next.get(rev) || [];
+              const seenIds = new Set(existing.map((a) => a.id));
+              const merged = [...existing, ...anns.filter((a) => !seenIds.has(a.id))];
+              next.set(rev, merged);
+              return next;
+            });
+          }
         } catch {}
       };
     };
@@ -328,14 +430,50 @@ function App() {
     return () => { if (reconnectTimer) clearTimeout(reconnectTimer); wsRef.current?.close(); };
   }, [sessionId]);
 
-  const handleSubmit = useCallback((feedback: string) => {
+  const submitSharedFeedbackWithIdentity = useCallback(async (feedback: string, identity: { id: string; name: string }) => {
+    try {
+      const raw = localStorage.getItem(`canvas:${sessionId}:rev:${selectedRevision}`);
+      let structuredAnnotations: any[] = [];
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          structuredAnnotations = (parsed.annotations || []).filter((a: any) => a.source !== "remote");
+        } catch {}
+      }
+      await submitSharedFeedback({
+        author: identity,
+        revision: selectedRevision,
+        annotations: structuredAnnotations,
+        generalNote: feedback,
+      });
+      setPreviewOpen(false);
+      setToast({ kind: "success", message: "Feedback submitted. The canvas author will see it shortly." });
+    } catch (e: any) {
+      setToast({ kind: "error", message: `Failed to submit feedback: ${e.message || e}` });
+    }
+  }, [sessionId, selectedRevision]);
+
+  const handleSubmit = useCallback(async (feedback: string) => {
+    if (isSharedMode) {
+      // Shared mode: POST feedback to the worker via the reviewer identity
+      // modal flow. If identity already cached, skip the modal.
+      const identity = getReviewerIdentity();
+      if (!identity) {
+        setPendingFeedback(feedback);
+        setReviewerDialogOpen(true);
+        return;
+      }
+      await submitSharedFeedbackWithIdentity(feedback, identity);
+      return;
+    }
+
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "submit", feedback }));
       setPreviewOpen(false);
       // Server will broadcast revision-updated with hasFeedback: true
       // which triggers isReadOnly via revisions state
     }
-  }, []);
+  }, [isSharedMode, submitSharedFeedbackWithIdentity]);
 
   if (!sessionId) {
     return <div className="flex items-center justify-center h-screen text-text-tertiary font-body">No session selected.</div>;
@@ -344,7 +482,13 @@ function App() {
   return (
     <SessionContext.Provider value={sessionId}>
       <RevisionContext.Provider value={{ currentRevision, selectedRevision, revisions, setSelectedRevision, isReadOnly, compareRevision, setCompareRevision, agentWatching }}>
-        <AnnotationProvider key={`${sessionId}:${selectedRevision}`} sessionId={sessionId} revision={selectedRevision} isReadOnly={isReadOnly}>
+        <AnnotationProvider
+          key={`${sessionId}:${selectedRevision}`}
+          sessionId={sessionId}
+          revision={selectedRevision}
+          isReadOnly={isReadOnly}
+          remoteAnnotations={remoteAnnotationsByRev.get(selectedRevision)}
+        >
           <ActiveViewContext.Provider value={{ activeView, setActiveView, openFiles, closeFile, canvasFiles }}>
           <ActiveViewCtx.Provider value={{ setActiveView }}>
             <div className="min-h-screen bg-bg-base">
@@ -371,8 +515,9 @@ function App() {
                 {/* Mobile top bar — only visible < lg */}
                 <div className="lg:hidden sticky top-0 z-20 flex items-center justify-between px-4 py-2 border-b border-border-subtle bg-bg-surface">
                   <div className="flex items-center gap-2">
-                    <SessionSwitcher currentSessionId={sessionId} projectRoot={projectRoot} />
-                    <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-accent-green" : "bg-accent-red"}`} />
+                    {!isSharedMode && <SessionSwitcher currentSessionId={sessionId} projectRoot={projectRoot} />}
+                    {isSharedMode && <span className="text-[11px] text-text-tertiary font-body">Shared canvas</span>}
+                    {!isSharedMode && <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-accent-green" : "bg-accent-red"}`} />}
                   </div>
                   <div className="flex items-center gap-1">
                     <RevisionSelector />
@@ -400,6 +545,15 @@ function App() {
                 {/* Individual canvas view — only mounted when active */}
                 {activeView.type === "canvas" && canvasFiles.includes(activeView.filename) && (
                   <div className="relative max-w-[720px] mx-auto px-6 pt-12 pb-32">
+                    {shareEnabled && (
+                      <div className="absolute top-3 right-12 z-10">
+                        <ShareButton
+                          onClick={() => setShareDialogOpen(true)}
+                          hasShare={shares.some((s) => s.revision === selectedRevision)}
+                          title={shares.some((s) => s.revision === selectedRevision) ? "Manage share link" : "Share this revision"}
+                        />
+                      </div>
+                    )}
                     <button
                       onClick={() => {
                         const planContent = document.querySelector(`[data-canvas-file="${activeView.filename}"] .plan-content`);
@@ -459,6 +613,54 @@ function App() {
               )}
 
               <ResponsePreview open={previewOpen} onClose={() => setPreviewOpen(false)} onSubmit={handleSubmit} />
+
+              <ShareDialog
+                sessionId={sessionId}
+                revision={selectedRevision}
+                open={shareDialogOpen}
+                shareEnabled={shareEnabled}
+                existingShares={shares}
+                onClose={() => setShareDialogOpen(false)}
+                onShareCreated={(share) => {
+                  setShares((prev) => [...prev.filter((s) => s.shareId !== share.shareId), share]);
+                  setToast({ kind: "success", message: "Share link created. Copy and send it to reviewers." });
+                }}
+                onShareRevoked={(shareId) => {
+                  setShares((prev) => prev.filter((s) => s.shareId !== shareId));
+                  setToast({ kind: "success", message: "Share link revoked." });
+                }}
+              />
+
+              <ReviewerIdentityDialog
+                open={reviewerDialogOpen}
+                onClose={() => { setReviewerDialogOpen(false); setPendingFeedback(null); }}
+                onSubmit={async (name) => {
+                  const identity = setReviewerIdentity(name);
+                  setReviewerDialogOpen(false);
+                  if (pendingFeedback !== null) {
+                    await submitSharedFeedbackWithIdentity(pendingFeedback, identity);
+                    setPendingFeedback(null);
+                  }
+                }}
+              />
+
+              {toast && (
+                <div
+                  className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-lg shadow-lg text-[13px] font-body font-medium flex items-center gap-2 ${
+                    toast.kind === "error"
+                      ? "bg-accent-red text-white"
+                      : "bg-accent-green text-white"
+                  }`}
+                >
+                  {toast.message}
+                  <button
+                    onClick={() => setToast(null)}
+                    className="ml-2 opacity-70 hover:opacity-100"
+                  >
+                    &#x2715;
+                  </button>
+                </div>
+              )}
             </div>
           </ActiveViewCtx.Provider>
           </ActiveViewContext.Provider>
@@ -469,6 +671,7 @@ function App() {
 }
 
 function LeftPanel({ sessionId, projectRoot, connected, onMobileSidebar, collapsed, onToggle }: { sessionId: string; projectRoot?: string; connected: boolean; onMobileSidebar: () => void; collapsed: boolean; onToggle: () => void }) {
+  const isSharedMode = MODE.isShared;
   return (
     <>
       {/* Collapsed toggle button */}
@@ -491,8 +694,14 @@ function LeftPanel({ sessionId, projectRoot, connected, onMobileSidebar, collaps
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-text-tertiary flex-shrink-0">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            <SessionSwitcher currentSessionId={sessionId} projectRoot={projectRoot} />
-            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${connected ? "bg-accent-green" : "bg-accent-red"}`} />
+            {isSharedMode ? (
+              <span className="text-[12px] font-body text-text-secondary truncate flex-1">Shared canvas</span>
+            ) : (
+              <>
+                <SessionSwitcher currentSessionId={sessionId} projectRoot={projectRoot} />
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${connected ? "bg-accent-green" : "bg-accent-red"}`} />
+              </>
+            )}
             <button
               onClick={onToggle}
               className="ml-auto w-6 h-6 flex items-center justify-center rounded text-text-tertiary hover:text-text-secondary hover:bg-bg-elevated transition-colors"
@@ -871,7 +1080,7 @@ function ContentTabs() {
 
       {/* Right-aligned actions */}
       <div className="ml-auto flex items-center gap-1 flex-shrink-0">
-        {activeView.type === "file" && (
+        {activeView.type === "file" && FS_AVAILABLE && (
           <button
             onClick={async () => {
               const path = activeView.path;

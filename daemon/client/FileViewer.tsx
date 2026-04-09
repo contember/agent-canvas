@@ -6,6 +6,7 @@ import { wrapRangeWithMark } from "./highlightRange";
 import { LANG_MAP } from "../langMap";
 import { generateAnnotationId } from "./utils";
 import { useTextAnnotation } from "./useTextAnnotation";
+import { FS_AVAILABLE } from "./clientApi";
 
 /** Walk up from a node to find the parent line div with data-line-num */
 function findLineDiv(node: Node): HTMLElement | null {
@@ -47,6 +48,23 @@ interface FileViewerProps {
 }
 
 export function FileViewer({ path }: FileViewerProps) {
+  if (!FS_AVAILABLE) {
+    return (
+      <div className="max-w-[720px] mx-auto px-6 pt-12 pb-32">
+        <div className="p-4 rounded-lg border border-border-subtle bg-bg-surface">
+          <div className="text-[11px] uppercase tracking-widest text-text-tertiary font-body mb-2">
+            File not available
+          </div>
+          <p className="text-[13px] text-text-secondary font-body leading-relaxed">
+            Opening <code className="px-1 py-0.5 rounded bg-bg-elevated text-text-primary text-[11px]">{path}</code> requires
+            filesystem access, which isn't available in shared view. If the
+            canvas author wanted this file visible, they should embed it as
+            a <code className="px-1 py-0.5 rounded bg-bg-elevated text-text-primary text-[11px]">&lt;FilePreview&gt;</code> in the canvas.
+          </p>
+        </div>
+      </div>
+    );
+  }
   const sessionId = useContext(SessionContext);
   const { annotations, addAnnotationWithId, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
   const [content, setContent] = useState<string | null>(null);

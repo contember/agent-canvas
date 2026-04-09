@@ -12,6 +12,22 @@ export interface AnnotationContext {
   lineEnd?: number;
 }
 
+/** Identifies the person who created an annotation. For local annotations
+ *  this is the daemon owner (unset). For remote annotations it carries the
+ *  reviewer's self-reported name + stable anonymous id assigned by the worker. */
+export interface AnnotationAuthor {
+  id: string;
+  name: string;
+}
+
+/** An image or other file attached to an annotation. Replaces the legacy
+ *  `images: string[]` pattern with a richer shape that can point to either
+ *  a local upload (daemon) or a remote blob (CF Worker R2). */
+export interface AnnotationAttachment {
+  url: string;
+  mime?: string;
+}
+
 export interface Annotation {
   id: string;
   snippet: string;
@@ -20,7 +36,13 @@ export interface Annotation {
   filePath?: string;
   canvasFile?: string;
   context?: AnnotationContext;
+  /** @deprecated use `attachments` — kept for localStorage backward compat */
   images?: string[];
+  attachments?: AnnotationAttachment[];
+  /** "remote" annotations come from a shared view and are read-only locally. */
+  source?: "local" | "remote";
+  /** Only set for source === "remote". */
+  author?: AnnotationAuthor;
 }
 
 export interface PlanResponse {

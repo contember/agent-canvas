@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { autoResizeTextarea } from "./utils";
+import { uploadUrl, MODE } from "./clientApi";
 
 interface AnnotationEditorProps {
   note: string;
@@ -26,16 +27,25 @@ interface AnnotationEditorProps {
 }
 
 export function imageToUrl(path: string): string {
+  // Shared-mode uploads come back from the worker as absolute URLs under
+  // /s/:shareId/uploads/... — return them as-is. Local daemon uploads are
+  // stored as absolute filesystem paths; translate to the served URL.
+  if (path.startsWith("/s/") || path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
   const filename = path.split("/").pop();
   return `/api/uploads/${filename}`;
 }
 
-async function uploadImage(sessionId: string, file: File): Promise<string | null> {
+async function uploadImage(_sessionId: string, file: File): Promise<string | null> {
   const formData = new FormData();
   formData.append("image", file);
   try {
-    const resp = await fetch(`/api/session/${sessionId}/upload`, { method: "POST", body: formData });
+    const resp = await fetch(uploadUrl(), { method: "POST", body: formData });
     const data = await resp.json();
+    // Local daemon returns { path }; worker returns { url }. Normalise to
+    // a single string that `imageToUrl` can resolve.
+    if (MODE.isShared) return data.url || null;
     return data.path || null;
   } catch {
     return null;

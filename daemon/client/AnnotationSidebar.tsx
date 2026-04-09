@@ -9,6 +9,7 @@ import { FileIcon } from "./FileIcon";
 import { autoResizeTextarea, RESPONSE_ANNOTATION_PATH } from "./utils";
 import { AnnotationEditor, ImageThumbnails } from "./AnnotationEditor";
 import { findAnnotationElement, scrollToAnnotation } from "./annotationDom";
+import { MODE, FS_AVAILABLE } from "./clientApi";
 
 interface AnnotationSidebarProps {
   onPreview: () => void;
@@ -32,11 +33,15 @@ export function AnnotationSidebar({ onPreview, onSubmit, collapseButton }: Annot
 }
 
 function FeedbackDisplay({ sessionId, revision, label, waitingForUpdate, feedbackConsumed, agentWatching, collapseButton }: { sessionId: string; revision: number; label: string; waitingForUpdate?: boolean; feedbackConsumed?: boolean; agentWatching?: boolean; collapseButton?: React.ReactNode }) {
+  const isSharedMode = MODE.isShared;
   const [feedback, setFeedback] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
+    // Shared mode has no prior local feedback to fetch — shared canvases
+    // are always one-off snapshots. Skip the call entirely.
+    if (!FS_AVAILABLE) { setFeedback(null); setLoading(false); return; }
     fetch(`/api/session/${sessionId}/revision/${revision}/feedback`)
       .then((r) => r.json())
       .then((data: any) => { setFeedback(data.feedback || null); setLoading(false); })
@@ -52,7 +57,7 @@ function FeedbackDisplay({ sessionId, revision, label, waitingForUpdate, feedbac
         {collapseButton}
       </div>
 
-      {waitingForUpdate && <WaitingBanner feedbackConsumed={feedbackConsumed} agentWatching={agentWatching} />}
+      {waitingForUpdate && !isSharedMode && <WaitingBanner feedbackConsumed={feedbackConsumed} agentWatching={agentWatching} />}
 
       <div className="flex-1 overflow-y-auto px-4">
         {loading ? (
@@ -158,6 +163,9 @@ function FeedbackDisplayContent({ sessionId, revision }: { sessionId: string; re
 
   useEffect(() => {
     setLoading(true);
+    // Shared mode has no prior local feedback to fetch — shared canvases
+    // are always one-off snapshots. Skip the call entirely.
+    if (!FS_AVAILABLE) { setFeedback(null); setLoading(false); return; }
     fetch(`/api/session/${sessionId}/revision/${revision}/feedback`)
       .then((r) => r.json())
       .then((data: any) => { setFeedback(data.feedback || null); setLoading(false); })
@@ -352,14 +360,18 @@ function AnnotationSidebarInner({ onPreview, onSubmit, agentWatching, collapseBu
   const hasContent = annotations.length > 0 || generalNote.trim().length > 0 || hasResponses || hasFeedback;
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const renderAnnotation = (ann: Annotation) => (
+  const renderAnnotation = (ann: Annotation) => {
+    const isRemote = ann.source === "remote";
+    return (
     <div
       key={ann.id}
       ref={(el) => { if (el) annRefs.current.set(ann.id, el); else annRefs.current.delete(ann.id); }}
       className={`group/ann relative px-3 py-2.5 transition-colors duration-150 ${
         activeAnnotationId === ann.id
           ? "bg-highlight-selected"
-          : "odd:bg-bg-elevated-half hover:bg-bg-input"
+          : isRemote
+            ? "bg-accent-purple-muted/30 hover:bg-accent-purple-muted/50"
+            : "odd:bg-bg-elevated-half hover:bg-bg-input"
       }`}
       onMouseEnter={() => handleMouseEnter(ann.id)}
       onMouseLeave={() => handleMouseLeave(ann.id)}
@@ -378,28 +390,48 @@ function AnnotationSidebarInner({ onPreview, onSubmit, agentWatching, collapseBu
         }
       }}
     >
+      {isRemote && ann.author && (
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-accent-purple text-white text-[9px] font-medium uppercase">
+            {ann.author.name.charAt(0)}
+          </span>
+          <span className="text-[11px] font-medium text-accent-purple font-body">
+            {ann.author.name}
+          </span>
+          <span className="text-[10px] text-text-tertiary font-body uppercase tracking-widest">
+            Remote
+          </span>
+        </div>
+      )}
+
       {/* Snippet quote */}
       <div className="text-[11px] text-text-tertiary italic line-clamp-2 mb-1.5 leading-snug font-body border-l-2 border-border-medium pl-2">
         {ann.snippet.length > 80 ? ann.snippet.slice(0, 80) + "..." : ann.snippet}
       </div>
 
-      {/* Editable note + images */}
-      <div onClick={(e) => e.stopPropagation()}>
-        <AnnotationEditor
-          note={ann.note}
-          onNoteChange={(note) => updateAnnotation(ann.id, note)}
-          images={ann.images || []}
-          onAddImage={(path) => addAnnotationImage(ann.id, path)}
-          onRemoveImage={(path) => removeAnnotationImage(ann.id, path)}
-          sessionId={sessionId}
-          autoResize
-          minHeight={20}
-          textareaClassName="w-full bg-transparent text-[13px] font-body text-text-primary resize-none focus:outline-none leading-relaxed p-0 border-none min-h-[20px]"
-          textareaStyle={{ height: "auto", overflow: "hidden" }}
-          placeholder="Add your note..."
-          attachButton="on-focus"
-        />
-      </div>
+      {/* Editable note + images — only for local annotations. Remote are read-only. */}
+      {isRemote ? (
+        <div className="text-[13px] font-body text-text-primary leading-relaxed whitespace-pre-wrap">
+          {ann.note}
+        </div>
+      ) : (
+        <div onClick={(e) => e.stopPropagation()}>
+          <AnnotationEditor
+            note={ann.note}
+            onNoteChange={(note) => updateAnnotation(ann.id, note)}
+            images={ann.images || []}
+            onAddImage={(path) => addAnnotationImage(ann.id, path)}
+            onRemoveImage={(path) => removeAnnotationImage(ann.id, path)}
+            sessionId={sessionId}
+            autoResize
+            minHeight={20}
+            textareaClassName="w-full bg-transparent text-[13px] font-body text-text-primary resize-none focus:outline-none leading-relaxed p-0 border-none min-h-[20px]"
+            textareaStyle={{ height: "auto", overflow: "hidden" }}
+            placeholder="Add your note..."
+            attachButton="on-focus"
+          />
+        </div>
+      )}
 
       {/* Actions — top right on hover */}
       <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/ann:opacity-100 transition-opacity duration-100 flex items-center gap-0.5">
@@ -415,19 +447,22 @@ function AnnotationSidebarInner({ onPreview, onSubmit, agentWatching, collapseBu
             <circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
           </svg>
         </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); removeAnnotation(ann.id); }}
-          className="w-5 h-5 flex items-center justify-center rounded text-text-tertiary hover:text-accent-red hover:bg-accent-red-muted transition-colors"
-          title="Delete annotation"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-          </svg>
-        </button>
+        {!isRemote && (
+          <button
+            onClick={(e) => { e.stopPropagation(); removeAnnotation(ann.id); }}
+            className="w-5 h-5 flex items-center justify-center rounded text-text-tertiary hover:text-accent-red hover:bg-accent-red-muted transition-colors"
+            title="Delete annotation"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+            </svg>
+          </button>
+        )}
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -438,10 +473,12 @@ function AnnotationSidebarInner({ onPreview, onSubmit, agentWatching, collapseBu
           {annotations.length > 0 && (
             <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-border-subtle text-[10px] font-medium text-text-secondary">{annotations.length}</span>
           )}
-          <span
-            className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${agentWatching ? "bg-accent-green" : "bg-accent-amber"}`}
-            title={agentWatching ? "Agent connected" : "Agent disconnected"}
-          />
+          {!MODE.isShared && (
+            <span
+              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${agentWatching ? "bg-accent-green" : "bg-accent-amber"}`}
+              title={agentWatching ? "Agent connected" : "Agent disconnected"}
+            />
+          )}
         </span>
         {collapseButton}
       </div>

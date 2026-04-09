@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { AnnotationCtx } from "#canvas/runtime";
 import type { Annotation, AnnotationContext, PlanResponse, FeedbackEntry, AnnotationContextValue } from "#canvas/runtime";
 import { generateAnnotationId } from "./utils";
@@ -11,6 +11,9 @@ interface AnnotationProviderProps {
   sessionId: string;
   revision: number;
   isReadOnly: boolean;
+  /** Remote annotations fetched from shared views. Merged read-only into
+   *  the annotation list so they render alongside the author's own. */
+  remoteAnnotations?: Annotation[];
   children: React.ReactNode;
 }
 
@@ -47,11 +50,21 @@ function clearPersisted(sessionId: string, revision: number) {
   } catch {}
 }
 
-export function AnnotationProvider({ sessionId, revision, isReadOnly, children }: AnnotationProviderProps) {
-  const [annotations, setAnnotations] = useState<Annotation[]>(() => {
+export function AnnotationProvider({ sessionId, revision, isReadOnly, remoteAnnotations, children }: AnnotationProviderProps) {
+  const [localAnnotations, setAnnotations] = useState<Annotation[]>(() => {
     const saved = loadPersisted(sessionId, revision);
-    return saved?.annotations ?? [];
+    return (saved?.annotations ?? []).map((a) => ({ ...a, source: a.source ?? "local" as const }));
   });
+
+  // Merge local + remote annotations. Remote annotations are always
+  // rendered read-only; mutation helpers below operate on localAnnotations
+  // only so they silently no-op on remote ids.
+  const annotations = useMemo<Annotation[]>(() => {
+    if (!remoteAnnotations || remoteAnnotations.length === 0) return localAnnotations;
+    const localIds = new Set(localAnnotations.map((a) => a.id));
+    const filtered = remoteAnnotations.filter((a) => !localIds.has(a.id));
+    return [...localAnnotations, ...filtered.map((a) => ({ ...a, source: "remote" as const }))];
+  }, [localAnnotations, remoteAnnotations]);
   const [generalNote, setGeneralNote] = useState(() => {
     const saved = loadPersisted(sessionId, revision);
     return saved?.generalNote ?? "";
@@ -73,14 +86,15 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, children }
     if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
     persistTimerRef.current = setTimeout(() => {
       savePersisted(sessionId, revision, {
-        annotations,
+        // Persist only local annotations — remote ones are re-fetched on load.
+        annotations: localAnnotations,
         generalNote,
         responses: Array.from(responses.entries()),
         feedbackEntries: Array.from(feedbackEntries.entries()),
       });
     }, 300);
     return () => { if (persistTimerRef.current) clearTimeout(persistTimerRef.current); };
-  }, [annotations, generalNote, responses, feedbackEntries, sessionId, revision, isReadOnly]);
+  }, [localAnnotations, generalNote, responses, feedbackEntries, sessionId, revision, isReadOnly]);
 
   const addAnnotationWithId = useCallback((id: string, snippet: string, note: string, filePath?: string, context?: AnnotationContext, images?: string[], canvasFile?: string) => {
     setAnnotations((prev) => [...prev, { id, snippet, note, createdAt: new Date().toISOString(), filePath, context, ...(images?.length ? { images } : {}), ...(canvasFile ? { canvasFile } : {}) }]);

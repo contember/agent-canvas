@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { FS_AVAILABLE } from "./clientApi";
 
 interface SessionInfo {
   id: string;
@@ -26,6 +27,10 @@ export function SessionSwitcher({ currentSessionId, projectRoot }: SessionSwitch
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // /api/sessions only exists on the local daemon. In shared mode we skip
+    // the switcher entirely (it's hidden by the parent), but guard the poll
+    // just in case this component is mounted — nothing to switch to.
+    if (!FS_AVAILABLE) return;
     const fetchSessions = async () => {
       try {
         const res = await fetch("/api/sessions");

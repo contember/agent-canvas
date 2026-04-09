@@ -6,6 +6,7 @@ import { extractContext } from "./annotationContext";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 import { generateAnnotationId } from "./utils";
 import { useTextAnnotation } from "./useTextAnnotation";
+import { canvasJsUrl } from "./clientApi";
 
 /** All navigable blocks (keyboard arrows) */
 const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='choice-option'], [data-md='multichoice-option'], [data-md='userinput'], [data-md='rangeinput'], [data-md='image']";
@@ -40,8 +41,8 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
     setLoading(true);
     setError(null);
     setFocusedBlockIndex(null);
-    const jsName = filename.replace(/\.jsx$/, ".js");
-    import(`/api/session/${sessionId}/canvas/${encodeURIComponent(jsName)}?rev=${revision}&t=${Date.now()}`)
+    void sessionId; // sessionId is implied by the URL in clientApi (shared or local)
+    import(/* @vite-ignore */ canvasJsUrl(filename, revision))
       .then((mod) => { setPlanComponent(() => mod.default); setLoading(false); })
       .catch((e) => { setError(e.message); setLoading(false); });
   }, [sessionId, revision, filename]);

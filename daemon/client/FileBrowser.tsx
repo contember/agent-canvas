@@ -4,6 +4,7 @@ import { useAnnotations } from "./AnnotationProvider";
 import { ActiveViewContext } from "./App";
 import { FileIcon } from "./FileIcon";
 import { RESPONSE_ANNOTATION_PATH } from "./utils";
+import { FS_AVAILABLE } from "./clientApi";
 
 interface TreeEntry { name: string; type: "file" | "dir"; }
 interface DirState { entries: TreeEntry[]; expanded: boolean; loaded: boolean; }
@@ -14,6 +15,21 @@ export function FileBrowser({ embedded }: { embedded?: boolean } = {}) {
   const { setActiveView } = useContext(ActiveViewContext);
   const [collapsed, setCollapsed] = useState(false);
   const [dirs, setDirs] = useState<Record<string, DirState>>({});
+
+  // Shared-mode canvases have no filesystem backing — the daemon's /api/tree
+  // endpoint isn't reachable. Render a simple placeholder so reviewers see
+  // something informative instead of a broken tree.
+  if (!FS_AVAILABLE) {
+    return (
+      <div className={embedded ? "px-4 py-3" : "p-4"}>
+        <div className="text-[11px] uppercase tracking-widest text-text-tertiary font-body mb-2">Files</div>
+        <p className="text-[11px] text-text-tertiary font-body leading-relaxed">
+          File browsing is not available in shared view. File previews embedded
+          in the canvas still work.
+        </p>
+      </div>
+    );
+  }
 
   const { annCountMap, annotatedFiles } = useMemo(() => {
     const map = new Map<string, number>();
