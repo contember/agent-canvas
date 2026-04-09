@@ -1,5 +1,5 @@
 import type { ServerWebSocket } from "bun";
-import type { SessionManager } from "./session";
+import type { SessionManager, RemoteFeedbackEntry } from "./session";
 
 export type WSData = { type: "browser" | "wait"; sessionId: string };
 
@@ -30,6 +30,19 @@ export function createWebSocketManager(sessionManager: SessionManager) {
     const payload = JSON.stringify({
       type: "revision-updated",
       revisions: session.revisions,
+    });
+    for (const ws of sockets) {
+      ws.send(payload);
+    }
+  }
+
+  function broadcastRemoteFeedback(sessionId: string, revision: number, entries: RemoteFeedbackEntry[]) {
+    const sockets = browserSockets.get(sessionId);
+    if (!sockets || sockets.size === 0) return;
+    const payload = JSON.stringify({
+      type: "remote-feedback",
+      revision,
+      entries,
     });
     for (const ws of sockets) {
       ws.send(payload);
@@ -140,5 +153,5 @@ export function createWebSocketManager(sessionManager: SessionManager) {
     },
   };
 
-  return { handlers, broadcastPlanUpdate, broadcastRevisionUpdate, broadcastWatcherStatus };
+  return { handlers, broadcastPlanUpdate, broadcastRevisionUpdate, broadcastWatcherStatus, broadcastRemoteFeedback };
 }

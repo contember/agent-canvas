@@ -3,6 +3,7 @@ import type { SessionManager } from "../session";
 import { compilePlan } from "../compiler";
 import { watchSession } from "../watcher";
 import { jsonResponse } from "./utils";
+import { loadShareConfig, shareRevision, revokeShare } from "../share";
 import type { Route } from "../router";
 
 export interface ApiContext {
@@ -154,7 +155,65 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
       canvasFiles: session.canvasFiles,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
+      shares: session.shares ?? [],
+      shareEnabled: !!process.env.CANVAS_SHARE_ENDPOINT,
     });
+  }
+
+  async function handleShareRevision(_req: Request, _url: URL, match: URLPatternResult): Promise<Response> {
+    const sessionId = match.pathname.groups.id!;
+    const rev = parseInt(match.pathname.groups.rev!, 10);
+
+    const session = sessionManager.get(sessionId);
+    if (!session) return jsonResponse({ error: "Session not found" }, 404);
+    if (!session.revisions.find((r) => r.revision === rev)) {
+      return jsonResponse({ error: `Revision ${rev} not found` }, 404);
+    }
+
+    const config = loadShareConfig(ctx.version);
+    if (!config) {
+      return jsonResponse({
+        error: "Sharing disabled. Set CANVAS_SHARE_ENDPOINT to the deployed canvas-share worker URL.",
+      }, 501);
+    }
+
+    try {
+      const entry = await shareRevision(sessionManager, sessionId, rev, config);
+      broadcastRevisionUpdate(sessionId);
+      return jsonResponse({ ok: true, share: entry });
+    } catch (e: any) {
+      return jsonResponse({ error: e.message || String(e) }, 502);
+    }
+  }
+
+  async function handleShareRevoke(_req: Request, _url: URL, match: URLPatternResult): Promise<Response> {
+    const sessionId = match.pathname.groups.id!;
+    const shareId = match.pathname.groups.shareId!;
+    if (!sessionManager.get(sessionId)) return jsonResponse({ error: "Session not found" }, 404);
+    const config = loadShareConfig(ctx.version);
+    if (!config) return jsonResponse({ error: "Sharing disabled" }, 501);
+    try {
+      await revokeShare(sessionManager, sessionId, shareId, config);
+      broadcastRevisionUpdate(sessionId);
+      return jsonResponse({ ok: true });
+    } catch (e: any) {
+      return jsonResponse({ error: e.message || String(e) }, 502);
+    }
+  }
+
+  function handleSharesList(_req: Request, _url: URL, match: URLPatternResult): Response {
+    const sessionId = match.pathname.groups.id!;
+    const session = sessionManager.get(sessionId);
+    if (!session) return jsonResponse({ error: "Session not found" }, 404);
+    return jsonResponse({ shares: session.shares ?? [] });
+  }
+
+  function handleRemoteFeedbackGet(_req: Request, _url: URL, match: URLPatternResult): Response {
+    const sessionId = match.pathname.groups.id!;
+    const rev = parseInt(match.pathname.groups.rev!, 10);
+    if (!sessionManager.get(sessionId)) return jsonResponse({ error: "Session not found" }, 404);
+    const entries = sessionManager.getRemoteFeedback(sessionId, rev);
+    return jsonResponse({ entries });
   }
 
   function handleSessions(): Response {
@@ -190,6 +249,10 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
     { method: "GET", pattern: new URLPattern({ pathname: "/api/session/:id/meta" }), handler: handleMeta },
     { method: "GET", pattern: new URLPattern({ pathname: "/api/session/:id/revision/:rev/feedback" }), handler: handleFeedbackGet },
     { method: "POST", pattern: new URLPattern({ pathname: "/api/session/:id/feedback/consume" }), handler: handleFeedbackConsume },
+    { method: "POST", pattern: new URLPattern({ pathname: "/api/session/:id/revision/:rev/share" }), handler: handleShareRevision },
+    { method: "POST", pattern: new URLPattern({ pathname: "/api/session/:id/shares/:shareId/revoke" }), handler: handleShareRevoke },
+    { method: "GET", pattern: new URLPattern({ pathname: "/api/session/:id/shares" }), handler: handleSharesList },
+    { method: "GET", pattern: new URLPattern({ pathname: "/api/session/:id/revision/:rev/remote-feedback" }), handler: handleRemoteFeedbackGet },
     { method: "GET", pattern: new URLPattern({ pathname: "/api/sessions" }), handler: handleSessions },
   ];
 }

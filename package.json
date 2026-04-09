@@ -8,6 +8,7 @@
   "scripts": {
     "build": "bun daemon/build.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p daemon/tsconfig.json",
+    "test": "bun test",
     "prepublishOnly": "bun daemon/build.ts"
   },
   "dependencies": {

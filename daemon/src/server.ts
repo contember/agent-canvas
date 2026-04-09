@@ -9,6 +9,7 @@ import { createApiHandlers } from "./handlers/api";
 import { createFileHandlers } from "./handlers/files";
 import { createStaticHandlers } from "./handlers/static";
 import { createUploadHandlers } from "./handlers/uploads";
+import { startRemoteFeedbackPoller } from "./remote-feedback";
 
 const PORT = parseInt(process.env.CANVAS_PORT || "19400", 10);
 const VERSION = JSON.parse(readFileSync(join(dirname(import.meta.dir), "..", "package.json"), "utf-8")).version as string;
@@ -81,5 +82,9 @@ export { sessionManager, server };
 export const broadcastPlanUpdate = wsManager.broadcastPlanUpdate;
 
 setInterval(() => sessionManager.cleanupStale(), 60 * 60 * 1000);
+
+// Start polling for remote feedback from shared canvases.
+// No-ops if CANVAS_SHARE_ENDPOINT is not set.
+startRemoteFeedbackPoller(sessionManager, wsManager.broadcastRemoteFeedback, VERSION);
 
 console.log(`Planner daemon listening on http://localhost:${PORT}`);

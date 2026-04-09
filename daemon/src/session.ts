@@ -22,6 +22,64 @@ export interface RevisionInfo {
   response?: string;
 }
 
+/**
+ * A single piece of feedback received from a remote (shared) reviewer.
+ * Structured so it can be merged into the local annotation system alongside
+ * the author's own annotations. `annotations` is the structured list of
+ * highlighted-text comments; `generalNote` is the free-form markdown.
+ */
+export interface RemoteFeedbackEntry {
+  /** Stable unique id assigned by the worker; used to dedupe on re-poll */
+  id: string;
+  shareId: string;
+  revision: number;
+  /** ISO timestamp when the reviewer submitted */
+  submittedAt: string;
+  author: { id: string; name: string };
+  annotations: RemoteAnnotation[];
+  generalNote?: string;
+}
+
+/**
+ * Mirror of the client-side Annotation shape, minus fields that only make
+ * sense locally. Kept intentionally narrow so the wire format is stable.
+ */
+export interface RemoteAnnotation {
+  id: string;
+  snippet: string;
+  note: string;
+  createdAt: string;
+  filePath?: string;
+  canvasFile?: string;
+  context?: {
+    before: string;
+    after: string;
+    hierarchy: string[];
+    lineStart?: number;
+    lineEnd?: number;
+  };
+  attachments?: { url: string; mime?: string }[];
+}
+
+/**
+ * A share is a snapshot of a specific revision that has been pushed to a
+ * remote endpoint (CF Worker) for external review. The `shareId` is the
+ * opaque capability token returned by the worker; the `url` is the full
+ * public URL the user shared with reviewers.
+ */
+export interface ShareEntry {
+  shareId: string;
+  url: string;
+  revision: number;
+  createdAt: string;
+  /** Bearer token returned by the worker — proves ownership for revoke. */
+  ownerToken?: string;
+  /** ISO timestamp when the share will expire on the worker side. */
+  expiresAt?: string;
+  /** ISO timestamp of the most recent remote feedback we've seen */
+  lastFeedbackAt?: string;
+}
+
 export interface SessionData {
   id: string;
   projectRoot: string;
@@ -30,6 +88,7 @@ export interface SessionData {
   revisions: RevisionInfo[];
   createdAt: string;
   updatedAt: string;
+  shares?: ShareEntry[];
 }
 
 interface SessionMeta {
@@ -38,6 +97,7 @@ interface SessionMeta {
   updatedAt: string;
   currentRevision: number;
   revisions: RevisionInfo[];
+  shares?: ShareEntry[];
 }
 
 // Legacy format (flat files, pre-revision)
@@ -85,14 +145,22 @@ function computeLineDiffStats(oldText: string, newText: string): DiffStats {
 
 export class SessionManager {
   private sessions = new Map<string, SessionData>();
+  private readonly sessionsDir: string;
 
-  constructor() {
-    mkdirSync(SESSIONS_DIR, { recursive: true });
+  /**
+   * @param sessionsDir Override the on-disk sessions root. Defaults to
+   *   the global SESSIONS_DIR (`~/.claude/agent-canvas/sessions`).
+   *   Tests pass an isolated temp directory so they don't interfere with
+   *   the user's real sessions.
+   */
+  constructor(sessionsDir?: string) {
+    this.sessionsDir = sessionsDir ?? SESSIONS_DIR;
+    mkdirSync(this.sessionsDir, { recursive: true });
     this.loadFromDisk();
   }
 
   private sessionDir(id: string): string {
-    return join(SESSIONS_DIR, id);
+    return join(this.sessionsDir, id);
   }
 
   private revisionDir(id: string, rev: number): string {
@@ -126,10 +194,10 @@ export class SessionManager {
   }
 
   private loadFromDisk() {
-    if (!existsSync(SESSIONS_DIR)) return;
-    for (const name of readdirSync(SESSIONS_DIR, { withFileTypes: true })) {
+    if (!existsSync(this.sessionsDir)) return;
+    for (const name of readdirSync(this.sessionsDir, { withFileTypes: true })) {
       if (!name.isDirectory()) continue;
-      const dir = join(SESSIONS_DIR, name.name);
+      const dir = join(this.sessionsDir, name.name);
       const metaPath = join(dir, "meta.json");
       if (!existsSync(metaPath)) continue;
 
@@ -186,6 +254,7 @@ export class SessionManager {
           revisions: meta.revisions,
           createdAt: meta.createdAt,
           updatedAt: meta.updatedAt,
+          ...(meta.shares ? { shares: meta.shares } : {}),
         });
       } catch {}
     }
@@ -321,8 +390,44 @@ export class SessionManager {
       updatedAt: session.updatedAt,
       currentRevision: session.currentRevision,
       revisions: session.revisions,
+      ...(session.shares?.length ? { shares: session.shares } : {}),
     };
     writeFileSync(join(this.sessionDir(session.id), "meta.json"), JSON.stringify(meta, null, 2));
+  }
+
+  /** Record a new share for a session revision. */
+  addShare(id: string, entry: ShareEntry): void {
+    const session = this.sessions.get(id);
+    if (!session) return;
+    session.shares = [...(session.shares ?? []), entry];
+    session.updatedAt = new Date().toISOString();
+    this.persistMeta(session);
+  }
+
+  getShares(id: string): ShareEntry[] {
+    return this.sessions.get(id)?.shares ?? [];
+  }
+
+  removeShare(id: string, shareId: string): void {
+    const session = this.sessions.get(id);
+    if (!session?.shares) return;
+    session.shares = session.shares.filter((s) => s.shareId !== shareId);
+    session.updatedAt = new Date().toISOString();
+    this.persistMeta(session);
+  }
+
+  updateShareLastFeedback(id: string, shareId: string, at: string): void {
+    const session = this.sessions.get(id);
+    if (!session?.shares) return;
+    const entry = session.shares.find((s) => s.shareId === shareId);
+    if (!entry) return;
+    entry.lastFeedbackAt = at;
+    this.persistMeta(session);
+  }
+
+  /** List all sessions that have at least one share. Used by the remote feedback poller. */
+  listSessionsWithShares(): SessionData[] {
+    return Array.from(this.sessions.values()).filter((s) => (s.shares?.length ?? 0) > 0);
   }
 
   private persistToDisk(session: SessionData, canvasFiles: Map<string, string>) {
@@ -417,6 +522,34 @@ export class SessionManager {
 
   getRevisionJsxPath(id: string, rev: number, filename: string): string {
     return join(this.revisionDir(id, rev), filename);
+  }
+
+  /**
+   * Remote feedback from shared views. Stored as one JSON file per revision
+   * at `revisions/{rev}/remote_feedback.json`, containing an array of
+   * RemoteFeedbackEntry. Appended to (not replaced) as new feedback arrives.
+   */
+  appendRemoteFeedback(id: string, rev: number, entries: RemoteFeedbackEntry[]): void {
+    if (entries.length === 0) return;
+    const revDir = this.revisionDir(id, rev);
+    mkdirSync(revDir, { recursive: true });
+    const file = join(revDir, "remote_feedback.json");
+    let existing: RemoteFeedbackEntry[] = [];
+    try {
+      existing = JSON.parse(readFileSync(file, "utf-8"));
+    } catch {}
+    const seen = new Set(existing.map((e) => e.id));
+    const merged = [...existing];
+    for (const e of entries) if (!seen.has(e.id)) merged.push(e);
+    writeFileSync(file, JSON.stringify(merged, null, 2));
+  }
+
+  getRemoteFeedback(id: string, rev: number): RemoteFeedbackEntry[] {
+    try {
+      return JSON.parse(readFileSync(join(this.revisionDir(id, rev), "remote_feedback.json"), "utf-8"));
+    } catch {
+      return [];
+    }
   }
 
   cleanupStale(maxAge = STALE_TIMEOUT_MS) {
