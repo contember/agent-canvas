@@ -156,7 +156,7 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       shares: session.shares ?? [],
-      shareEnabled: !!process.env.CANVAS_SHARE_ENDPOINT,
+      shareEnabled: !!loadShareConfig(ctx.version),
     });
   }
 
