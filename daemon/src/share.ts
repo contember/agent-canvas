@@ -48,7 +48,7 @@ export interface ShareConfig {
 }
 
 export function loadShareConfig(version: string): ShareConfig | null {
-  const endpoint = process.env.CANVAS_SHARE_ENDPOINT;
+  const endpoint = process.env.CANVAS_SHARE_ENDPOINT ?? "https://canvas.contember.com";
   if (!endpoint) return null;
   return {
     endpoint: endpoint.replace(/\/+$/, ""),
