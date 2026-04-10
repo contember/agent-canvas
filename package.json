@@ -29,6 +29,9 @@
     "type": "git",
     "url": "https://github.com/contember/agent-canvas"
   },
+  "workspaces": [
+    "workers/*"
+  ],
   "license": "MIT",
   "keywords": [
     "claude-code",
