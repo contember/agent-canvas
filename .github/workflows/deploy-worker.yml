@@ -25,11 +25,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
-      - name: Install root dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Install worker dependencies
-        working-directory: workers/canvas-share
+      - name: Install dependencies
         run: bun install --frozen-lockfile
 
       # Build the daemon bundles first. The root build script auto-mirrors
