@@ -43,7 +43,8 @@ export function useTextAnnotation(options: UseTextAnnotationOptions) {
   const setActiveAnnotationIdRef = useRef(setActiveAnnotationId);
   setActiveAnnotationIdRef.current = setActiveAnnotationId;
 
-  // Mark restoration after content renders
+  // Mark restoration after content renders or annotations change
+  const restoreAnnotationsLen = restoreAnnotations.length;
   useEffect(() => {
     if (!containerRef.current) return;
     const timer = setTimeout(() => {
@@ -52,7 +53,7 @@ export function useTextAnnotation(options: UseTextAnnotationOptions) {
       }
     }, 50);
     return () => clearTimeout(timer);
-  }, [restoreKey]);
+  }, [restoreKey, restoreAnnotationsLen]);
 
   // Mark active state tracking
   const prevActiveRef = useRef<string | null>(null);
