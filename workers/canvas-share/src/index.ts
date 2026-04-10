@@ -254,7 +254,8 @@ async function handleListFeedback(shareId: string, req: Request, env: Env): Prom
     cursor = list.list_complete ? undefined : list.cursor;
 
     const wanted = list.keys.filter((k) => {
-      const submittedAt = k.name.slice(prefix.length).split(":")[0];
+      const rest = k.name.slice(prefix.length);
+      const submittedAt = rest.slice(0, rest.lastIndexOf(":"));
       return !since || submittedAt > since;
     });
     if (wanted.length === 0) {
