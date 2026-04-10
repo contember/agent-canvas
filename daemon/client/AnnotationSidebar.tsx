@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useState, useContext } from "react";
+import React, { useRef, useEffect, useCallback, useState, useContext, useMemo } from "react";
 import { useAnnotations, Annotation } from "./AnnotationProvider";
 import { setMarkActive } from "./highlightRange";
 import { generateMarkdown, hasValue, getMissingRequiredLabels } from "./generateMarkdown";
@@ -10,14 +10,14 @@ import { autoResizeTextarea, RESPONSE_ANNOTATION_PATH } from "./utils";
 import { AnnotationEditor, ImageThumbnails } from "./AnnotationEditor";
 import { findAnnotationElement, scrollToAnnotation } from "./annotationDom";
 import { MODE, FS_AVAILABLE } from "./clientApi";
+import { ResponsePreview } from "./ResponsePreview";
 
 interface AnnotationSidebarProps {
-  onPreview: () => void;
   onSubmit: (feedback: string) => void;
   collapseButton?: React.ReactNode;
 }
 
-export function AnnotationSidebar({ onPreview, onSubmit, collapseButton }: AnnotationSidebarProps) {
+export function AnnotationSidebar({ onSubmit, collapseButton }: AnnotationSidebarProps) {
   const { isReadOnly, selectedRevision, currentRevision, revisions, agentWatching } = useContext(RevisionContext);
   const sessionId = useContext(SessionContext);
   const selectedRevInfo = revisions.find((r) => r.revision === selectedRevision);
@@ -29,7 +29,7 @@ export function AnnotationSidebar({ onPreview, onSubmit, collapseButton }: Annot
     return <ReadOnlyAnnotationSidebar sessionId={sessionId} revision={selectedRevision} label={roundLabel} waitingForUpdate={isCurrentButSubmitted} feedbackConsumed={feedbackConsumed} agentWatching={agentWatching} collapseButton={collapseButton} />;
   }
 
-  return <AnnotationSidebarInner onPreview={onPreview} onSubmit={onSubmit} agentWatching={agentWatching} collapseButton={collapseButton} />;
+  return <AnnotationSidebarInner onSubmit={onSubmit} agentWatching={agentWatching} collapseButton={collapseButton} />;
 }
 
 function FeedbackDisplay({ sessionId, revision, label, waitingForUpdate, feedbackConsumed, agentWatching, collapseButton }: { sessionId: string; revision: number; label: string; waitingForUpdate?: boolean; feedbackConsumed?: boolean; agentWatching?: boolean; collapseButton?: React.ReactNode }) {
@@ -311,7 +311,8 @@ function ReadOnlyAnnotationList({ annotations, generalNote, activeAnnotationId, 
   );
 }
 
-function AnnotationSidebarInner({ onPreview, onSubmit, agentWatching, collapseButton }: AnnotationSidebarProps & { agentWatching: boolean }) {
+function AnnotationSidebarInner({ onSubmit, agentWatching, collapseButton }: Omit<AnnotationSidebarProps, "onPreview"> & { agentWatching: boolean }) {
+  const [previewOpen, setPreviewOpen] = useState(false);
   const {
     annotations, updateAnnotation, removeAnnotation,
     addAnnotationImage, removeAnnotationImage,
@@ -355,6 +356,27 @@ function AnnotationSidebarInner({ onPreview, onSubmit, agentWatching, collapseBu
     setMarkActive(annId, false);
   }, [activeAnnotationId]);
 
+  const remoteAnnotations = useMemo(() => annotations.filter((a) => a.source === "remote"), [annotations]);
+  const [includedRemoteIds, setIncludedRemoteIds] = useState<Set<string>>(() => new Set());
+
+  // Auto-include new remote annotations as they arrive
+  useEffect(() => {
+    if (remoteAnnotations.length === 0) return;
+    setIncludedRemoteIds((prev) => {
+      const next = new Set(prev);
+      for (const a of remoteAnnotations) next.add(a.id);
+      return next.size === prev.size ? prev : next;
+    });
+  }, [remoteAnnotations]);
+
+  const toggleRemoteId = useCallback((id: string) => {
+    setIncludedRemoteIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
   const hasResponses = Array.from(responses.values()).some(hasValue);
   const hasFeedback = feedbackEntries.size > 0;
   const hasContent = annotations.length > 0 || generalNote.trim().length > 0 || hasResponses || hasFeedback;
@@ -392,6 +414,14 @@ function AnnotationSidebarInner({ onPreview, onSubmit, agentWatching, collapseBu
     >
       {isRemote && ann.author && (
         <div className="flex items-center gap-1.5 mb-1.5">
+          <input
+            type="checkbox"
+            checked={includedRemoteIds.has(ann.id)}
+            onChange={(e) => { e.stopPropagation(); toggleRemoteId(ann.id); }}
+            onClick={(e) => e.stopPropagation()}
+            className="accent-accent-purple flex-shrink-0"
+            title="Include in submission"
+          />
           <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-accent-purple text-white text-[9px] font-medium uppercase">
             {ann.author.name.charAt(0)}
           </span>
@@ -539,7 +569,7 @@ function AnnotationSidebarInner({ onPreview, onSubmit, agentWatching, collapseBu
           <button
             onClick={() => {
               setValidationError(null);
-              const md = generateMarkdown(annotations, generalNote, responses, feedbackEntries);
+              const md = generateMarkdown(annotations, generalNote, responses, feedbackEntries, includedRemoteIds);
               onSubmit(md);
             }}
             className="text-[11px] text-text-tertiary hover:text-text-secondary font-body whitespace-nowrap underline"
@@ -554,7 +584,7 @@ function AnnotationSidebarInner({ onPreview, onSubmit, agentWatching, collapseBu
         {hasContent ? (
           <div className="flex gap-2">
             <button
-              onClick={onPreview}
+              onClick={() => setPreviewOpen(true)}
               className="flex-1 py-2 rounded-lg font-body text-[13px] font-medium transition-all bg-border-subtle text-text-secondary hover:bg-border-medium hover:text-text-primary"
             >
               Preview
@@ -567,7 +597,7 @@ function AnnotationSidebarInner({ onPreview, onSubmit, agentWatching, collapseBu
                   return;
                 }
                 setValidationError(null);
-                const md = generateMarkdown(annotations, generalNote, responses, feedbackEntries);
+                const md = generateMarkdown(annotations, generalNote, responses, feedbackEntries, includedRemoteIds);
                 onSubmit(md);
               }}
               className="flex-1 py-2 rounded-lg font-body text-[13px] font-medium transition-all bg-btn-primary text-btn-primary-text hover:opacity-90 hover:-translate-y-px shadow-sm"
@@ -584,8 +614,14 @@ function AnnotationSidebarInner({ onPreview, onSubmit, agentWatching, collapseBu
           </button>
         )}
       </div>
+      <ResponsePreview
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        onSubmit={onSubmit}
+        includedRemoteIds={includedRemoteIds}
+        onToggleRemoteId={toggleRemoteId}
+      />
     </div>
   );
 }
-
 

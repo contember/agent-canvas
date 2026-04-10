@@ -5,7 +5,6 @@ import { SessionContext, ActiveViewCtx } from "#canvas/runtime";
 import { AnnotationProvider, useAnnotations } from "./AnnotationProvider";
 import { PlanRenderer } from "./PlanRenderer";
 import { AnnotationSidebar } from "./AnnotationSidebar";
-import { ResponsePreview } from "./ResponsePreview";
 import { FileBrowser } from "./FileBrowser";
 import { FileIcon } from "./FileIcon";
 import { FileViewer } from "./FileViewer";
@@ -226,8 +225,8 @@ function App() {
   const [revisions, setRevisions] = useState<RevisionInfo[]>([]);
   const [compareRevision, setCompareRevision] = useState<{ left: number; right: number } | null>(null);
   const [connected, setConnected] = useState(false);
+  const [sharedFeedbackSubmitted, setSharedFeedbackSubmitted] = useState(false);
   const [agentWatching, setAgentWatching] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [canvasFiles, setCanvasFiles] = useState<string[]>([]);
   const [activeView, setActiveViewRaw] = useState<ActiveView>({ type: "overview" });
   const [openFiles, setOpenFiles] = useState<string[]>([]);
@@ -278,7 +277,7 @@ function App() {
   const scrollPositions = useRef<Map<string, number>>(new Map());
 
   const selectedRevInfo = revisions.find((r) => r.revision === selectedRevision);
-  const isReadOnly = selectedRevision !== currentRevision || !!selectedRevInfo?.hasFeedback;
+  const isReadOnly = selectedRevision !== currentRevision || !!selectedRevInfo?.hasFeedback || sharedFeedbackSubmitted;
 
   const setActiveView = useCallback((v: ActiveView) => {
     // Save current scroll position before switching
@@ -446,7 +445,7 @@ function App() {
         annotations: structuredAnnotations,
         generalNote: feedback,
       });
-      setPreviewOpen(false);
+      setSharedFeedbackSubmitted(true);
       setToast({ kind: "success", message: "Feedback submitted. The canvas author will see it shortly." });
     } catch (e: any) {
       setToast({ kind: "error", message: `Failed to submit feedback: ${e.message || e}` });
@@ -469,7 +468,6 @@ function App() {
 
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "submit", feedback }));
-      setPreviewOpen(false);
       // Server will broadcast revision-updated with hasFeedback: true
       // which triggers isReadOnly via revisions state
     }
@@ -497,7 +495,7 @@ function App() {
 
               {/* Right panel — fixed to viewport, resizable */}
               <ResizableSidebar collapsed={rightCollapsed} onToggle={() => setRightCollapsed((c) => !c)}>
-                <AnnotationSidebar onPreview={() => setPreviewOpen(true)} onSubmit={handleSubmit} />
+                <AnnotationSidebar onSubmit={handleSubmit} />
               </ResizableSidebar>
 
               {/* Center content — normal document flow, browser scroll */}
@@ -606,13 +604,11 @@ function App() {
                       <button onClick={() => setMobileSidebar(false)} className="text-text-tertiary hover:text-text-secondary w-7 h-7 flex items-center justify-center">&#x2715;</button>
                     </div>
                     <div className="flex-1 overflow-hidden">
-                      <AnnotationSidebar onPreview={() => setPreviewOpen(true)} onSubmit={handleSubmit} />
+                      <AnnotationSidebar onSubmit={handleSubmit} />
                     </div>
                   </div>
                 </div>
               )}
-
-              <ResponsePreview open={previewOpen} onClose={() => setPreviewOpen(false)} onSubmit={handleSubmit} />
 
               <ShareDialog
                 sessionId={sessionId}

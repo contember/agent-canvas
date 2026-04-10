@@ -10,11 +10,15 @@ export function generateMarkdown(
   generalNote: string,
   responses?: Map<string, PlanResponse>,
   feedbackEntries?: Map<string, FeedbackEntry>,
+  includedRemoteIds?: Set<string>,
 ): string {
   const parts: string[] = [];
-  const responseAnns = annotations.filter((a) => a.filePath === RESPONSE_ANNOTATION_PATH);
-  const canvasAnns = annotations.filter((a) => !a.filePath);
-  const fileAnns = annotations.filter((a) => a.filePath && a.filePath !== RESPONSE_ANNOTATION_PATH);
+  const included = annotations.filter((a) =>
+    a.source !== "remote" || (includedRemoteIds && includedRemoteIds.has(a.id))
+  );
+  const responseAnns = included.filter((a) => a.filePath === RESPONSE_ANNOTATION_PATH);
+  const canvasAnns = included.filter((a) => !a.filePath);
+  const fileAnns = included.filter((a) => a.filePath && a.filePath !== RESPONSE_ANNOTATION_PATH);
   const resps = responses ? Array.from(responses.values()).filter((r) => hasValue(r)) : [];
   const fbEntries = feedbackEntries
     ? Array.from(feedbackEntries.values()).filter((e) => e.markdown.trim())

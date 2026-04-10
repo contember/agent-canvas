@@ -7,9 +7,11 @@ interface ResponsePreviewProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (feedback: string) => void;
+  includedRemoteIds: Set<string>;
+  onToggleRemoteId: (id: string) => void;
 }
 
-export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProps) {
+export function ResponsePreview({ open, onClose, onSubmit, includedRemoteIds, onToggleRemoteId }: ResponsePreviewProps) {
   const { annotations, generalNote, responses, feedbackEntries } = useAnnotations();
   const [editedText, setEditedText] = useState("");
   const [manuallyEdited, setManuallyEdited] = useState(false);
@@ -17,6 +19,11 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
   const [validationError, setValidationError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [prevOpen, setPrevOpen] = useState(false);
+
+  const remoteAnnotations = useMemo(
+    () => annotations.filter((a) => a.source === "remote"),
+    [annotations],
+  );
 
   if (open && !prevOpen) {
     setManuallyEdited(false);
@@ -33,8 +40,8 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
   }
 
   const generatedText = useMemo(
-    () => generateMarkdown(annotations, generalNote, responses, feedbackEntries),
-    [annotations, generalNote, responses, feedbackEntries]
+    () => generateMarkdown(annotations, generalNote, responses, feedbackEntries, includedRemoteIds),
+    [annotations, generalNote, responses, feedbackEntries, includedRemoteIds],
   );
   const text = manuallyEdited ? editedText : generatedText;
 
@@ -108,6 +115,15 @@ export function ResponsePreview({ open, onClose, onSubmit }: ResponsePreviewProp
         ) : (
           <div className="flex-1 overflow-y-auto p-5">
             <MarkdownPreview text={text} />
+          </div>
+        )}
+
+        {/* Remote feedback summary */}
+        {remoteAnnotations.length > 0 && (
+          <div className="px-5 py-2 border-t border-border-subtle flex-shrink-0">
+            <span className="text-[12px] text-text-secondary font-body">
+              Reviewer feedback: {includedRemoteIds.size}/{remoteAnnotations.length} included
+            </span>
           </div>
         )}
 
