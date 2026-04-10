@@ -367,6 +367,7 @@ async function handleUploadServe(shareId: string, filename: string, env: Env): P
   });
 }
 
+
 // ----- HTML shell -----------------------------------------------------------
 
 /** HTML served at /s/:shareId. Loads runtime bundles + booted client in
@@ -417,6 +418,11 @@ export default {
 
     if (req.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
+    // Landing page — served from public/index.html via ASSETS binding
+    if (url.pathname === "/" && req.method === "GET") {
+      return env.ASSETS.fetch(req);
     }
 
     // Health check

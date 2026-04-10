@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Canvas &mdash; Visual canvas for Claude Code</title>
+  <meta name="description" content="Give Claude Code a browser. Author JSX canvases, annotate, collect feedback, and share with your team." />
+  
+  <!-- Moderní font, který eliminuje "generický system font" look -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-base: #050505;
+      --bg-surface: #0e0e11;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --text-main: #f3f3f6;
+      --text-muted: #a1a1aa;
+      --accent: #5e6ad2;
+      --accent-glow: #8b96ff;
+    }
+
+    /* Reset & Base */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Developer-style grid background */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100vh;
+      background-image: 
+        linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+      pointer-events: none;
+      z-index: -2;
+    }
+
+    /* Subtle ambient glow */
+    .glow {
+      position: absolute;
+      top: -10vw;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60vw;
+      height: 30vw;
+      background: radial-gradient(ellipse at center, rgba(94, 106, 210, 0.15) 0%, rgba(0,0,0,0) 70%);
+      filter: blur(60px);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    /* --- Hero Section --- */
+    .hero {
+      padding: 8rem 0 5rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      padding: 0.4rem 0.8rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+      backdrop-filter: blur(10px);
+    }
+
+    .hero h1 {
+      font-size: clamp(3rem, 6vw, 4.5rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      margin-bottom: 1.5rem;
+      text-wrap: balance;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, #fff, var(--accent-glow));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      padding-right: 0.1em;
+    }
+
+    .hero .lead {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      max-width: 580px;
+      margin: 0 auto 2.5rem;
+      text-wrap: balance;
+    }
+
+    /* Buttons */
+    .actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    
+    .btn-primary {
+      background: var(--text-main);
+      color: var(--bg-base);
+      border: 1px solid transparent;
+      box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.2);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px -5px rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      backdrop-filter: blur(10px);
+    }
+    .btn-ghost:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    /* --- Screenshot / Browser Mockup --- */
+    .screenshot {
+      max-width: 1100px;
+      margin: 0 auto 6rem;
+      padding: 0 1.5rem;
+      perspective: 1000px;
+    }
+    .screenshot img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+    }
+    
+
+    /* --- Bento Box: How it works --- */
+    .how {
+      margin-bottom: 6rem;
+    }
+    
+    .section-title {
+      font-size: 2rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 3rem;
+      letter-spacing: -0.02em;
+    }
+
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .bento-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-color);
+      padding: 2rem;
+      border-radius: 16px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .bento-card:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .step-num {
+      width: 36px; height: 36px;
+      background: rgba(94, 106, 210, 0.15);
+      color: var(--accent-glow);
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .bento-card h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--text-main);
+    }
+
+    .bento-card p {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85em;
+      padding: 0.2em 0.4em;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.08);
+      color: var(--text-main);
+    }
+
+    /* --- Terminal Install --- */
+    .install-section {
+      text-align: center;
+      margin-bottom: 6rem;
+    }
+
+    .terminal-wrapper {
+      display: inline-block;
+      min-width: 400px;
+      background: #000;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+      text-align: left;
+    }
+
+    .terminal-header {
+      background: #111;
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      gap: 6px;
+    }
+
+    .terminal-header span {
+      width: 10px; height: 10px; border-radius: 50%; background: #333;
+    }
+
+    .terminal-body {
+      padding: 1.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    .terminal-body span { color: var(--accent-glow); }
+    .terminal-body b { color: var(--text-main); font-weight: normal; }
+
+    /* --- Footer --- */
+    footer {
+      padding: 3rem 0;
+      border-top: 1px solid var(--border-color);
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    
+    footer a { 
+      color: var(--text-main); 
+      text-decoration: none; 
+      transition: color 0.15s;
+    }
+    
+    footer a:hover { color: var(--accent-glow); }
+
+    @media (max-width: 768px) {
+      .hero { padding: 5rem 0 3rem; }
+      .terminal-wrapper { min-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  
+  <div class="glow"></div>
+
+  <div class="container">
+    <section class="hero">
+      <div class="hero-badge">Claude Code Integration</div>
+      <h1>Give your AI agent<br />a <em>canvas</em></h1>
+      <p class="lead">
+        Agent Canvas lets Claude Code render JSX documents in the browser.
+        Annotate, review with your team, and send structured feedback
+        back to the agent in one continuous loop.
+      </p>
+      
+      <div class="actions">
+        <a class="btn btn-primary" href="https://github.com/contember/agent-canvas">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.09-.745.083-.729.083-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.418-1.305.762-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.605-.015 2.896-.015 3.286 0 .315.21.694.825.576C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12"/></svg>
+          View on GitHub
+        </a>
+        <a class="btn btn-ghost" href="https://www.npmjs.com/package/agent-canvas">npm package</a>
+      </div>
+    </section>
+
+    <section class="install-section">
+      <div class="terminal-wrapper">
+        <div class="terminal-header">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="terminal-body">
+          <b>bunx</b> agent-canvas install
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="screenshot">
+      <img src="/screenshot-dark.png" alt="Agent Canvas displaying annotated project UI" />
+  </div>
+
+  <div class="container">
+    <section class="how">
+      <h2 class="section-title">Workflow built for speed</h2>
+      <div class="bento-grid">
+        
+        <div class="bento-card">
+          <div class="step-num">1</div>
+          <h3>Install the skill</h3>
+          <p>Run <code>bunx agent-canvas install</code> once to globally register the <code>/canvas</code> command in your Claude Code CLI.</p>
+        </div>
+
+        <div class="bento-card">
+          <div class="step-num">2</div>
+          <h3>Generate a canvas</h3>
+          <p>Ask Claude for a plan, component, or report. It writes standard JSX, auto-compiles it, and launches your browser instantly.</p>
+        </div>
+
+        <div class="bento-card">
+          <div class="step-num">3</div>
+          <h3>Click & annotate</h3>
+          <p>Select any rendered element to leave feedback. Write notes, vote on tasks, or general comments. Feedback returns right to Claude.</p>
+        </div>
+
+        <div class="bento-card">
+          <div class="step-num">4</div>
+          <h3>Share the link</h3>
+          <p>Create a shortlink for any revision. Your teammates can review without cloning code. Everything syncs back to your terminal securely.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <footer>
+      <p>
+        <a href="https://github.com/contember/agent-canvas">contember/agent-canvas</a>
+        &nbsp;&middot;&nbsp; Open Source &nbsp;&middot;&nbsp; MIT Licensed
+      </p>
+    </footer>
+  </div>
+
+</body>
+</html>
