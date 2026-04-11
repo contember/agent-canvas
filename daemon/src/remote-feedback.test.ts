@@ -162,18 +162,22 @@ describe("startRemoteFeedbackPoller", () => {
     expect(calls).toBe(0);
   });
 
-  test("does nothing when CANVAS_SHARE_ENDPOINT not set", async () => {
+  test("uses default endpoint when CANVAS_SHARE_ENDPOINT not set", async () => {
     delete process.env.CANVAS_SHARE_ENDPOINT;
 
     const sm = newSessionManager();
-    setupSession(sm);
-    let calls = 0;
-    (globalThis as any).fetch = async () => { calls++; return new Response("", { status: 200 }); };
+    const { shareId } = setupSession(sm);
+    let capturedUrl = "";
+    (globalThis as any).fetch = async (url: any) => {
+      capturedUrl = String(url);
+      return new Response(JSON.stringify({ entries: [] }), { status: 200 });
+    };
 
     const poller = startRemoteFeedbackPoller(sm, () => {}, "0.0.0");
     await new Promise((r) => setTimeout(r, 100));
     poller.stop();
 
-    expect(calls).toBe(0);
+    expect(capturedUrl).toContain("canvas.contember.com");
+    expect(capturedUrl).toContain(shareId);
   });
 });
