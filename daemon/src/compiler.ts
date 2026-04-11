@@ -3,10 +3,8 @@ import { join } from "path";
 import { randomUUID } from "crypto";
 import { h, Fragment } from "preact";
 import renderToString from "preact-render-to-string";
-import mermaid from "mermaid";
+import { validateMermaid } from "@aj-archipelago/merval";
 import { COMPILE_TEMP_DIR } from "./paths";
-
-mermaid.initialize({ startOnLoad: false });
 
 type CompileResult =
   | { ok: true; js: string }
@@ -121,13 +119,9 @@ async function validateCompiledPlan(js: string): Promise<{ ok: true } | { ok: fa
 
   // Validate collected Mermaid diagram sources
   for (const source of collectedMermaidSources) {
-    try {
-      await mermaid.parse(source);
-    } catch (e: any) {
-      const msg = e?.message || String(e);
-      // DOMPurify doesn't work in Bun (no DOM) — mermaid.parse() triggers
-      // it for some diagram types even though it's just parsing. Skip these.
-      if (msg.includes("DOMPurify")) continue;
+    const result = validateMermaid(source);
+    if (!result.isValid) {
+      const msg = result.errors?.map((e) => e.message).join("; ") || "Invalid diagram";
       return { ok: false, error: `Mermaid syntax error: ${msg}` };
     }
   }
