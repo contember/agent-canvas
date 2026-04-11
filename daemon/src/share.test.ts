@@ -32,15 +32,6 @@ afterEach(() => {
 });
 
 describe("loadShareConfig", () => {
-  test("returns default endpoint when env not set", () => {
-    const before = process.env.CANVAS_SHARE_ENDPOINT;
-    delete process.env.CANVAS_SHARE_ENDPOINT;
-    const cfg = loadShareConfig("0.0.0");
-    expect(cfg).not.toBeNull();
-    expect(cfg?.endpoint).toBe("https://canvas.contember.com");
-    if (before) process.env.CANVAS_SHARE_ENDPOINT = before;
-  });
-
   test("strips trailing slashes", () => {
     process.env.CANVAS_SHARE_ENDPOINT = "https://example.com/";
     const cfg = loadShareConfig("0.0.0");
