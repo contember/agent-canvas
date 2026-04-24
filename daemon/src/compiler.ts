@@ -3,7 +3,7 @@ import { join } from "path";
 import { randomUUID } from "crypto";
 import { h, Fragment } from "preact";
 import renderToString from "preact-render-to-string";
-import { validateMermaid } from "@aj-archipelago/merval";
+import { parse as parseMermaid } from "mermaid-parser-bundle";
 import { COMPILE_TEMP_DIR } from "./paths";
 
 type CompileResult =
@@ -119,9 +119,10 @@ async function validateCompiledPlan(js: string): Promise<{ ok: true } | { ok: fa
 
   // Validate collected Mermaid diagram sources
   for (const source of collectedMermaidSources) {
-    const result = validateMermaid(source);
-    if (!result.isValid) {
-      const msg = result.errors?.map((e) => e.message).join("; ") || "Invalid diagram";
+    try {
+      await parseMermaid(source);
+    } catch (e: any) {
+      const msg = (e?.message || "Invalid diagram").split("\n")[0];
       return { ok: false, error: `Mermaid syntax error: ${msg}` };
     }
   }

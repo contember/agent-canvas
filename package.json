@@ -12,8 +12,8 @@
     "prepublishOnly": "bun daemon/build.ts"
   },
   "dependencies": {
-    "@aj-archipelago/merval": "^1.0.7",
     "marked": "^17.0.4",
+    "mermaid-parser-bundle": "^0.1.2",
     "preact": "^10.25.0",
     "preact-render-to-string": "^6.6.6"
   },
