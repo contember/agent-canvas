@@ -1,4 +1,5 @@
 import React from "react";
+import { renderMarkdownChildren } from "./renderMarkdownChildren";
 
 interface CalloutProps {
   type?: "info" | "warning" | "danger" | "tip";
@@ -19,7 +20,7 @@ export function Callout({ type = "info", children }: CalloutProps) {
       <span className={`${cfg.iconColor} opacity-70 text-base leading-relaxed flex-shrink-0 mt-px`}>
         {cfg.icon}
       </span>
-      <div className="text-body text-text-secondary leading-relaxed">{children}</div>
+      <div className="text-body text-text-secondary leading-relaxed">{renderMarkdownChildren(children)}</div>
     </div>
   );
 }

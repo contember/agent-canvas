@@ -1,4 +1,5 @@
 import React from "react";
+import { renderMarkdownChildren } from "./renderMarkdownChildren";
 
 type Status = "todo" | "done" | "blocked" | "in-progress";
 type BadgeVariant = "info" | "success" | "warning" | "danger" | "neutral";
@@ -61,7 +62,7 @@ export function Item({ id, label, status, badge, badgeVariant = "neutral", child
             )}
           </div>
           {children && (
-            <div className="text-body text-text-secondary mt-1 leading-relaxed">{children}</div>
+            <div className="text-body text-text-secondary mt-1 leading-relaxed">{renderMarkdownChildren(children)}</div>
           )}
         </div>
       </div>

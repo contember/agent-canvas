@@ -70,6 +70,7 @@ function walkNode(el: HTMLElement, lines: string[], depth: number) {
       case "codeblock": return handleCodeBlock(el, lines);
       case "callout": return handleCallout(el, lines);
       case "note": return handleNote(el, lines);
+      case "markdown": return handleMarkdown(el, lines);
       case "table": return handleTable(el, lines);
       case "checklist": return handleChecklist(el, lines);
       case "diff": return handleDiff(el, lines);
@@ -206,6 +207,11 @@ function handleMermaid(el: HTMLElement, lines: string[]) {
   if (source) {
     lines.push("```mermaid", source, "```", "");
   }
+}
+
+function handleMarkdown(el: HTMLElement, lines: string[]) {
+  const source = el.getAttribute("data-md-source") || "";
+  if (source) lines.push(source, "");
 }
 
 function handleChoice(el: HTMLElement, lines: string[]) {

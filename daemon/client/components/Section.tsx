@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { renderMarkdownChildren } from "./renderMarkdownChildren";
 
 interface SectionProps {
   title: string;
@@ -26,7 +27,7 @@ export function Section({ title, children }: SectionProps) {
           {title}
         </h2>
       </div>
-      <div className={collapsed ? "mt-6 hidden" : "mt-6"}>{children}</div>
+      <div className={collapsed ? "mt-6 hidden" : "mt-6"}>{renderMarkdownChildren(children)}</div>
     </div>
   );
 }
