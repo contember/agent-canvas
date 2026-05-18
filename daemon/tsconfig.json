@@ -16,5 +16,8 @@
     }
   },
   "include": ["src/**/*", "client/**/*"],
-  "exclude": ["client/compat/**/*"]
+  "exclude": [
+    "client/compat/**/*",
+    "src/share-e2e.test.ts"
+  ]
 }
