@@ -9,7 +9,8 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { SessionManager } from "./session";
-import { buildSharePayload, pushShareToWorker, shareRevision, loadShareConfig } from "./share";
+import { buildSharePayload, pushShareToWorker, shareRevision, loadShareConfig, encryptSharePayload } from "./share";
+import { generateShareKey, importShareKey, decryptString } from "../client/shareCrypto";
 
 let testDir: string;
 let originalSessionsDir: string | undefined;
@@ -195,18 +196,92 @@ describe("shareRevision", () => {
     const entry = await shareRevision(sm, sid, 1, {
       endpoint: "https://example.com",
       componentsVersion: "1.0.0",
+      encryption: false,
     });
 
     expect(entry.shareId).toBe("abc123def456");
     expect(entry.revision).toBe(1);
     expect(entry.ownerToken).toBe("owner");
     expect(entry.expiresAt).toBe("2026-12-31T00:00:00Z");
+    // Legacy unencrypted share: no key recorded, no #k= fragment.
+    expect(entry.encryptionKey).toBeUndefined();
+    expect(entry.url).toBe("https://example.com/s/abc123def456");
 
     const shares = sm.getShares(sid);
     expect(shares).toHaveLength(1);
     expect(shares[0].shareId).toBe("abc123def456");
 
     sm.remove(sid);
+  });
+
+  test("encrypts payload by default and appends #k= fragment to URL", async () => {
+    let captured: any = null;
+    (globalThis as any).fetch = async (_url: any, init: any) => {
+      captured = JSON.parse(init.body);
+      return new Response(JSON.stringify({
+        shareId: "encshareid01",
+        url: "https://example.com/s/encshareid01",
+        ownerToken: "owner",
+      }), { status: 200 });
+    };
+
+    const sm = new SessionManager(testDir);
+    const sid = `enc-${Date.now()}`;
+    sm.upsert(sid, new Map([["plan.jsx", "<Section>hi</Section>"]]), "/tmp", "Secret Label");
+    sm.saveCompiled(sid, "plan.jsx", "/* SECRET-COMPILED */ export default ()=>null");
+
+    const entry = await shareRevision(sm, sid, 1, {
+      endpoint: "https://example.com",
+      componentsVersion: "1.0.0",
+      encryption: true,
+    });
+
+    // Payload going to the worker must be ciphertext, not plaintext.
+    expect(captured.encryption).toEqual({ alg: "AES-GCM", v: 1 });
+    expect(captured.origin.sessionId).not.toBe(sid);
+    expect(captured.origin.label).not.toBe("Secret Label");
+    expect(captured.canvasFiles[0].compiledJs).not.toContain("SECRET-COMPILED");
+    expect(captured.origin.revision).toBe(1); // revision stays plaintext (routing)
+    expect(captured.canvasFiles[0].filename).toBe("plan.jsx"); // filename stays plaintext
+
+    // The URL handed to the user includes the key as a fragment, and the
+    // ShareEntry retains a local copy so the daemon can decrypt feedback.
+    expect(entry.url.startsWith("https://example.com/s/encshareid01#k=")).toBe(true);
+    expect(typeof entry.encryptionKey).toBe("string");
+
+    // Round-trip: import the stored key and confirm it decrypts the
+    // ciphertext that was actually sent to the worker.
+    const key = await importShareKey(entry.encryptionKey!);
+    expect(await decryptString(key, captured.origin.sessionId)).toBe(sid);
+    expect(await decryptString(key, captured.origin.label)).toBe("Secret Label");
+    expect(await decryptString(key, captured.canvasFiles[0].compiledJs)).toContain("SECRET-COMPILED");
+
+    sm.remove(sid);
+  });
+});
+
+describe("encryptSharePayload", () => {
+  test("leaves routing fields plaintext, encrypts secrets", async () => {
+    const key = await generateShareKey();
+    const result = await encryptSharePayload(
+      {
+        version: 1,
+        origin: { sessionId: "sess", revision: 7, label: "lbl", createdAt: "2026-04-09T00:00:00.000Z" },
+        canvasFiles: [
+          { filename: "plan.jsx", compiledJs: "JS-BODY", sourceJsx: "JSX-BODY" },
+        ],
+        runtime: { componentsVersion: "9.9.9" },
+      },
+      key,
+    );
+    expect(result.encryption).toEqual({ alg: "AES-GCM", v: 1 });
+    expect(result.origin.revision).toBe(7);
+    expect(result.origin.createdAt).toBe("2026-04-09T00:00:00.000Z");
+    expect(result.runtime.componentsVersion).toBe("9.9.9");
+    expect(result.canvasFiles[0].filename).toBe("plan.jsx");
+    expect(result.origin.sessionId).not.toBe("sess");
+    expect(result.canvasFiles[0].compiledJs).not.toBe("JS-BODY");
+    expect(result.canvasFiles[0].sourceJsx).not.toBe("JSX-BODY");
   });
 });
 

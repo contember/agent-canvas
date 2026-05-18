@@ -16,8 +16,15 @@ export interface Env {
   SHARE_TTL_SECONDS?: string;
 }
 
+export interface EncryptionMeta {
+  alg: "AES-GCM";
+  v: 1;
+}
+
 export interface SharePayload {
   version: 1;
+  /** Present when sessionId/label/compiledJs/sourceJsx are ciphertext. */
+  encryption?: EncryptionMeta;
   origin: {
     sessionId: string;
     revision: number;
@@ -40,6 +47,9 @@ export interface ShareRecord {
   componentsVersion: string;
   origin: SharePayload["origin"];
   canvasFilenames: string[];
+  /** Mirrored from the SharePayload so consumers (meta endpoint, daemon
+   *  feedback poller) know whether they're looking at ciphertext fields. */
+  encryption?: EncryptionMeta;
 }
 
 export interface FeedbackPostBody {
@@ -56,6 +66,10 @@ export interface FeedbackPostBody {
   }>;
   generalNote?: string;
   revision: number;
+  /** Present when name/snippet/note/etc. fields are ciphertext. The worker
+   *  stores the marker verbatim; the daemon uses it to decide whether to
+   *  decrypt with the share's encryption key. */
+  encryption?: EncryptionMeta;
 }
 
 export interface FeedbackEntry {
@@ -66,6 +80,7 @@ export interface FeedbackEntry {
   author: { id: string; name: string };
   annotations: FeedbackPostBody["annotations"];
   generalNote?: string;
+  encryption?: EncryptionMeta;
 }
 
 // --- Limits — single source of truth -------------------------------------
@@ -77,12 +92,19 @@ export const LIMITS = {
   FEEDBACK_BODY_BYTES: 256 * 1024, // 256 KB
   /** Maximum size of an annotation upload. */
   UPLOAD_BYTES: 5 * 1024 * 1024, // 5 MB
-  /** Maximum length of a reviewer-supplied display name. */
+  /** Maximum length of a reviewer-supplied display name (plaintext mode). */
   AUTHOR_NAME_LENGTH: 80,
+  /** Loose upper bound for `author.name` accepted by validation. Plaintext
+   *  names are sliced down to AUTHOR_NAME_LENGTH in the handler; ciphertext
+   *  names from encrypted shares need extra headroom for IV + tag + base64
+   *  overhead and the unknown plaintext length. 1 KB is plenty. */
+  AUTHOR_NAME_CIPHERTEXT_LENGTH: 1024,
   /** Maximum number of annotations per feedback submission. */
   MAX_ANNOTATIONS_PER_FEEDBACK: 200,
-  /** Maximum length of generalNote markdown. */
+  /** Maximum length of generalNote markdown (plaintext mode). */
   GENERAL_NOTE_LENGTH: 10_000,
+  /** Loose upper bound for `generalNote` accepted by validation. */
+  GENERAL_NOTE_CIPHERTEXT_LENGTH: 32_000,
   /** Default share TTL when SHARE_TTL_SECONDS env var is not set. */
   DEFAULT_SHARE_TTL_SECONDS: 30 * 24 * 60 * 60,
 } as const;

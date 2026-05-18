@@ -78,6 +78,11 @@ export interface ShareEntry {
   expiresAt?: string;
   /** ISO timestamp of the most recent remote feedback we've seen */
   lastFeedbackAt?: string;
+  /** Base64url-encoded AES-GCM key for end-to-end encrypted shares. The
+   *  same key is also embedded in `url` as a `#k=...` fragment so reviewers
+   *  can decrypt; the daemon keeps a copy here so it can decrypt feedback
+   *  it polls back from the worker. Absent on legacy unencrypted shares. */
+  encryptionKey?: string;
 }
 
 export interface SessionData {

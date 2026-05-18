@@ -81,6 +81,7 @@ async function handleCreateShare(req: Request, env: Env, origin: string): Promis
     componentsVersion: payload.runtime.componentsVersion,
     origin: payload.origin,
     canvasFilenames: payload.canvasFiles.map((cf) => cf.filename),
+    ...(payload.encryption ? { encryption: payload.encryption } : {}),
   };
 
   const prefix = `shares/${shareId}`;
@@ -159,6 +160,9 @@ async function handleGetMeta(shareId: string, env: Env): Promise<Response> {
     shares: [],
     shareEnabled: false,
     runtime: { componentsVersion: record.componentsVersion },
+    // Lets the browser know whether origin.sessionId / origin.label and
+    // canvas JS bodies need decrypting with the URL-fragment key.
+    ...(record.encryption ? { encryption: record.encryption } : {}),
   });
 }
 
@@ -211,10 +215,14 @@ async function handleSubmitFeedback(shareId: string, req: Request, env: Env): Pr
     submittedAt: new Date().toISOString(),
     author: {
       id: body.author.id || randomHexId(8),
-      name: body.author.name.slice(0, LIMITS.AUTHOR_NAME_LENGTH),
+      // Ciphertext names are opaque — slicing them would corrupt the IV /
+      // tag and make the entry undecryptable. The schema already caps the
+      // overall length so the abuse-protection still holds.
+      name: body.encryption ? body.author.name : body.author.name.trim().slice(0, LIMITS.AUTHOR_NAME_LENGTH),
     },
     annotations: body.annotations || [],
     ...(body.generalNote ? { generalNote: body.generalNote } : {}),
+    ...(body.encryption ? { encryption: body.encryption } : {}),
   };
 
   // KV key is sortable so `since` queries can use prefix listing efficiently.

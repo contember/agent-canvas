@@ -20,7 +20,7 @@ import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 import { ShareDialog, ShareButton, type ShareEntry } from "./ShareDialog";
 import { ReviewerIdentityDialog } from "./ReviewerIdentityDialog";
 import type { Annotation } from "#canvas/runtime";
-import { MODE, metaUrl, FS_AVAILABLE, WS_AVAILABLE, submitSharedFeedback, getReviewerIdentity, setReviewerIdentity } from "./clientApi";
+import { MODE, fetchMeta, FS_AVAILABLE, WS_AVAILABLE, submitSharedFeedback, getReviewerIdentity, setReviewerIdentity } from "./clientApi";
 
 export type ActiveView = { type: "overview" } | { type: "canvas"; filename: string } | { type: "file"; path: string };
 
@@ -309,8 +309,7 @@ function App() {
   // Fetch initial meta
   useEffect(() => {
     if (!sessionId) return;
-    fetch(metaUrl())
-      .then((r) => r.json())
+    fetchMeta()
       .then((data: any) => {
         if (data.currentRevision) {
           setCurrentRevision(data.currentRevision);

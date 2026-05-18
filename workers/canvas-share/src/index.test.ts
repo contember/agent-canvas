@@ -116,6 +116,50 @@ describe("validateFeedbackBody", () => {
       annotations: [{ id: "a1", snippet: 123, note: "y", createdAt: "2026-04-09T00:00:00.000Z" }],
     })).toBe("string");
   });
+
+  test("accepts encrypted feedback with oversized ciphertext fields", () => {
+    // In encrypted mode plaintext caps don't apply: ciphertext is opaque
+    // base64 that can legitimately exceed AUTHOR_NAME_LENGTH /
+    // GENERAL_NOTE_LENGTH while staying well under the wire-size caps.
+    const result = validateFeedbackBody({
+      ...valid,
+      author: { name: "x".repeat(LIMITS.AUTHOR_NAME_LENGTH + 200) },
+      generalNote: "x".repeat(LIMITS.GENERAL_NOTE_LENGTH + 5000),
+      encryption: { alg: "AES-GCM", v: 1 },
+    });
+    expect(typeof result).toBe("object");
+  });
+
+  test("still rejects unknown encryption algorithm", () => {
+    expect(typeof validateFeedbackBody({
+      ...valid,
+      encryption: { alg: "RSA", v: 1 },
+    })).toBe("string");
+  });
+});
+
+describe("validateSharePayload encryption", () => {
+  test("accepts the encryption marker", () => {
+    const result = validateSharePayload({
+      version: 1,
+      encryption: { alg: "AES-GCM", v: 1 },
+      origin: { sessionId: "ciphertext", revision: 1, createdAt: "2026-04-09T00:00:00.000Z" },
+      canvasFiles: [{ filename: "plan.jsx", compiledJs: "ciphertext-blob" }],
+      runtime: { componentsVersion: "0.1.0" },
+    });
+    expect(typeof result).toBe("object");
+  });
+
+  test("rejects unknown version of encryption", () => {
+    const result = validateSharePayload({
+      version: 1,
+      encryption: { alg: "AES-GCM", v: 99 },
+      origin: { sessionId: "x", revision: 1, createdAt: "2026-04-09T00:00:00.000Z" },
+      canvasFiles: [{ filename: "plan.jsx", compiledJs: "x" }],
+      runtime: { componentsVersion: "0.1.0" },
+    });
+    expect(typeof result).toBe("string");
+  });
 });
 
 describe("validateShareId", () => {

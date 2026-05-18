@@ -1,5 +1,6 @@
-import type { SessionManager, RemoteFeedbackEntry } from "./session";
+import type { SessionManager, RemoteFeedbackEntry, RemoteAnnotation } from "./session";
 import { loadShareConfig } from "./share";
+import { importShareKey, decryptString } from "../client/shareCrypto";
 
 /**
  * Background polling loop for remote feedback.
@@ -19,10 +20,70 @@ import { loadShareConfig } from "./share";
 const POLL_INTERVAL_MS = 5_000;
 const MAX_BACKOFF_MS = 60_000;
 
+/** Wire-format feedback entry as returned by the worker. When the
+ *  reviewer submitted from an encrypted share their browser ciphertexted
+ *  the secret fields and stamped this with `encryption`; the daemon
+ *  decrypts using the key stashed on the local ShareEntry. */
+interface WireFeedbackEntry {
+  id: string;
+  shareId: string;
+  revision: number;
+  submittedAt: string;
+  author: { id: string; name: string };
+  annotations: Array<{
+    id: string;
+    snippet: string;
+    note: string;
+    createdAt: string;
+    filePath?: string;
+    canvasFile?: string;
+    context?: unknown;
+    attachments?: Array<{ url: string; mime?: string }>;
+  }>;
+  generalNote?: string;
+  encryption?: { alg: string; v: number };
+}
+
 interface WorkerFeedbackResponse {
-  entries: RemoteFeedbackEntry[];
+  entries: WireFeedbackEntry[];
   /** Server-reported high water mark — echo back in the next `since` param */
   latestAt?: string;
+}
+
+/** Decrypt an encrypted-wire feedback entry into the plaintext shape used
+ *  throughout the rest of the daemon. Throws if any field fails to
+ *  decrypt — caller treats that as a transient error so we re-try later. */
+async function decryptFeedbackEntry(entry: WireFeedbackEntry, key: CryptoKey): Promise<RemoteFeedbackEntry> {
+  const annotations: RemoteAnnotation[] = await Promise.all(
+    entry.annotations.map(async (a) => {
+      const out: RemoteAnnotation = {
+        id: a.id,
+        snippet: await decryptString(key, a.snippet),
+        note: await decryptString(key, a.note),
+        createdAt: a.createdAt,
+      };
+      if (a.filePath) out.filePath = await decryptString(key, a.filePath);
+      if (a.canvasFile) out.canvasFile = await decryptString(key, a.canvasFile);
+      if (typeof a.context === "string" && a.context.length > 0) {
+        out.context = JSON.parse(await decryptString(key, a.context));
+      }
+      if (a.attachments) out.attachments = a.attachments;
+      return out;
+    }),
+  );
+
+  return {
+    id: entry.id,
+    shareId: entry.shareId,
+    revision: entry.revision,
+    submittedAt: entry.submittedAt,
+    author: {
+      id: entry.author.id,
+      name: await decryptString(key, entry.author.name),
+    },
+    annotations,
+    ...(entry.generalNote ? { generalNote: await decryptString(key, entry.generalNote) } : {}),
+  };
 }
 
 export function startRemoteFeedbackPoller(
@@ -31,6 +92,18 @@ export function startRemoteFeedbackPoller(
   version: string,
 ): { stop: () => void } {
   let stopped = false;
+
+  // Per-share CryptoKey cache — `importKey` is async and pure given the
+  // same encoded key, so we memoize it for the lifetime of the poller.
+  const keyCache = new Map<string, Promise<CryptoKey>>();
+  function getKey(shareId: string, encoded: string): Promise<CryptoKey> {
+    let cached = keyCache.get(shareId);
+    if (!cached) {
+      cached = importShareKey(encoded);
+      keyCache.set(shareId, cached);
+    }
+    return cached;
+  }
 
   // Per-share consecutive error count → exponential backoff so a dead
   // worker doesn't generate a fire-hose of failed requests.
@@ -41,7 +114,11 @@ export function startRemoteFeedbackPoller(
     return Math.min(MAX_BACKOFF_MS, POLL_INTERVAL_MS * Math.pow(2, errors - 1));
   }
 
-  async function pollShare(sessionId: string, share: { shareId: string; lastFeedbackAt?: string }, endpoint: string) {
+  async function pollShare(
+    sessionId: string,
+    share: { shareId: string; lastFeedbackAt?: string; encryptionKey?: string },
+    endpoint: string,
+  ) {
     try {
       const since = share.lastFeedbackAt ?? "";
       const url = `${endpoint}/shares/${share.shareId}/feedback${since ? `?since=${encodeURIComponent(since)}` : ""}`;
@@ -60,8 +137,31 @@ export function startRemoteFeedbackPoller(
 
       if (!data.entries || data.entries.length === 0) return;
 
-      const byRev = new Map<number, RemoteFeedbackEntry[]>();
+      // Decrypt any entries that came in encrypted. Plaintext entries
+      // (legacy submissions from non-encrypted shares) pass through.
+      const decrypted: RemoteFeedbackEntry[] = [];
       for (const e of data.entries) {
+        if (e.encryption) {
+          if (!share.encryptionKey) {
+            console.warn(`[remote-feedback] ${share.shareId}: received encrypted feedback but no local key — skipping entry ${e.id}`);
+            continue;
+          }
+          try {
+            const key = await getKey(share.shareId, share.encryptionKey);
+            decrypted.push(await decryptFeedbackEntry(e, key));
+          } catch (err: any) {
+            console.warn(`[remote-feedback] ${share.shareId}: failed to decrypt entry ${e.id}: ${err.message || err}`);
+            continue;
+          }
+        } else {
+          decrypted.push(e as RemoteFeedbackEntry);
+        }
+      }
+
+      if (decrypted.length === 0) return;
+
+      const byRev = new Map<number, RemoteFeedbackEntry[]>();
+      for (const e of decrypted) {
         if (!byRev.has(e.revision)) byRev.set(e.revision, []);
         byRev.get(e.revision)!.push(e);
       }

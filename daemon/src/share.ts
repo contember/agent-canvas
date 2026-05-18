@@ -1,4 +1,11 @@
 import type { SessionManager, ShareEntry } from "./session";
+import {
+  generateShareKey,
+  exportShareKey,
+  encryptString,
+  ENCRYPTION_META,
+  type EncryptionMeta,
+} from "../client/shareCrypto";
 
 /**
  * Canvas sharing: packages a specific revision into a self-contained
@@ -10,10 +17,25 @@ import type { SessionManager, ShareEntry } from "./session";
  * payload — the worker serves matching runtime from its own deploy, keyed
  * off `runtime.componentsVersion` in the payload. This keeps shares small
  * while still guaranteeing version compatibility.
+ *
+ * End-to-end encryption (default on)
+ * ----------------------------------
+ * Unless `CANVAS_SHARE_ENCRYPTION=off`, each share is encrypted with a
+ * fresh AES-GCM-256 key generated client-side here. The key is embedded
+ * in the returned URL as a `#k=<base64url>` fragment, which browsers do
+ * not transmit to the worker. The worker stores opaque ciphertext and
+ * routing metadata only. The daemon retains the key on `ShareEntry` so it
+ * can also decrypt feedback polled from the worker.
+ *
+ * Legacy unencrypted shares remain supported: the worker accepts both
+ * formats, and the browser detects which one to use based on the URL
+ * fragment.
  */
 
 export interface SharePayload {
   version: 1;
+  /** Present iff payload fields below are ciphertext rather than plaintext. */
+  encryption?: EncryptionMeta;
   origin: {
     sessionId: string;
     revision: number;
@@ -45,6 +67,8 @@ export interface ShareConfig {
   /** Optional bearer token. If the worker has SHARE_AUTH_TOKEN set, this
    *  must match. Loaded from CANVAS_SHARE_AUTH_TOKEN env var on the daemon. */
   authToken?: string;
+  /** End-to-end encryption setting. Defaults to true. */
+  encryption?: boolean;
 }
 
 export function loadShareConfig(version: string): ShareConfig | null {
@@ -53,8 +77,14 @@ export function loadShareConfig(version: string): ShareConfig | null {
   return {
     endpoint: endpoint.replace(/\/+$/, ""),
     componentsVersion: version,
+    encryption: !isEncryptionDisabled(),
     ...(process.env.CANVAS_SHARE_AUTH_TOKEN ? { authToken: process.env.CANVAS_SHARE_AUTH_TOKEN } : {}),
   };
+}
+
+function isEncryptionDisabled(): boolean {
+  const v = (process.env.CANVAS_SHARE_ENCRYPTION ?? "").trim().toLowerCase();
+  return v === "0" || v === "off" || v === "false" || v === "no";
 }
 
 /**
@@ -102,6 +132,42 @@ export function buildSharePayload(
 }
 
 /**
+ * Encrypt a plaintext SharePayload in-place semantics, returning a new
+ * payload whose secret fields are ciphertext + the `encryption` marker.
+ * Fields kept plaintext (and why):
+ *  - `version`, `runtime.componentsVersion`: routing
+ *  - `origin.revision`, `origin.createdAt`: indexing/display
+ *  - `canvasFiles[].filename`: used as the route key by the worker
+ * Everything else (sessionId, label, compiledJs, sourceJsx) is encrypted.
+ */
+export async function encryptSharePayload(
+  payload: SharePayload,
+  key: CryptoKey,
+): Promise<SharePayload> {
+  const canvasFiles = await Promise.all(
+    payload.canvasFiles.map(async (cf) => ({
+      filename: cf.filename,
+      compiledJs: await encryptString(key, cf.compiledJs),
+      ...(cf.sourceJsx ? { sourceJsx: await encryptString(key, cf.sourceJsx) } : {}),
+    })),
+  );
+  return {
+    version: payload.version,
+    encryption: ENCRYPTION_META,
+    origin: {
+      sessionId: await encryptString(key, payload.origin.sessionId),
+      revision: payload.origin.revision,
+      ...(payload.origin.label
+        ? { label: await encryptString(key, payload.origin.label) }
+        : {}),
+      createdAt: payload.origin.createdAt,
+    },
+    canvasFiles,
+    runtime: payload.runtime,
+  };
+}
+
+/**
  * POST the payload to the CF Worker. Returns the `shareId` + public URL
  * assigned by the worker. Throws on any HTTP error — the caller is expected
  * to surface the failure to the client (dialog) so the user can retry or
@@ -136,8 +202,10 @@ export async function pushShareToWorker(
 }
 
 /**
- * High-level: build payload, push to worker, record the share on the
- * session. Returns the ShareEntry that was recorded.
+ * High-level: build payload, optionally encrypt it, push to worker, record
+ * the share on the session. The URL stored on the ShareEntry includes the
+ * `#k=...` fragment when encryption is on so the user can simply copy &
+ * paste it to reviewers.
  */
 export async function shareRevision(
   sessionManager: SessionManager,
@@ -145,15 +213,28 @@ export async function shareRevision(
   revision: number,
   config: ShareConfig,
 ): Promise<ShareEntry> {
-  const payload = buildSharePayload(sessionManager, sessionId, revision, config.componentsVersion);
+  const plaintext = buildSharePayload(sessionManager, sessionId, revision, config.componentsVersion);
+
+  const useEncryption = config.encryption !== false;
+  let payload = plaintext;
+  let encodedKey: string | undefined;
+  if (useEncryption) {
+    const key = await generateShareKey();
+    encodedKey = await exportShareKey(key);
+    payload = await encryptSharePayload(plaintext, key);
+  }
+
   const response = await pushShareToWorker(payload, config);
+  const url = encodedKey ? `${response.url}#k=${encodedKey}` : response.url;
+
   const entry: ShareEntry = {
     shareId: response.shareId,
-    url: response.url,
+    url,
     revision,
     createdAt: new Date().toISOString(),
     ...(response.ownerToken ? { ownerToken: response.ownerToken } : {}),
     ...(response.expiresAt ? { expiresAt: response.expiresAt } : {}),
+    ...(encodedKey ? { encryptionKey: encodedKey } : {}),
   };
   sessionManager.addShare(sessionId, entry);
   return entry;
@@ -184,4 +265,3 @@ export async function revokeShare(
   }
   sessionManager.removeShare(sessionId, shareId);
 }
-
