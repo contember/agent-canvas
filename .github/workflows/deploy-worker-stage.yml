@@ -16,7 +16,6 @@ jobs:
     uses: ./.github/workflows/deploy-worker.yml
     with:
       env: stage
-    secrets:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      SHARE_AUTH_TOKEN: ${{ secrets.SHARE_AUTH_TOKEN_STAGE }}
+    # inherit so the reusable workflow can resolve secrets; the env-scoped
+    # values (set on the `stage` environment) win over repo-level ones.
+    secrets: inherit

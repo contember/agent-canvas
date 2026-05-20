@@ -14,7 +14,6 @@ jobs:
     uses: ./.github/workflows/deploy-worker.yml
     with:
       env: prod
-    secrets:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      SHARE_AUTH_TOKEN: ${{ secrets.SHARE_AUTH_TOKEN_PROD }}
+    # inherit so the reusable workflow can resolve secrets; the env-scoped
+    # values (set on the `prod` environment) win over repo-level ones.
+    secrets: inherit

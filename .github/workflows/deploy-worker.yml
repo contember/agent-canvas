@@ -7,14 +7,13 @@ on:
         description: "Target environment (stage or prod)"
         required: true
         type: string
-    secrets:
-      CLOUDFLARE_API_TOKEN:
-        required: true
-      CLOUDFLARE_ACCOUNT_ID:
-        required: true
-      SHARE_AUTH_TOKEN:
-        description: "Bearer token the daemon must send to POST /shares. Optional but strongly recommended in production."
-        required: false
+    # No `secrets:` inputs on purpose. The deploy job below declares
+    # `environment: ${{ inputs.env }}`, so referencing `secrets.X` directly
+    # resolves the matching *environment* secret (falling back to a
+    # repo-level secret of the same name). Callers pass `secrets: inherit`
+    # so org/repo secrets remain reachable too. This is what makes the
+    # CLOUDFLARE_* / SHARE_AUTH_TOKEN values environment-scoped — a prod
+    # token can never be read by a stage deploy and vice versa.
 
 jobs:
   deploy:
