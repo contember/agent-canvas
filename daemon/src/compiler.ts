@@ -131,6 +131,18 @@ async function validateCompiledPlan(js: string): Promise<{ ok: true } | { ok: fa
 }
 
 export async function compilePlan(jsx: string, projectRoot?: string): Promise<CompileResult> {
+  // Strip leading pragma / block / line comments (e.g. `/** @jsxImportSource ... */`).
+  // Authored JSX sometimes carries a JSX-runtime pragma from another toolchain;
+  // Canvas injects its own imports and uses the React automatic runtime, so the
+  // pragma is unused. Left in place it sits at the top level of the wrapped
+  // fragment as plain text (JSX only treats `{/* */}` as a comment) and renders
+  // literally on the page.
+  let stripped: string;
+  do {
+    stripped = jsx;
+    jsx = jsx.replace(/^\s*(?:\/\*[\s\S]*?\*\/|\/\/[^\n]*)\s*/, "");
+  } while (jsx !== stripped);
+
   // Resolve file contents at compile time
   if (projectRoot) {
     jsx = resolveFilePreviews(jsx, projectRoot);
