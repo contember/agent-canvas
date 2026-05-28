@@ -59,7 +59,11 @@ export async function handlePush(args: string[]) {
   // Skip restart only for clear user errors (syntax errors with line/col,
   // runtime validation errors) — those won't be fixed by a restart.
   const isUserError = !result.ok && result.errors && Object.values(result.errors).every((e: any) =>
-    typeof e === "string" && (/\(line \d+, col \d+\)/.test(e) || e.startsWith("Runtime error:")));
+    typeof e === "string" && (
+      /\(line \d+, col \d+\)/.test(e) ||
+      /Syntax Error|Parse error|Mermaid syntax error/i.test(e) ||
+      e.startsWith("Runtime error:")
+    ));
   const shouldRestart = !result.ok && result.error === "Canvas compilation failed" && !isUserError;
   if (shouldRestart) {
     console.error("Compilation failed, restarting daemon and retrying...");

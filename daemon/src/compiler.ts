@@ -130,6 +130,46 @@ async function validateCompiledPlan(js: string): Promise<{ ok: true } | { ok: fa
   return { ok: true };
 }
 
+/**
+ * Normalize a Bun build/transpile failure into a precise, actionable string.
+ *
+ * Bun surfaces JSX syntax errors through three different shapes, all handled
+ * here so the CLI never again prints a bare "Parse error" / "Bundle failed":
+ *   - `Bun.Transpiler.transformSync` throws a `BuildMessage` (has `.position`).
+ *   - `Bun.build()` returns `{ success: false, logs: [BuildMessage] }`.
+ *   - `Bun.build()` throws an `AggregateError` whose `.errors[0]` is a
+ *     `BuildMessage` — the case the old catch discarded, returning only the
+ *     useless top-level "Bundle failed".
+ *
+ * `lineOffset` is the number of lines Canvas prepended (component imports +
+ * wrapper) so the reported line maps back to the user's authored file. When a
+ * position is available we append `(line N, col M)` plus a one-line code frame
+ * with a caret — that suffix is also what lets the CLI classify the error as a
+ * user error and skip a pointless daemon restart (see push.ts).
+ */
+function formatBuildError(err: any, lineOffset: number): string {
+  // Collect every candidate that might carry a `.position`, most specific first.
+  const candidates: any[] = [];
+  if (err?.position) candidates.push(err);
+  if (Array.isArray(err?.errors)) candidates.push(...err.errors);
+  if (!candidates.length && err && typeof err[Symbol.iterator] === "function") {
+    try { candidates.push(...err); } catch {}
+  }
+  const detail = candidates.find((c) => c?.position) ?? candidates[0] ?? err;
+  const message = String(detail?.message || err?.message || "Syntax error").split("\n")[0];
+
+  const pos = detail?.position;
+  if (!pos || typeof pos.line !== "number") return message;
+
+  const loc = ` (line ${pos.line - lineOffset}, col ${pos.column})`;
+  let frame = "";
+  if (typeof pos.lineText === "string") {
+    const caret = " ".repeat(Math.max(0, pos.column ?? 0)) + "^";
+    frame = `\n  ${pos.lineText}\n  ${caret}`;
+  }
+  return `${message}${loc}${frame}`;
+}
+
 export async function compilePlan(jsx: string, projectRoot?: string): Promise<CompileResult> {
   // Strip leading pragma / block / line comments (e.g. `/** @jsxImportSource ... */`).
   // Authored JSX sometimes carries a JSX-runtime pragma from another toolchain;
@@ -162,18 +202,18 @@ export async function compilePlan(jsx: string, projectRoot?: string): Promise<Co
     ? `${COMPONENT_IMPORTS}\n${jsx}`
     : `${COMPONENT_IMPORTS}\nexport default function Plan() {\n  return (<>${jsx}</>);\n}\n`;
 
+  // Offset: COMPONENT_IMPORTS lines + wrapper lines (export default function
+  // Plan() + return). Used to map Bun's line numbers back to the authored file.
+  const wrapperLines = hasDefaultExport ? 1 : 2;
+  const lineOffset = COMPONENT_IMPORTS_LINES + wrapperLines;
+
   // Pre-validate syntax with Bun.Transpiler — gives precise error positions,
   // unlike Bun.build() which throws opaque "Bundle failed" for syntax errors.
   try {
     const transpiler = new Bun.Transpiler({ loader: "jsx" });
     transpiler.transformSync(source);
   } catch (syntaxError: any) {
-    const pos = syntaxError?.position;
-    // Offset: COMPONENT_IMPORTS lines + wrapper lines (export default function Plan() + return)
-    const wrapperLines = hasDefaultExport ? 1 : 2;
-    const lineOffset = COMPONENT_IMPORTS_LINES + wrapperLines;
-    const loc = pos ? ` (line ${pos.line - lineOffset}, col ${pos.column})` : "";
-    return { ok: false, error: `${syntaxError?.message || "Syntax error"}${loc}` };
+    return { ok: false, error: formatBuildError(syntaxError, lineOffset) };
   }
 
   const tmpFile = join(COMPILE_TEMP_DIR, `plan-${randomUUID()}.jsx`);
@@ -190,9 +230,9 @@ export async function compilePlan(jsx: string, projectRoot?: string): Promise<Co
       });
 
       if (!result.success) {
-        const errors = result.logs
-          .filter((l) => l.level === "error")
-          .map((l) => l.message)
+        const errorLogs = result.logs.filter((l) => l.level === "error");
+        const errors = errorLogs
+          .map((l) => formatBuildError(l, lineOffset))
           .join("\n");
         return { ok: false, error: errors || "Bundle failed" };
       }
@@ -204,8 +244,17 @@ export async function compilePlan(jsx: string, projectRoot?: string): Promise<Co
       }
       return { ok: true, js };
     } catch (buildError: any) {
-      // Bun.build() can throw "Unknown Error, TODO" in long-running processes
-      // when its internal bundler state gets corrupted. Let the CLI handle restart.
+      // A real syntax error surfaces as an AggregateError carrying BuildMessages
+      // (with positions) — format it precisely. The opaque "Unknown Error, TODO"
+      // corruption case (internal bundler state gets corrupted in long-running
+      // processes) has no sub-errors; pass it through so the CLI restarts the
+      // daemon and retries.
+      const hasDetail =
+        buildError?.position ||
+        (Array.isArray(buildError?.errors) && buildError.errors.length > 0);
+      if (hasDetail) {
+        return { ok: false, error: formatBuildError(buildError, lineOffset) };
+      }
       return { ok: false, error: buildError?.message || "Unknown Error" };
     }
   } catch (e: any) {
