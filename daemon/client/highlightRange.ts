@@ -58,6 +58,7 @@ function getTextNodesInRange(range: Range): Text[] {
     // Skip line numbers and existing marks
     const parent = node.parentElement;
     if (parent?.classList.contains("select-none")) continue;
+    if (parent?.closest("[data-annotation-id]")) continue;
 
     if (range.intersectsNode(node)) {
       nodes.push(node);
@@ -108,26 +109,17 @@ export function restoreMarks(
   container: HTMLElement,
   annotations: { id: string; snippet: string; filePath?: string; context?: { before: string; after: string; hierarchy: string[] } }[]
 ) {
-  // Skip annotations that already have marks in the DOM
-  const toRestore = annotations.filter(
-    (a) => !document.querySelector(`[data-annotation-id="${a.id}"]`)
-  );
-  if (!toRestore.length) return;
+  for (const ann of annotations) {
+    // A canvas can be rendered more than once (overview, compare, hidden
+    // source panes), so restore decisions must be scoped to this container.
+    if (container.querySelector(`[data-annotation-id="${ann.id}"]`)) continue;
 
-  // Build full text content + mapping from text offset to (textNode, offsetInNode)
-  const textNodes: { node: Text; start: number }[] = [];
-  let fullText = "";
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-  let tn: Text | null;
-  while ((tn = walker.nextNode() as Text | null)) {
-    if (tn.parentElement?.classList.contains("select-none")) continue;
-    textNodes.push({ node: tn, start: fullText.length });
-    fullText += tn.textContent || "";
-  }
-
-  for (const ann of toRestore) {
     const snippet = ann.snippet;
     if (!snippet) continue;
+
+    // Rebuild after every inserted mark. Wrapping text splits and moves text
+    // nodes, so a cached offset map can point at stale DOM after the first hit.
+    const { fullText, textNodes } = buildTextIndex(container);
 
     // Find all occurrences of the snippet in the full text
     const occurrences: number[] = [];
@@ -179,6 +171,24 @@ export function restoreMarks(
       wrapRangeWithMark(range, ann.id);
     } catch {}
   }
+}
+
+function buildTextIndex(container: HTMLElement): {
+  fullText: string;
+  textNodes: { node: Text; start: number }[];
+} {
+  const textNodes: { node: Text; start: number }[] = [];
+  let fullText = "";
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let tn: Text | null;
+  while ((tn = walker.nextNode() as Text | null)) {
+    const parent = tn.parentElement;
+    if (parent?.classList.contains("select-none")) continue;
+    if (parent?.closest("[data-annotation-id]")) continue;
+    textNodes.push({ node: tn, start: fullText.length });
+    fullText += tn.textContent || "";
+  }
+  return { fullText, textNodes };
 }
 
 function offsetToNode(
