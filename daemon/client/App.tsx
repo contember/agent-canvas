@@ -21,6 +21,7 @@ import { ShareDialog, ShareButton, type ShareEntry } from "./ShareDialog";
 import { ReviewerIdentityDialog } from "./ReviewerIdentityDialog";
 import type { Annotation } from "#canvas/runtime";
 import { MODE, fetchMeta, FS_AVAILABLE, WS_AVAILABLE, submitSharedFeedback, getReviewerIdentity, setReviewerIdentity } from "./clientApi";
+import { carryUnsubmittedDraft } from "./annotationDraft";
 
 export type ActiveView = { type: "overview" } | { type: "canvas"; filename: string } | { type: "file"; path: string };
 
@@ -312,9 +313,11 @@ function App() {
     fetchMeta()
       .then((data: any) => {
         if (data.currentRevision) {
+          const nextRevisions: RevisionInfo[] = data.revisions || [];
+          carryUnsubmittedDraft(localStorage, sessionId, data.currentRevision, nextRevisions);
           setCurrentRevision(data.currentRevision);
           setSelectedRevision(data.currentRevision);
-          setRevisions(data.revisions || []);
+          setRevisions(nextRevisions);
         }
         if (data.canvasFiles) {
           const files = (data.canvasFiles as string[]).sort();
@@ -378,11 +381,12 @@ function App() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === "plan-updated") {
+            const allRevisions: RevisionInfo[] = Array.isArray(data.revisions) ? data.revisions : [];
+            carryUnsubmittedDraft(localStorage, sessionId, data.currentRevision, allRevisions);
             setCurrentRevision(data.currentRevision);
             setSelectedRevision(data.currentRevision);
             setCompareRevision(null);
-            if (data.revisions) {
-              const allRevisions = data.revisions as RevisionInfo[];
+            if (allRevisions.length > 0) {
               setRevisions(allRevisions);
               const latest = allRevisions.find((r: RevisionInfo) => r.revision === data.currentRevision);
               if (latest?.canvasFiles) {
