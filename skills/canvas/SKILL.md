@@ -13,16 +13,26 @@ disable-model-invocation: true
 
 ## Session
 
-Your canvas session ID is: `${CLAUDE_SESSION_ID}`
+Resolve the canvas session ID **once**, then reuse the literal value for the
+entire workflow:
 
-Use this value for:
-- File paths: `$TMPDIR/agent-canvas/${CLAUDE_SESSION_ID}/`
-- CLI flags: `--session ${CLAUDE_SESSION_ID}`
+```bash
+echo "${CANVAS_SESSION_ID:-${CODEX_THREAD_ID:-${CLAUDE_CODE_SESSION_ID:-$(uuidgen)}}}"
+```
+
+Write the printed value into every canvas command as `--session "<id>"`, and
+store canvas files in `${TMPDIR:-/tmp}/agent-canvas/<id>/`.
+
+Do NOT rely on `export` — in some hosts (Claude Code) each shell call starts
+fresh, so the variable will not survive between commands.
 
 ## Instructions
 
-!`bunx agent-canvas instructions`
+Run these commands from the user's project root before using Canvas:
 
-!`bunx agent-canvas instructions --list`
+```bash
+bunx agent-canvas instructions
+bunx agent-canvas instructions --list
+```
 
 **Getting detailed docs**: Run `bunx agent-canvas instructions <topic>` for detailed documentation on any component or flow. For example: `bunx agent-canvas instructions component-mermaid` or `bunx agent-canvas instructions flow-feature`.

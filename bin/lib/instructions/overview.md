@@ -4,16 +4,17 @@ Canvas opens a rich, annotatable document in the user's browser. You write JSX, 
 
 Use it whenever structured visual communication beats inline chat: plans, reviews, decisions, explanations, discovery interviews.
 
-**Note**: Replace all `<session-id>` references below with your actual canvas session ID (provided in the skill header).
+**Note**: Replace all `<session-id>` references below with the stable canvas
+session ID resolved by the skill.
 
 ## Core Workflow
 
 ### 1. Write JSX
 
-Use the **Write** tool to create `.jsx` files in `$TMPDIR/agent-canvas/<session-id>/`:
+Use the **Write** tool to create `.jsx` files in `${TMPDIR:-/tmp}/agent-canvas/<session-id>/`:
 
 ```jsx
-// $TMPDIR/agent-canvas/<session-id>/plan.jsx
+// ${TMPDIR:-/tmp}/agent-canvas/<session-id>/plan.jsx
 
 <Section title="Authentication Redesign">
   A proposal to replace session-based auth with JWT tokens.
@@ -41,7 +42,7 @@ Components are auto-available — no imports needed. The file can be a JSX fragm
 Push the directory to open all canvases in the browser:
 
 ```bash
-bunx agent-canvas push $TMPDIR/agent-canvas/<session-id>/ --session <session-id> --label "Implementation Plan"
+bunx agent-canvas push ${TMPDIR:-/tmp}/agent-canvas/<session-id>/ --session <session-id> --label "Implementation Plan"
 ```
 
 All `*.jsx` files in the directory are pushed as a snapshot. Each file appears as a separate tab. **Always show the `browserUrl` from the output to the user.**
@@ -52,16 +53,32 @@ Options:
 
 ### 3. Watch for feedback
 
-Run the watch command **in the background** using the Bash tool's `run_in_background` parameter:
+Start watching immediately after every push:
 
 ```bash
-# Use Bash tool with run_in_background: true
 bunx agent-canvas watch --session <session-id>
 ```
 
-You will be **automatically notified** when the user submits feedback. Do NOT poll, sleep, or proactively check. Just stop and wait.
+How to run the watcher depends on the host:
 
-**Important**: The push → watch sequence is atomic. Never push without watching. After starting the background watch, do not continue with other work unless instructed.
+- **Codex**: Keep the watcher attached to the current agent turn. Run it without
+  detaching or backgrounding it. If the shell tool yields a process/session
+  handle, call `write_stdin` on that same handle until the command returns the
+  feedback. Do not end the agent turn while the watcher is still running.
+- **Claude Code**: Run the watcher in the background using the Bash tool's
+  `run_in_background` parameter. You will be **automatically notified** when the
+  user submits feedback. Do NOT poll, sleep, or proactively check. Just stop and
+  wait.
+- **Other hosts**: Keep the watcher in the foreground unless the host explicitly
+  guarantees that background-process completion wakes the agent.
+
+In Codex, a wait may yield before feedback arrives. Continue waiting on the same
+process handle; do not start another watcher. Keep user-facing progress updates
+brief and no more than 60 seconds apart while waiting.
+
+**Important**: The push → watch sequence is atomic. Never push without starting
+the host-specific watcher immediately afterward. Do not continue with unrelated
+work while waiting for feedback.
 
 ### 4. Iterate
 
@@ -82,7 +99,7 @@ Returns immediately — prints feedback if available, otherwise no output.
 Use different files for different phases or concerns:
 
 ```
-$TMPDIR/agent-canvas/<session-id>/
+${TMPDIR:-/tmp}/agent-canvas/<session-id>/
   discovery.jsx    # Discovery interview
   requirements.jsx # Requirements spec
   plan.jsx         # Implementation plan
@@ -92,7 +109,7 @@ Write new files as phases progress, then push the directory. Previous files rema
 
 ## File Location
 
-All canvas files go in `$TMPDIR/agent-canvas/<session-id>/`. This is a system temp directory — no `.gitignore` needed.
+All canvas files go in `${TMPDIR:-/tmp}/agent-canvas/<session-id>/`. This is a system temp directory — no `.gitignore` needed.
 
 ## Components
 
@@ -167,14 +184,14 @@ User wants to make a decision? → DECISION flow
 2. **Announce** briefly: "I'll start with discovery, then create a detailed plan."
 3. **Write canvas JSX** with the Write tool
 4. **Push + show browserUrl** to the user
-5. **IMMEDIATELY watch in background** — the push → watch sequence is atomic
+5. **IMMEDIATELY watch using the host-specific strategy above** — the push → watch sequence is atomic
 6. **Read feedback** — check for annotations, answers, context files
 7. **Edit and re-push + watch**, or advance to next phase
 8. **After implementation**, push a summary canvas and **watch for feedback** — the user may want to respond
 
 ## Important Rules
 
-- **Never `cd`** before running `bunx agent-canvas` commands. The daemon uses the current working directory to resolve project file paths (`<FilePreview>`, file browser). Always run commands from the project root. Since canvas files are in `$TMPDIR`, use absolute paths to reference them — e.g. `bunx agent-canvas push $TMPDIR/agent-canvas/<session-id>/`.
+- **Never `cd`** before running `bunx agent-canvas` commands. The daemon uses the current working directory to resolve project file paths (`<FilePreview>`, file browser). Always run commands from the project root. Since canvas files are in `${TMPDIR:-/tmp}`, use absolute paths to reference them — e.g. `bunx agent-canvas push ${TMPDIR:-/tmp}/agent-canvas/<session-id>/`.
 - **Write** canvas files using the Write tool. Never use bash heredocs.
 - **Edit** canvas files using the Edit tool. Never rewrite entire files.
 - Every `<Item>` and interactive component needs a unique `id`.

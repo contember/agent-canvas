@@ -151,7 +151,7 @@ Goal: detailed implementation plan with file-level changes. The user approves be
 
 ## Phase 4: Summary (`summary.jsx`)
 
-Push AFTER implementation is complete. Always do this, even briefly. **After pushing the summary, start a background watch** — the user may want to provide feedback (follow-up requests, corrections, questions about what was done).
+Push AFTER implementation is complete. Always do this, even briefly. **After pushing the summary, start the host-specific watch described in the overview** — the user may want to provide feedback (follow-up requests, corrections, questions about what was done).
 
 ```jsx
 <Section title="Implementation Summary: [Feature Name]">
