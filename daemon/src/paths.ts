@@ -14,6 +14,9 @@ export const TEMP_DIR = join(tmpdir(), "agent-canvas");
 /** PID file for daemon process */
 export const PID_FILE = join(TEMP_DIR, "daemon.pid");
 
+/** Capability used only by the CLI to resolve secret values */
+export const CLI_AUTH_FILE = join(TEMP_DIR, "daemon-auth-token");
+
 /** Temp dir for JSX compilation */
 export const COMPILE_TEMP_DIR = join(TEMP_DIR, "compile");
 

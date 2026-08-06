@@ -8,7 +8,7 @@ export function jsonResponse(data: unknown, status = 200): Response {
 export function corsHeaders(port: number): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": "http://localhost:" + port,
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
 }

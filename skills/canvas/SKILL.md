@@ -6,7 +6,8 @@ description: >
   comments, answers questions, and submits feedback.
 
   Supports planning, architecture reviews, code reviews, discovery interviews,
-  implementation summaries, proposals, decision documents, and explanations.
+  implementation summaries, proposals, decision documents, explanations, and
+  runbooks that hand local secrets to commands without putting values in context.
 disable-model-invocation: true
 
 ---

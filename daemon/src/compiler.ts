@@ -14,7 +14,7 @@ const COMPONENT_IMPORTS = `import React from 'react';
 import * as C from '#canvas/components';
 const { Section, Item, Task, FilePreview, CodeBlock, Callout,
         Mermaid, Table, Priority, Checklist, Note, Diff,
-        Choice, MultiChoice, UserInput, RangeInput, ImageView,
+        Choice, MultiChoice, UserInput, RangeInput, SecretInput, ImageView,
         Markdown, useFeedback, useAnnotations } = C;
 `;
 
@@ -40,7 +40,7 @@ const STUB_COMPONENTS: Record<string, any> = {};
 for (const name of [
   "Section", "Item", "Task", "FilePreview", "CodeBlock", "Callout",
   "Table", "Priority", "Checklist", "Note", "Diff",
-  "Choice", "MultiChoice", "UserInput", "RangeInput", "ImageView", "Markdown",
+  "Choice", "MultiChoice", "UserInput", "RangeInput", "SecretInput", "ImageView", "Markdown",
 ]) {
   STUB_COMPONENTS[name] = Stub;
 }

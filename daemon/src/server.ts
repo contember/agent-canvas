@@ -1,6 +1,7 @@
-import { writeFileSync, mkdirSync, readFileSync } from "fs";
+import { writeFileSync, mkdirSync, readFileSync, chmodSync } from "fs";
 import { join, dirname } from "path";
 import { tmpdir } from "os";
+import { randomBytes } from "crypto";
 import { SessionManager } from "./session";
 import { createWebSocketManager, type WSData } from "./websocket";
 import { dispatch } from "./router";
@@ -10,20 +11,25 @@ import { createFileHandlers } from "./handlers/files";
 import { createStaticHandlers } from "./handlers/static";
 import { createUploadHandlers } from "./handlers/uploads";
 import { startRemoteFeedbackPoller } from "./remote-feedback";
+import { CLI_AUTH_FILE } from "./paths";
 
 const PORT = parseInt(process.env.CANVAS_PORT || "19400", 10);
 const VERSION = JSON.parse(readFileSync(join(dirname(import.meta.dir), "..", "package.json"), "utf-8")).version as string;
 
 // Write PID file so CLI can find and stop us
 const pidDir = join(tmpdir(), "agent-canvas");
-mkdirSync(pidDir, { recursive: true });
+mkdirSync(pidDir, { recursive: true, mode: 0o700 });
+chmodSync(pidDir, 0o700);
 writeFileSync(join(pidDir, "daemon.pid"), String(process.pid));
+const cliAuthToken = randomBytes(32).toString("base64url");
+writeFileSync(CLI_AUTH_FILE, cliAuthToken, { mode: 0o600 });
+chmodSync(CLI_AUTH_FILE, 0o600);
 
 const sessionManager = new SessionManager();
 const wsManager = createWebSocketManager(sessionManager);
 
 const routes = [
-  ...createApiHandlers({ sessionManager, broadcastPlanUpdate: wsManager.broadcastPlanUpdate, broadcastRevisionUpdate: wsManager.broadcastRevisionUpdate, port: PORT, version: VERSION }),
+  ...createApiHandlers({ sessionManager, broadcastPlanUpdate: wsManager.broadcastPlanUpdate, broadcastRevisionUpdate: wsManager.broadcastRevisionUpdate, port: PORT, version: VERSION, cliAuthToken }),
   ...createFileHandlers(sessionManager),
   ...createUploadHandlers(sessionManager),
   ...createStaticHandlers(),

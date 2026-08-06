@@ -118,6 +118,47 @@ export function uploadUrl(): string {
   return `/api/session/${MODE.sessionId}/upload`;
 }
 
+function localSecretUrl(fieldId: string, suffix: "status" | "value"): string {
+  if (MODE.isShared) throw new Error("Secret inputs are available only on the local canvas daemon");
+  return `/api/session/${encodeURIComponent(MODE.sessionId)}/secrets/${encodeURIComponent(fieldId)}/${suffix}`;
+}
+
+async function secretApiError(response: Response): Promise<Error> {
+  const raw: unknown = await response.json().catch(() => null);
+  if (typeof raw === "object" && raw !== null && "error" in raw && typeof raw.error === "string") {
+    return new Error(raw.error);
+  }
+  return new Error(`Secret API request failed with status ${response.status}`);
+}
+
+/** Return only readiness metadata. The secret value is never sent back to the browser. */
+export async function getLocalSecretStatus(fieldId: string): Promise<boolean> {
+  const response = await fetch(localSecretUrl(fieldId, "status"), { cache: "no-store" });
+  if (!response.ok) throw await secretApiError(response);
+  const raw: unknown = await response.json();
+  return typeof raw === "object" && raw !== null && "ready" in raw && raw.ready === true;
+}
+
+/** Deposit a secret into the daemon's in-memory vault. */
+export async function storeLocalSecret(fieldId: string, value: string): Promise<void> {
+  const response = await fetch(localSecretUrl(fieldId, "value"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify({ value }),
+  });
+  if (!response.ok) throw await secretApiError(response);
+}
+
+/** Remove a deposited secret without retrieving its value. */
+export async function clearLocalSecret(fieldId: string): Promise<void> {
+  const response = await fetch(localSecretUrl(fieldId, "value"), {
+    method: "DELETE",
+    cache: "no-store",
+  });
+  if (!response.ok) throw await secretApiError(response);
+}
+
 // --- Meta fetch (with optional decryption) ---------------------------------
 
 interface RawMetaResponse {

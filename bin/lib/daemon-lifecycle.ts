@@ -1,7 +1,7 @@
 import { spawn } from "child_process";
 import { openSync, closeSync, readFileSync, existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
-import { PACKAGE_ROOT, TEMP_DIR, BASE_URL, PID_FILE, VERSION } from "./config.ts";
+import { PACKAGE_ROOT, TEMP_DIR, BASE_URL, PID_FILE, CLI_AUTH_FILE, VERSION } from "./config.ts";
 
 export async function isDaemonRunning(): Promise<boolean> {
   try {
@@ -79,10 +79,12 @@ export function stopDaemon(): boolean {
       process.kill(pid, "SIGTERM");
       console.log("Daemon stopped.");
       try { unlinkSync(PID_FILE); } catch {}
+      try { unlinkSync(CLI_AUTH_FILE); } catch {}
       return true;
     } catch {
       console.log("Daemon was not running (stale PID file).");
       try { unlinkSync(PID_FILE); } catch {}
+      try { unlinkSync(CLI_AUTH_FILE); } catch {}
       return false;
     }
   } else {

@@ -96,6 +96,10 @@ export interface SessionData {
   shares?: ShareEntry[];
 }
 
+export type SecretResolution =
+  | { ok: true; values: Map<string, string> }
+  | { ok: false; missing: string[] };
+
 interface SessionMeta {
   projectRoot: string;
   createdAt: string;
@@ -150,6 +154,7 @@ function computeLineDiffStats(oldText: string, newText: string): DiffStats {
 
 export class SessionManager {
   private sessions = new Map<string, SessionData>();
+  private sessionSecrets = new Map<string, { revision: number; values: Map<string, string> }>();
   private readonly sessionsDir: string;
 
   /**
@@ -383,6 +388,8 @@ export class SessionManager {
       updatedAt: now,
     };
 
+    // Secrets belong to one revision and must never carry into a new runbook.
+    this.sessionSecrets.delete(id);
     this.sessions.set(id, session);
     this.persistToDisk(session, canvasFiles);
     return session;
@@ -454,7 +461,54 @@ export class SessionManager {
 
   remove(id: string) {
     this.sessions.delete(id);
+    this.sessionSecrets.delete(id);
     rmSync(this.sessionDir(id), { recursive: true, force: true });
+  }
+
+  setSecret(id: string, fieldId: string, value: string): boolean {
+    const session = this.sessions.get(id);
+    if (!session) return false;
+
+    let secrets = this.sessionSecrets.get(id);
+    if (!secrets || secrets.revision !== session.currentRevision) {
+      secrets = { revision: session.currentRevision, values: new Map() };
+      this.sessionSecrets.set(id, secrets);
+    }
+    secrets.values.set(fieldId, value);
+    return true;
+  }
+
+  hasSecret(id: string, fieldId: string): boolean {
+    const session = this.sessions.get(id);
+    const secrets = this.sessionSecrets.get(id);
+    return !!session
+      && secrets?.revision === session.currentRevision
+      && secrets.values.has(fieldId);
+  }
+
+  clearSecret(id: string, fieldId: string): boolean {
+    const session = this.sessions.get(id);
+    const secrets = this.sessionSecrets.get(id);
+    if (!session || secrets?.revision !== session.currentRevision) return false;
+    return secrets.values.delete(fieldId);
+  }
+
+  resolveSecrets(id: string, fieldIds: string[]): SecretResolution | null {
+    const session = this.sessions.get(id);
+    if (!session) return null;
+
+    const secrets = this.sessionSecrets.get(id);
+    const missing = fieldIds.filter((fieldId) =>
+      secrets?.revision !== session.currentRevision || !secrets.values.has(fieldId)
+    );
+    if (missing.length > 0) return { ok: false, missing };
+
+    const values = new Map<string, string>();
+    for (const fieldId of fieldIds) {
+      const value = secrets?.values.get(fieldId);
+      if (value !== undefined) values.set(fieldId, value);
+    }
+    return { ok: true, values };
   }
 
   saveCompiled(id: string, filename: string, js: string, rev?: number) {

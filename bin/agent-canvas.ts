@@ -6,6 +6,7 @@ import { handleWatch } from "./lib/commands/watch.ts";
 import { handleDaemon } from "./lib/commands/daemon.ts";
 import { handleInstall } from "./lib/commands/install.ts";
 import { handleInstructions } from "./lib/commands/instructions.ts";
+import { handleExec } from "./lib/commands/exec.ts";
 import { VERSION } from "./lib/config.ts";
 
 function printUsage() {
@@ -14,9 +15,11 @@ function printUsage() {
 Commands:
   agent-canvas install [local|global]  Install skill for Claude Code
   agent-canvas instructions [topic]    Show usage instructions (for AI agents)
-  agent-canvas push <file.jsx>         Push a canvas, open browser
+  agent-canvas push <directory>        Push canvases, open browser
   agent-canvas fetch [--session <id>]  Check for feedback (returns immediately)
   agent-canvas watch [--session <id>]  Wait for user feedback (blocks until submitted)
+  agent-canvas exec --secret ENV=id -- <command>
+                                      Run a command with an in-memory secret
   agent-canvas daemon status           Show daemon status
   agent-canvas daemon stop             Stop the daemon
   agent-canvas daemon start            Start the daemon
@@ -46,6 +49,7 @@ async function main() {
     case "push": return handlePush(rest);
     case "fetch": return handleFetch(rest);
     case "watch": return handleWatch(rest);
+    case "exec": return handleExec(rest);
     case "instructions": return handleInstructions(rest);
     case "install": return handleInstall(rest);
     case "daemon": return handleDaemon(rest);

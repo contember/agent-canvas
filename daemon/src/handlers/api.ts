@@ -6,12 +6,31 @@ import { jsonResponse } from "./utils";
 import { loadShareConfig, shareRevision, revokeShare } from "../share";
 import type { Route } from "../router";
 
+const SECRET_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const MAX_SECRET_BYTES = 64 * 1024;
+const MAX_RESOLVED_SECRETS = 32;
+
+function secretJsonResponse(data: unknown, status = 200): Response {
+  const response = jsonResponse(data, status);
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidSecretField(fieldId: string): boolean {
+  return SECRET_FIELD_RE.test(fieldId);
+}
+
 export interface ApiContext {
   sessionManager: SessionManager;
   broadcastPlanUpdate: (id: string) => void;
   broadcastRevisionUpdate: (id: string) => void;
   port: number;
   version: string;
+  cliAuthToken: string;
 }
 
 export function createApiHandlers(ctx: ApiContext): Route[] {
@@ -242,6 +261,64 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
     return jsonResponse({ found: true, revision: result.revision, feedback: result.feedback });
   }
 
+  async function handleSecretStore(req: Request, _url: URL, match: URLPatternResult): Promise<Response> {
+    const sessionId = match.pathname.groups.id!;
+    const fieldId = match.pathname.groups.field!;
+    if (!sessionManager.get(sessionId)) return secretJsonResponse({ error: "Session not found" }, 404);
+    if (!isValidSecretField(fieldId)) return secretJsonResponse({ error: "Invalid secret field ID" }, 400);
+
+    const raw: unknown = await req.json();
+    if (!isRecord(raw) || typeof raw.value !== "string" || raw.value.length === 0) {
+      return secretJsonResponse({ error: "Secret value must be a non-empty string" }, 400);
+    }
+    if (new TextEncoder().encode(raw.value).byteLength > MAX_SECRET_BYTES) {
+      return secretJsonResponse({ error: `Secret exceeds ${MAX_SECRET_BYTES} bytes` }, 413);
+    }
+
+    sessionManager.setSecret(sessionId, fieldId, raw.value);
+    return secretJsonResponse({ ok: true, ready: true });
+  }
+
+  function handleSecretStatus(_req: Request, _url: URL, match: URLPatternResult): Response {
+    const sessionId = match.pathname.groups.id!;
+    const fieldId = match.pathname.groups.field!;
+    if (!sessionManager.get(sessionId)) return secretJsonResponse({ error: "Session not found" }, 404);
+    if (!isValidSecretField(fieldId)) return secretJsonResponse({ error: "Invalid secret field ID" }, 400);
+    return secretJsonResponse({ ready: sessionManager.hasSecret(sessionId, fieldId) });
+  }
+
+  function handleSecretClear(_req: Request, _url: URL, match: URLPatternResult): Response {
+    const sessionId = match.pathname.groups.id!;
+    const fieldId = match.pathname.groups.field!;
+    if (!sessionManager.get(sessionId)) return secretJsonResponse({ error: "Session not found" }, 404);
+    if (!isValidSecretField(fieldId)) return secretJsonResponse({ error: "Invalid secret field ID" }, 400);
+    sessionManager.clearSecret(sessionId, fieldId);
+    return secretJsonResponse({ ok: true, ready: false });
+  }
+
+  async function handleSecretResolve(req: Request, _url: URL, match: URLPatternResult): Promise<Response> {
+    if (req.headers.get("X-Agent-Canvas-CLI-Token") !== ctx.cliAuthToken) {
+      return secretJsonResponse({ error: "Secret resolution is available only to the local CLI" }, 403);
+    }
+    const sessionId = match.pathname.groups.id!;
+    if (!sessionManager.get(sessionId)) return secretJsonResponse({ error: "Session not found" }, 404);
+
+    const raw: unknown = await req.json();
+    const fields = isRecord(raw) && Array.isArray(raw.fields) ? raw.fields : null;
+    if (!fields || fields.length === 0 || fields.length > MAX_RESOLVED_SECRETS || !fields.every((field) => typeof field === "string" && isValidSecretField(field))) {
+      return secretJsonResponse({ error: `fields must contain 1-${MAX_RESOLVED_SECRETS} valid secret field IDs` }, 400);
+    }
+
+    const uniqueFields = [...new Set(fields)];
+    const result = sessionManager.resolveSecrets(sessionId, uniqueFields);
+    if (!result) return secretJsonResponse({ error: "Session not found" }, 404);
+    if (!result.ok) return secretJsonResponse({ error: "Required secrets are not ready", missing: result.missing }, 409);
+
+    return secretJsonResponse({
+      values: [...result.values].map(([id, value]) => ({ id, value })),
+    });
+  }
+
   return [
     { method: "GET", pattern: new URLPattern({ pathname: "/health" }), handler: handleHealth },
     { method: "POST", pattern: new URLPattern({ pathname: "/api/session/:id/plan" }), handler: handlePlanPost },
@@ -249,6 +326,10 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
     { method: "GET", pattern: new URLPattern({ pathname: "/api/session/:id/meta" }), handler: handleMeta },
     { method: "GET", pattern: new URLPattern({ pathname: "/api/session/:id/revision/:rev/feedback" }), handler: handleFeedbackGet },
     { method: "POST", pattern: new URLPattern({ pathname: "/api/session/:id/feedback/consume" }), handler: handleFeedbackConsume },
+    { method: "POST", pattern: new URLPattern({ pathname: "/api/session/:id/secrets/resolve" }), handler: handleSecretResolve },
+    { method: "POST", pattern: new URLPattern({ pathname: "/api/session/:id/secrets/:field/value" }), handler: handleSecretStore },
+    { method: "GET", pattern: new URLPattern({ pathname: "/api/session/:id/secrets/:field/status" }), handler: handleSecretStatus },
+    { method: "DELETE", pattern: new URLPattern({ pathname: "/api/session/:id/secrets/:field/value" }), handler: handleSecretClear },
     { method: "POST", pattern: new URLPattern({ pathname: "/api/session/:id/revision/:rev/share" }), handler: handleShareRevision },
     { method: "POST", pattern: new URLPattern({ pathname: "/api/session/:id/shares/:shareId/revoke" }), handler: handleShareRevoke },
     { method: "GET", pattern: new URLPattern({ pathname: "/api/session/:id/shares" }), handler: handleSharesList },

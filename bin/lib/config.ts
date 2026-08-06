@@ -10,3 +10,4 @@ export const BASE_URL = `http://localhost:${DAEMON_PORT}`;
 export const WS_URL = `ws://localhost:${DAEMON_PORT}`;
 export const TIMEOUT_MS = parseInt(process.env.CANVAS_TIMEOUT || String(60 * 60 * 1000), 10);
 export const PID_FILE = join(TEMP_DIR, "daemon.pid");
+export const CLI_AUTH_FILE = join(TEMP_DIR, "daemon-auth-token");

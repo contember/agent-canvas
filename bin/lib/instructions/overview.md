@@ -138,6 +138,7 @@ All components are globally available in canvas JSX — no imports needed. For i
 - **Choice** — single-select radio group. Props: `id`, `label`, `options`, `required`
 - **MultiChoice** — multi-select checkboxes. Props: `id`, `label`, `options`, `required`
 - **UserInput** — free text input. Props: `id`, `label`, `placeholder`, `required`
+- **SecretInput** — local in-memory secret handoff. Props: `id`, `label`, `env`, `placeholder`, `required`
 - **RangeInput** — numeric slider. Props: `id`, `label`, `min`, `max`, `minLabel`, `maxLabel`, `required`
 
 ### Advanced
@@ -163,6 +164,7 @@ User wants something built/changed?
 User wants to understand something? → EXPLAIN flow
 User wants review/audit? → REVIEW flow
 User wants to make a decision? → DECISION flow
+Agent needs the user to complete manual steps? → RUNBOOK flow
 ```
 
 **Adapt dynamically**: flows are guidelines, not rigid pipelines. Skip or combine phases when appropriate:
@@ -195,6 +197,7 @@ User wants to make a decision? → DECISION flow
 - **Write** canvas files using the Write tool. Never use bash heredocs.
 - **Edit** canvas files using the Edit tool. Never rewrite entire files.
 - Every `<Item>` and interactive component needs a unique `id`.
+- Use `<SecretInput>`, never `<UserInput>`, for credentials. Read `component-secretinput` and `flow-runbook` first.
 - `<FilePreview path="...">` paths are relative to project root.
 - Read any files the user added to context (listed under "Added context" in feedback).
 - Always push a summary canvas after implementation, even if brief.

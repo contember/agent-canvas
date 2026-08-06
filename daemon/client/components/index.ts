@@ -11,6 +11,7 @@ export { Mermaid } from "./Mermaid";
 export { Diff } from "./Diff";
 export { Choice, MultiChoice } from "./Choice";
 export { UserInput, RangeInput } from "./UserInput";
+export { SecretInput } from "./SecretInput";
 export { ImageView } from "./Image";
 export { Markdown } from "./Markdown";
 export { useFeedback } from "#canvas/runtime";

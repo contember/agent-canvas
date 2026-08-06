@@ -37,3 +37,8 @@ test("well-formed canvas compiles", async () => {
   const result = await compilePlan(`<Section title="Hello"><Item id="a" label="b">text</Item></Section>`);
   expect(result.ok).toBe(true);
 });
+
+test("runbook secret input compiles", async () => {
+  const result = await compilePlan(`<SecretInput id="service-token" label="Service token" env="SERVICE_TOKEN" required />`);
+  expect(result.ok).toBe(true);
+});
