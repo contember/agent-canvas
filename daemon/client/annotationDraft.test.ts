@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { carryUnsubmittedDraft } from "./annotationDraft";
+import { carryUnsubmittedDraft, clearPersistedDraft } from "./annotationDraft";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
@@ -11,12 +11,27 @@ class MemoryStorage {
   setItem(key: string, value: string): void {
     this.values.set(key, value);
   }
+
+  removeItem(key: string): void {
+    this.values.delete(key);
+  }
 }
 
 const sessionId = "session";
 const key = (revision: number) => `canvas:${sessionId}:rev:${revision}`;
 
 describe("carryUnsubmittedDraft", () => {
+  test("clears a submitted draft and its carry marker", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(key(2), JSON.stringify({ generalNote: "Submitted" }));
+    storage.setItem(`${key(2)}:draft-handled`, "1");
+
+    clearPersistedDraft(storage, sessionId, 2);
+
+    expect(storage.getItem(key(2))).toBeNull();
+    expect(storage.getItem(`${key(2)}:draft-handled`)).toBeNull();
+  });
+
   test("carries the latest unsent draft into a new revision", () => {
     const storage = new MemoryStorage();
     storage.setItem(key(2), JSON.stringify({

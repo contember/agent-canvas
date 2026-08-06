@@ -21,7 +21,7 @@ import { ShareDialog, ShareButton, type ShareEntry } from "./ShareDialog";
 import { ReviewerIdentityDialog } from "./ReviewerIdentityDialog";
 import type { Annotation } from "#canvas/runtime";
 import { MODE, fetchMeta, FS_AVAILABLE, WS_AVAILABLE, submitSharedFeedback, getReviewerIdentity, setReviewerIdentity } from "./clientApi";
-import { carryUnsubmittedDraft } from "./annotationDraft";
+import { carryUnsubmittedDraft, clearPersistedDraft } from "./annotationDraft";
 
 export type ActiveView = { type: "overview" } | { type: "canvas"; filename: string } | { type: "file"; path: string };
 
@@ -314,6 +314,9 @@ function App() {
       .then((data: any) => {
         if (data.currentRevision) {
           const nextRevisions: RevisionInfo[] = data.revisions || [];
+          for (const revision of nextRevisions) {
+            if (revision.hasFeedback) clearPersistedDraft(localStorage, sessionId, revision.revision);
+          }
           carryUnsubmittedDraft(localStorage, sessionId, data.currentRevision, nextRevisions);
           setCurrentRevision(data.currentRevision);
           setSelectedRevision(data.currentRevision);
@@ -407,7 +410,13 @@ function App() {
             }
           }
           if (data.type === "revision-updated") {
-            if (data.revisions) setRevisions(data.revisions);
+            if (Array.isArray(data.revisions)) {
+              const nextRevisions: RevisionInfo[] = data.revisions;
+              for (const revision of nextRevisions) {
+                if (revision.hasFeedback) clearPersistedDraft(localStorage, sessionId, revision.revision);
+              }
+              setRevisions(nextRevisions);
+            }
           }
           if (data.type === "watcher-status") {
             setAgentWatching(!!data.watching);
@@ -448,6 +457,7 @@ function App() {
         annotations: structuredAnnotations,
         generalNote: feedback,
       });
+      clearPersistedDraft(localStorage, sessionId, selectedRevision);
       setSharedFeedbackSubmitted(true);
       setToast({ kind: "success", message: "Feedback submitted. The canvas author will see it shortly." });
     } catch (e: any) {

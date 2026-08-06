@@ -129,8 +129,6 @@ interface LegacyRevisionInfo {
   diffStats?: DiffStats;
 }
 
-const STALE_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24 hours
-
 function computeLineDiffStats(oldText: string, newText: string): DiffStats {
   const oldLines = oldText.split("\n");
   const newLines = newText.split("\n");
@@ -341,6 +339,7 @@ export class SessionManager {
   upsert(id: string, canvasFiles: Map<string, string>, projectRoot: string, label?: string, response?: string): SessionData {
     const existing = this.sessions.get(id);
     const now = new Date().toISOString();
+    // Stable session IDs must never recycle revision numbers used as browser draft keys.
     const revision = existing ? existing.currentRevision + 1 : 1;
 
     // Compute per-file diffStats against the previous revision
@@ -608,15 +607,6 @@ export class SessionManager {
       return JSON.parse(readFileSync(join(this.revisionDir(id, rev), "remote_feedback.json"), "utf-8"));
     } catch {
       return [];
-    }
-  }
-
-  cleanupStale(maxAge = STALE_TIMEOUT_MS) {
-    const now = Date.now();
-    for (const [id, session] of this.sessions) {
-      if (now - new Date(session.updatedAt).getTime() > maxAge) {
-        this.remove(id);
-      }
     }
   }
 }

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { AnnotationCtx } from "#canvas/runtime";
 import type { Annotation, AnnotationContext, PlanResponse, FeedbackEntry, AnnotationContextValue } from "#canvas/runtime";
+import { clearPersistedDraft } from "./annotationDraft";
 import { generateAnnotationId } from "./utils";
 
 // Re-export types for convenience
@@ -41,12 +42,6 @@ function loadPersisted(sessionId: string, revision: number): PersistedState | nu
 function savePersisted(sessionId: string, revision: number, state: PersistedState) {
   try {
     localStorage.setItem(storageKey(sessionId, revision), JSON.stringify(state));
-  } catch {}
-}
-
-function clearPersisted(sessionId: string, revision: number) {
-  try {
-    localStorage.removeItem(storageKey(sessionId, revision));
   } catch {}
 }
 
@@ -164,7 +159,7 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, remoteAnno
     setActiveAnnotationId(null);
     setResponses(new Map());
     setFeedbackEntries(new Map());
-    clearPersisted(sessionId, revision);
+    clearPersistedDraft(localStorage, sessionId, revision);
   }, [sessionId, revision]);
 
   return (

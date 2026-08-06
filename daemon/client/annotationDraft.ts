@@ -8,12 +8,27 @@ interface AnnotationStorage {
   setItem(key: string, value: string): void;
 }
 
+interface RemovableAnnotationStorage {
+  removeItem(key: string): void;
+}
+
 function storageKey(sessionId: string, revision: number): string {
   return `canvas:${sessionId}:rev:${revision}`;
 }
 
 function handledKey(sessionId: string, revision: number): string {
   return `${storageKey(sessionId, revision)}:draft-handled`;
+}
+
+export function clearPersistedDraft(
+  storage: RemovableAnnotationStorage,
+  sessionId: string,
+  revision: number,
+): void {
+  try {
+    storage.removeItem(storageKey(sessionId, revision));
+    storage.removeItem(handledKey(sessionId, revision));
+  } catch {}
 }
 
 function parseState(raw: string | null): object | null {

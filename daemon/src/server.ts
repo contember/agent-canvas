@@ -87,8 +87,6 @@ const server = Bun.serve<WSData>({
 export { sessionManager, server };
 export const broadcastPlanUpdate = wsManager.broadcastPlanUpdate;
 
-setInterval(() => sessionManager.cleanupStale(), 60 * 60 * 1000);
-
 // Start polling for remote feedback from shared canvases.
 // No-ops if CANVAS_SHARE_ENDPOINT is not set.
 startRemoteFeedbackPoller(sessionManager, wsManager.broadcastRemoteFeedback, VERSION);
