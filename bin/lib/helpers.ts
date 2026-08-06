@@ -33,37 +33,87 @@ export function openBrowser(url: string) {
   console.error(`Open this URL in your browser: ${url}`);
 }
 
-export async function waitForFeedback(sessionId: string): Promise<void> {
-  return new Promise((resolveP, rejectP) => {
-    const ws = new WebSocket(`${WS_URL}/ws/wait/${sessionId}`);
-    const timeout = setTimeout(() => {
+interface FeedbackSocket {
+  close(): void;
+  onmessage: ((event: MessageEvent) => void) | null;
+  onerror: ((event: Event) => void) | null;
+  onclose: ((event: CloseEvent) => void) | null;
+}
+
+interface FeedbackWaitOptions {
+  createSocket?: (url: string) => FeedbackSocket;
+  timeoutMs?: number;
+  reconnectAttempts?: number;
+  reconnectDelayMs?: number;
+}
+
+class FeedbackWaitError extends Error {
+  constructor(message: string, readonly retryable: boolean) {
+    super(message);
+  }
+}
+
+function waitForFeedbackConnection(
+  sessionId: string,
+  timeoutMs: number,
+  createSocket: (url: string) => FeedbackSocket,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const ws = createSocket(`${WS_URL}/ws/wait/${sessionId}`);
+    let settled = false;
+
+    const finish = (result: string | FeedbackWaitError) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
       ws.close();
-      console.error("Error: Timeout waiting for feedback.");
-      process.exit(1);
-    }, TIMEOUT_MS);
+      if (result instanceof FeedbackWaitError) reject(result);
+      else resolve(result);
+    };
+
+    const timeout = setTimeout(() => {
+      finish(new FeedbackWaitError("Timeout waiting for feedback.", false));
+    }, timeoutMs);
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(typeof event.data === "string" ? event.data : "");
         if (data.type === "submit") {
-          clearTimeout(timeout);
-          process.stdout.write(data.feedback);
-          ws.close();
-          process.exit(0);
+          finish(data.feedback);
         }
       } catch {}
     };
 
     ws.onerror = () => {
-      clearTimeout(timeout);
-      console.error("Error: WebSocket connection failed.");
-      process.exit(1);
+      finish(new FeedbackWaitError("WebSocket connection failed.", true));
     };
 
     ws.onclose = () => {
-      clearTimeout(timeout);
+      finish(new FeedbackWaitError("WebSocket closed before feedback was submitted.", true));
     };
   });
+}
+
+export async function waitForFeedback(sessionId: string, options: FeedbackWaitOptions = {}): Promise<string> {
+  const createSocket = options.createSocket ?? ((url: string) => new WebSocket(url));
+  const timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
+  const reconnectAttempts = options.reconnectAttempts ?? 3;
+  const reconnectDelayMs = options.reconnectDelayMs ?? 1_000;
+  const deadline = Date.now() + timeoutMs;
+
+  for (let attempt = 0; ; attempt++) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) throw new FeedbackWaitError("Timeout waiting for feedback.", false);
+
+    try {
+      return await waitForFeedbackConnection(sessionId, remainingMs, createSocket);
+    } catch (error) {
+      if (!(error instanceof FeedbackWaitError) || !error.retryable || attempt >= reconnectAttempts) {
+        throw error;
+      }
+      await Bun.sleep(Math.min(reconnectDelayMs, Math.max(0, deadline - Date.now())));
+    }
+  }
 }
 
 export async function readLine(): Promise<string> {

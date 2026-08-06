@@ -19,5 +19,12 @@ export async function handleWatch(args: string[]) {
     process.exit(0);
   }
 
-  await waitForFeedback(sessionId);
+  try {
+    const submittedFeedback = await waitForFeedback(sessionId);
+    process.stdout.write(submittedFeedback);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Error: ${message}`);
+    process.exit(1);
+  }
 }
