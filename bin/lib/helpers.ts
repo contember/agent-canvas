@@ -47,6 +47,30 @@ interface FeedbackWaitOptions {
   reconnectDelayMs?: number;
 }
 
+interface CanvasRenderError {
+  revision: number;
+  filename: string;
+  message: string;
+  stack?: string;
+  componentStack?: string;
+}
+
+function isCanvasRenderError(value: unknown): value is CanvasRenderError {
+  return typeof value === "object" && value !== null
+    && "revision" in value && Number.isInteger(value.revision)
+    && "filename" in value && typeof value.filename === "string"
+    && "message" in value && typeof value.message === "string"
+    && (!("stack" in value) || value.stack === undefined || typeof value.stack === "string")
+    && (!("componentStack" in value) || value.componentStack === undefined || typeof value.componentStack === "string");
+}
+
+function formatCanvasRenderError(error: CanvasRenderError): string {
+  const details = [`Canvas render failed in ${error.filename} (revision ${error.revision}):`, error.message];
+  if (error.componentStack?.trim()) details.push(`Component stack:${error.componentStack}`);
+  if (error.stack?.trim()) details.push(`Browser stack:\n${error.stack}`);
+  return details.join("\n");
+}
+
 class FeedbackWaitError extends Error {
   constructor(message: string, readonly retryable: boolean) {
     super(message);
@@ -80,6 +104,9 @@ function waitForFeedbackConnection(
         const data = JSON.parse(typeof event.data === "string" ? event.data : "");
         if (data.type === "submit") {
           finish(data.feedback);
+        }
+        if (data.type === "render-error" && isCanvasRenderError(data.error)) {
+          finish(new FeedbackWaitError(formatCanvasRenderError(data.error), false));
         }
       } catch {}
     };

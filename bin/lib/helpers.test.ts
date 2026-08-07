@@ -45,4 +45,34 @@ describe("waitForFeedback", () => {
 
     await expect(result).rejects.toThrow("WebSocket closed before feedback was submitted.");
   });
+
+  test("reports a browser render error without reconnecting", async () => {
+    const sockets: FakeSocket[] = [];
+    const result = waitForFeedback("session", {
+      createSocket: () => {
+        const socket = new FakeSocket();
+        sockets.push(socket);
+        queueMicrotask(() => socket.onmessage?.(new MessageEvent("message", {
+          data: JSON.stringify({
+            type: "render-error",
+            error: {
+              revision: 3,
+              filename: "architecture.jsx",
+              message: "Table: required prop `headers` must be an array",
+              componentStack: "\n    at Table",
+            },
+          }),
+        })));
+        return socket;
+      },
+      timeoutMs: 1_000,
+      reconnectAttempts: 2,
+      reconnectDelayMs: 0,
+    });
+
+    await expect(result).rejects.toThrow(
+      "Canvas render failed in architecture.jsx (revision 3):\nTable: required prop `headers` must be an array",
+    );
+    expect(sockets).toHaveLength(1);
+  });
 });

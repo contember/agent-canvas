@@ -1,13 +1,38 @@
-import type { ServerWebSocket } from "bun";
 import type { SessionManager, RemoteFeedbackEntry } from "./session";
 
 export type WSData = { type: "browser" | "wait"; sessionId: string };
 
+export interface CanvasSocket {
+  data: WSData;
+  send(message: string): unknown;
+  close(): void;
+  ping(): unknown;
+}
+
+interface CanvasRenderError {
+  revision: number;
+  filename: string;
+  message: string;
+  stack?: string;
+  componentStack?: string;
+}
+
+function isCanvasRenderError(value: unknown): value is CanvasRenderError {
+  return typeof value === "object" && value !== null
+    && "revision" in value && Number.isInteger(value.revision)
+    && "filename" in value && typeof value.filename === "string"
+    && "message" in value && typeof value.message === "string"
+    && (!("stack" in value) || value.stack === undefined || typeof value.stack === "string")
+    && (!("componentStack" in value) || value.componentStack === undefined || typeof value.componentStack === "string");
+}
+
 export function createWebSocketManager(sessionManager: SessionManager) {
-  const browserSockets = new Map<string, Set<ServerWebSocket<WSData>>>();
-  const waitSockets = new Map<string, Set<ServerWebSocket<WSData>>>();
+  const browserSockets = new Map<string, Set<CanvasSocket>>();
+  const waitSockets = new Map<string, Set<CanvasSocket>>();
+  const pendingRenderErrors = new Map<string, CanvasRenderError>();
 
   function broadcastPlanUpdate(sessionId: string) {
+    pendingRenderErrors.delete(sessionId);
     const sockets = browserSockets.get(sessionId);
     if (!sockets) return;
     const session = sessionManager.get(sessionId);
@@ -59,13 +84,29 @@ export function createWebSocketManager(sessionManager: SessionManager) {
     }
   }
 
+  function deliverPendingRenderError(sessionId: string): boolean {
+    const error = pendingRenderErrors.get(sessionId);
+    const waiters = waitSockets.get(sessionId);
+    if (!error || !waiters || waiters.size === 0) return false;
+
+    pendingRenderErrors.delete(sessionId);
+    waitSockets.delete(sessionId);
+    const payload = JSON.stringify({ type: "render-error", error });
+    for (const waiter of waiters) {
+      waiter.send(payload);
+      waiter.close();
+    }
+    broadcastWatcherStatus(sessionId);
+    return true;
+  }
+
   // Ping wait sockets periodically to detect dead connections.
   // We can't rely on ws.close() triggering the close handler for dead sockets,
   // so we manually remove dead sockets and broadcast status.
   const PING_INTERVAL = 5_000;
-  const pongReceived = new WeakSet<ServerWebSocket<WSData>>();
+  const pongReceived = new WeakSet<CanvasSocket>();
 
-  function removeWaitSocket(ws: ServerWebSocket<WSData>, sessionId: string) {
+  function removeWaitSocket(ws: CanvasSocket, sessionId: string) {
     const sockets = waitSockets.get(sessionId);
     if (sockets) {
       sockets.delete(ws);
@@ -92,7 +133,7 @@ export function createWebSocketManager(sessionManager: SessionManager) {
   }, PING_INTERVAL);
 
   const handlers = {
-    open(ws: ServerWebSocket<WSData>) {
+    open(ws: CanvasSocket) {
       const { type, sessionId } = ws.data;
       const map = type === "browser" ? browserSockets : waitSockets;
       if (!map.has(sessionId)) map.set(sessionId, new Set());
@@ -104,10 +145,12 @@ export function createWebSocketManager(sessionManager: SessionManager) {
       } else {
         // CLI waiter connected — notify browsers
         pongReceived.add(ws); // Give it a free pass on first interval
-        broadcastWatcherStatus(sessionId);
+        if (!deliverPendingRenderError(sessionId)) {
+          broadcastWatcherStatus(sessionId);
+        }
       }
     },
-    message(ws: ServerWebSocket<WSData>, message: string | Buffer) {
+    message(ws: CanvasSocket, message: string | Buffer) {
       const { type, sessionId } = ws.data;
       if (type === "browser") {
         try {
@@ -133,15 +176,26 @@ export function createWebSocketManager(sessionManager: SessionManager) {
               }
             }
           }
+          if (data.type === "render-error" && isCanvasRenderError(data.error)) {
+            const session = sessionManager.get(sessionId);
+            if (
+              session
+              && data.error.revision === session.currentRevision
+              && session.canvasFiles.includes(data.error.filename)
+            ) {
+              pendingRenderErrors.set(sessionId, data.error);
+              deliverPendingRenderError(sessionId);
+            }
+          }
         } catch {}
       }
     },
-    pong(ws: ServerWebSocket<WSData>) {
+    pong(ws: CanvasSocket) {
       if (ws.data.type === "wait") {
         pongReceived.add(ws);
       }
     },
-    close(ws: ServerWebSocket<WSData>) {
+    close(ws: CanvasSocket) {
       const { type, sessionId } = ws.data;
       const map = type === "browser" ? browserSockets : waitSockets;
       map.get(sessionId)?.delete(ws);

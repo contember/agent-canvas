@@ -7,6 +7,7 @@ import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 import { generateAnnotationId } from "./utils";
 import { useTextAnnotation } from "./useTextAnnotation";
 import { loadCanvasModule } from "./clientApi";
+import { RenderErrorContext, type CanvasRenderError } from "./RenderErrorContext";
 
 /** All navigable blocks (keyboard arrows) */
 const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='choice-option'], [data-md='multichoice-option'], [data-md='userinput'], [data-md='rangeinput'], [data-md='image']";
@@ -18,8 +19,53 @@ interface PlanRendererProps {
   filename: string;
 }
 
+interface CanvasErrorBoundaryProps {
+  revision: number;
+  filename: string;
+  reportError: (error: CanvasRenderError) => void;
+  children: React.ReactNode;
+}
+
+interface CanvasErrorBoundaryState {
+  error: Error | null;
+}
+
+class CanvasErrorBoundary extends React.Component<CanvasErrorBoundaryProps, CanvasErrorBoundaryState> {
+  state: CanvasErrorBoundaryState = { error: null };
+
+  static getDerivedStateFromError(error: Error): CanvasErrorBoundaryState {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    this.props.reportError({
+      revision: this.props.revision,
+      filename: this.props.filename,
+      message: error.message,
+      ...(error.stack ? { stack: error.stack } : {}),
+      ...(info.componentStack ? { componentStack: info.componentStack } : {}),
+    });
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return <CanvasErrorDisplay message={this.state.error.message} />;
+  }
+}
+
+function CanvasErrorDisplay({ message }: { message: string }) {
+  return (
+    <div className="bg-accent-red-muted rounded-lg p-5">
+      <h3 className="font-body font-semibold text-accent-red mb-2">Canvas render failed</h3>
+      <pre className="text-code font-mono text-text-secondary whitespace-pre-wrap">{message}</pre>
+      <p className="text-meta font-body text-text-tertiary mt-3">The error was sent back to the canvas author.</p>
+    </div>
+  );
+}
+
 export function PlanRenderer({ revision, filename }: PlanRendererProps) {
   const sessionId = useContext(SessionContext);
+  const reportError = useContext(RenderErrorContext);
   const [PlanComponent, setPlanComponent] = useState<React.ComponentType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,8 +90,18 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
     void sessionId; // sessionId is implied by the URL in clientApi (shared or local)
     loadCanvasModule(filename, revision)
       .then((mod) => { setPlanComponent(() => mod.default); setLoading(false); })
-      .catch((e) => { setError(e.message); setLoading(false); });
-  }, [sessionId, revision, filename]);
+      .catch((cause: unknown) => {
+        const moduleError = cause instanceof Error ? cause : new Error(String(cause));
+        setError(moduleError.message);
+        setLoading(false);
+        reportError({
+          revision,
+          filename,
+          message: moduleError.message,
+          ...(moduleError.stack ? { stack: moduleError.stack } : {}),
+        });
+      });
+  }, [sessionId, revision, filename, reportError]);
 
   const scrollContainer = document.getElementById("plan-scroll-container");
 
@@ -250,12 +306,7 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
   }
 
   if (error) {
-    return (
-      <div className="bg-accent-red-muted rounded-lg p-5">
-        <h3 className="font-body font-semibold text-accent-red mb-2">Compilation Error</h3>
-        <pre className="text-code font-mono text-text-secondary whitespace-pre-wrap">{error}</pre>
-      </div>
-    );
+    return <CanvasErrorDisplay message={error} />;
   }
 
   if (!PlanComponent) {
@@ -265,7 +316,14 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
   return (
     <CanvasFileCtx.Provider value={filename}>
       <div ref={containerRef} className="plan-content plan-updated">
-        {planElement}
+        <CanvasErrorBoundary
+          key={`${revision}:${filename}`}
+          revision={revision}
+          filename={filename}
+          reportError={reportError}
+        >
+          {planElement}
+        </CanvasErrorBoundary>
       </div>
       {editingAnn && (
         <EditAnnotationModal
@@ -554,4 +612,3 @@ function EditAnnotationModal({ note, onSave, onCancel }: { note: string; onSave:
     </div>
   );
 }
-

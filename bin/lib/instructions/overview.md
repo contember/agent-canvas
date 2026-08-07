@@ -76,6 +76,11 @@ In Codex, a wait may yield before feedback arrives. Continue waiting on the same
 process handle; do not start another watcher. Keep user-facing progress updates
 brief and no more than 60 seconds apart while waiting.
 
+If the watcher exits with `Canvas render failed`, treat it like a compilation
+error: fix the reported canvas file, push the corrected revision, and start a
+new watcher. The browser reports these failures automatically; do not ask the
+user to transcribe console output.
+
 **Important**: The push → watch sequence is atomic. Never push without starting
 the host-specific watcher immediately afterward. Do not continue with unrelated
 work while waiting for feedback.

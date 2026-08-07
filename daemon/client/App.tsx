@@ -22,6 +22,7 @@ import { ReviewerIdentityDialog } from "./ReviewerIdentityDialog";
 import type { Annotation } from "#canvas/runtime";
 import { MODE, fetchMeta, FS_AVAILABLE, WS_AVAILABLE, submitSharedFeedback, getReviewerIdentity, setReviewerIdentity } from "./clientApi";
 import { carryUnsubmittedDraft, clearPersistedDraft } from "./annotationDraft";
+import { RenderErrorContext, type CanvasRenderError } from "./RenderErrorContext";
 
 export type ActiveView = { type: "overview" } | { type: "canvas"; filename: string } | { type: "file"; path: string };
 
@@ -232,6 +233,8 @@ function App() {
   const [activeView, setActiveViewRaw] = useState<ActiveView>({ type: "overview" });
   const [openFiles, setOpenFiles] = useState<string[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
+  const pendingRenderErrorsRef = useRef<CanvasRenderError[]>([]);
+  const reportedRenderErrorsRef = useRef(new Set<string>());
 
   const [projectRoot, setProjectRoot] = useState<string | undefined>();
   const [mobileSidebar, setMobileSidebar] = useState(false);
@@ -247,6 +250,21 @@ function App() {
   const [reviewerDialogOpen, setReviewerDialogOpen] = useState(false);
   const [pendingFeedback, setPendingFeedback] = useState<string | null>(null);
   const [toast, setToast] = useState<{ kind: "error" | "success"; message: string } | null>(null);
+
+  const reportRenderError = useCallback((error: CanvasRenderError) => {
+    if (isSharedMode) return;
+    const signature = `${error.revision}\0${error.filename}\0${error.message}`;
+    if (reportedRenderErrorsRef.current.has(signature)) return;
+    reportedRenderErrorsRef.current.add(signature);
+
+    const payload = JSON.stringify({ type: "render-error", error });
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(payload);
+    } else {
+      pendingRenderErrorsRef.current.push(error);
+    }
+  }, [isSharedMode]);
+
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 4000);
@@ -378,7 +396,13 @@ function App() {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const ws = new WebSocket(`${protocol}//${window.location.host}/ws/session/${sessionId}`);
       wsRef.current = ws;
-      ws.onopen = () => setConnected(true);
+      ws.onopen = () => {
+        setConnected(true);
+        for (const error of pendingRenderErrorsRef.current) {
+          ws.send(JSON.stringify({ type: "render-error", error }));
+        }
+        pendingRenderErrorsRef.current = [];
+      };
       ws.onclose = () => { setConnected(false); reconnectTimer = setTimeout(connect, 2000); };
       ws.onmessage = (event) => {
         try {
@@ -492,14 +516,15 @@ function App() {
 
   return (
     <SessionContext.Provider value={sessionId}>
-      <RevisionContext.Provider value={{ currentRevision, selectedRevision, revisions, setSelectedRevision, isReadOnly, compareRevision, setCompareRevision, agentWatching }}>
-        <AnnotationProvider
-          key={`${sessionId}:${selectedRevision}`}
-          sessionId={sessionId}
-          revision={selectedRevision}
-          isReadOnly={isReadOnly}
-          remoteAnnotations={remoteAnnotationsByRev.get(selectedRevision)}
-        >
+      <RenderErrorContext.Provider value={reportRenderError}>
+        <RevisionContext.Provider value={{ currentRevision, selectedRevision, revisions, setSelectedRevision, isReadOnly, compareRevision, setCompareRevision, agentWatching }}>
+          <AnnotationProvider
+            key={`${sessionId}:${selectedRevision}`}
+            sessionId={sessionId}
+            revision={selectedRevision}
+            isReadOnly={isReadOnly}
+            remoteAnnotations={remoteAnnotationsByRev.get(selectedRevision)}
+          >
           <ActiveViewContext.Provider value={{ activeView, setActiveView, openFiles, closeFile, canvasFiles }}>
           <ActiveViewCtx.Provider value={{ setActiveView }}>
             <div className="min-h-screen bg-bg-base">
@@ -673,8 +698,9 @@ function App() {
             </div>
           </ActiveViewCtx.Provider>
           </ActiveViewContext.Provider>
-        </AnnotationProvider>
-      </RevisionContext.Provider>
+          </AnnotationProvider>
+        </RevisionContext.Provider>
+      </RenderErrorContext.Provider>
     </SessionContext.Provider>
   );
 }
