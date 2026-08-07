@@ -42,3 +42,16 @@ test("runbook secret input compiles", async () => {
   const result = await compilePlan(`<SecretInput id="service-token" label="Service token" env="SERVICE_TOKEN" required />`);
   expect(result.ok).toBe(true);
 });
+
+test("missing required component prop fails before the browser renders", async () => {
+  const result = await compilePlan(`<Table columns={["Name"]} rows={[["Canvas"]]} />`);
+
+  expect(result.ok).toBe(false);
+  if (result.ok) return;
+  expect(result.error).toBe("Runtime error: Table: required prop `headers` must be an array");
+});
+
+test("component prop validation accepts valid table props", async () => {
+  const result = await compilePlan(`<Table headers={["Name"]} rows={[["Canvas"]]} />`);
+  expect(result.ok).toBe(true);
+});

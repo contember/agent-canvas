@@ -1,7 +1,7 @@
 import { writeFileSync, unlinkSync, readFileSync } from "fs";
 import { join } from "path";
 import { randomUUID } from "crypto";
-import { h, Fragment } from "preact";
+import { h, Fragment, type ComponentChildren } from "preact";
 import renderToString from "preact-render-to-string";
 import { parse as parseMermaid } from "mermaid-parser-bundle";
 import { COMPILE_TEMP_DIR } from "./paths";
@@ -33,17 +33,51 @@ function mockJsxDEV(type: any, props: any, key?: any) {
   return h(type, { ...rest, key }, children);
 }
 
+interface StubProps {
+  children?: ComponentChildren;
+  [key: string]: unknown;
+}
+
 /** Passthrough component — just renders its children */
-const Stub = ({ children }: any) => h(Fragment, null, children);
+const Stub = ({ children }: StubProps) => h(Fragment, null, children);
+
+type RequiredPropKind = "array" | "string";
+
+function validatingStub(component: string, requiredProps: Record<string, RequiredPropKind>) {
+  return (props: StubProps) => {
+    for (const [prop, kind] of Object.entries(requiredProps)) {
+      const value = props[prop];
+      const valid = kind === "array" ? Array.isArray(value) : typeof value === kind;
+      if (!valid) {
+        throw new Error(`${component}: required prop \`${prop}\` must be ${kind === "array" ? "an array" : `a ${kind}`}`);
+      }
+    }
+    return h(Fragment, null, props.children);
+  };
+}
 
 const STUB_COMPONENTS: Record<string, any> = {};
 for (const name of [
-  "Section", "Item", "Task", "FilePreview", "CodeBlock", "Callout",
-  "Table", "Priority", "Checklist", "Note", "Diff",
-  "Choice", "MultiChoice", "UserInput", "RangeInput", "SecretInput", "ImageView", "Markdown",
+  "CodeBlock", "Callout", "Note", "Markdown",
 ]) {
   STUB_COMPONENTS[name] = Stub;
 }
+Object.assign(STUB_COMPONENTS, {
+  Section: validatingStub("Section", { title: "string" }),
+  Item: validatingStub("Item", { id: "string", label: "string" }),
+  Task: validatingStub("Task", { id: "string", label: "string" }),
+  FilePreview: validatingStub("FilePreview", { path: "string" }),
+  Table: validatingStub("Table", { headers: "array", rows: "array" }),
+  Priority: validatingStub("Priority", { level: "string" }),
+  Checklist: validatingStub("Checklist", { items: "array" }),
+  Diff: validatingStub("Diff", { before: "string", after: "string" }),
+  Choice: validatingStub("Choice", { id: "string", label: "string", options: "array" }),
+  MultiChoice: validatingStub("MultiChoice", { id: "string", label: "string", options: "array" }),
+  UserInput: validatingStub("UserInput", { id: "string", label: "string" }),
+  RangeInput: validatingStub("RangeInput", { id: "string", label: "string" }),
+  SecretInput: validatingStub("SecretInput", { id: "string", label: "string", env: "string" }),
+  ImageView: validatingStub("ImageView", { src: "string" }),
+});
 // Mermaid stub collects diagram sources for post-render validation
 let collectedMermaidSources: string[] = [];
 STUB_COMPONENTS.Mermaid = ({ children }: any) => {
