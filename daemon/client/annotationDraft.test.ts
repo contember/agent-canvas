@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { carryUnsubmittedDraft, clearPersistedDraft } from "./annotationDraft";
+import { annotationDraftKey, carryUnsubmittedDraft, clearPersistedDraft } from "./annotationDraft";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
@@ -18,7 +18,8 @@ class MemoryStorage {
 }
 
 const sessionId = "session";
-const key = (revision: number) => `canvas:${sessionId}:rev:${revision}`;
+const key = (revision: number) => annotationDraftKey(sessionId, revision);
+const nextKey = (revision: number) => annotationDraftKey(sessionId, revision, "next");
 
 describe("carryUnsubmittedDraft", () => {
   test("clears a submitted draft and its carry marker", () => {
@@ -76,6 +77,44 @@ describe("carryUnsubmittedDraft", () => {
       { revision: 3, hasFeedback: false },
     ])).toBeNull();
     expect(storage.getItem(key(3))).toBeNull();
+  });
+
+  test("carries a post-feedback draft into the next revision", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(key(2), JSON.stringify({
+      annotations: [{ id: "submitted-annotation" }],
+      generalNote: "Submitted feedback",
+      responses: [],
+    }));
+    storage.setItem(nextKey(2), JSON.stringify({
+      annotations: [{ id: "next-annotation" }],
+      generalNote: "",
+      responses: [],
+      feedbackEntries: [["generated", { markdown: "stale generated content" }]],
+    }));
+
+    expect(carryUnsubmittedDraft(storage, sessionId, 3, [
+      { revision: 2, hasFeedback: true },
+      { revision: 3, hasFeedback: false },
+    ])).toBe(2);
+    expect(JSON.parse(storage.getItem(key(3)) ?? "")).toEqual({
+      annotations: [{ id: "next-annotation" }],
+      generalNote: "",
+      responses: [],
+      feedbackEntries: [],
+    });
+    expect(storage.getItem(nextKey(2))).toBeNull();
+  });
+
+  test("clearing submitted feedback preserves its next-revision draft", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(key(2), JSON.stringify({ annotations: [{ id: "submitted" }] }));
+    storage.setItem(nextKey(2), JSON.stringify({ annotations: [{ id: "next" }] }));
+
+    clearPersistedDraft(storage, sessionId, 2);
+
+    expect(storage.getItem(key(2))).toBeNull();
+    expect(storage.getItem(nextKey(2))).not.toBeNull();
   });
 
   test("does not overwrite meaningful target data", () => {

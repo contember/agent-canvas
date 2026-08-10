@@ -21,7 +21,7 @@ import { ShareDialog, ShareButton, type ShareEntry } from "./ShareDialog";
 import { ReviewerIdentityDialog } from "./ReviewerIdentityDialog";
 import type { Annotation } from "#canvas/runtime";
 import { MODE, fetchMeta, FS_AVAILABLE, WS_AVAILABLE, submitSharedFeedback, getReviewerIdentity, setReviewerIdentity } from "./clientApi";
-import { carryUnsubmittedDraft, clearPersistedDraft } from "./annotationDraft";
+import { carryUnsubmittedDraft, clearPersistedDraft, type AnnotationDraftPhase } from "./annotationDraft";
 import { RenderErrorContext, type CanvasRenderError } from "./RenderErrorContext";
 
 export type ActiveView = { type: "overview" } | { type: "canvas"; filename: string } | { type: "file"; path: string };
@@ -297,6 +297,10 @@ function App() {
 
   const selectedRevInfo = revisions.find((r) => r.revision === selectedRevision);
   const isReadOnly = selectedRevision !== currentRevision || !!selectedRevInfo?.hasFeedback || sharedFeedbackSubmitted;
+  // Keep feedback added after submission separate from the already-sent draft.
+  const draftPhase: AnnotationDraftPhase = selectedRevision === currentRevision && (!!selectedRevInfo?.hasFeedback || sharedFeedbackSubmitted)
+    ? "next"
+    : "current";
 
   const setActiveView = useCallback((v: ActiveView) => {
     // Save current scroll position before switching
@@ -519,10 +523,11 @@ function App() {
       <RenderErrorContext.Provider value={reportRenderError}>
         <RevisionContext.Provider value={{ currentRevision, selectedRevision, revisions, setSelectedRevision, isReadOnly, compareRevision, setCompareRevision, agentWatching }}>
           <AnnotationProvider
-            key={`${sessionId}:${selectedRevision}`}
+            key={`${sessionId}:${selectedRevision}:${draftPhase}`}
             sessionId={sessionId}
             revision={selectedRevision}
             isReadOnly={isReadOnly}
+            draftPhase={draftPhase}
             remoteAnnotations={remoteAnnotationsByRev.get(selectedRevision)}
           >
           <ActiveViewContext.Provider value={{ activeView, setActiveView, openFiles, closeFile, canvasFiles }}>

@@ -6,18 +6,26 @@ interface RevisionState {
 interface AnnotationStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem(key: string): void;
 }
 
 interface RemovableAnnotationStorage {
   removeItem(key: string): void;
 }
 
-function storageKey(sessionId: string, revision: number): string {
-  return `canvas:${sessionId}:rev:${revision}`;
+export type AnnotationDraftPhase = "current" | "next";
+
+export function annotationDraftKey(
+  sessionId: string,
+  revision: number,
+  phase: AnnotationDraftPhase = "current",
+): string {
+  const base = `canvas:${sessionId}:rev:${revision}`;
+  return phase === "next" ? `${base}:next-draft` : base;
 }
 
 function handledKey(sessionId: string, revision: number): string {
-  return `${storageKey(sessionId, revision)}:draft-handled`;
+  return `${annotationDraftKey(sessionId, revision)}:draft-handled`;
 }
 
 export function clearPersistedDraft(
@@ -26,7 +34,7 @@ export function clearPersistedDraft(
   revision: number,
 ): void {
   try {
-    storage.removeItem(storageKey(sessionId, revision));
+    storage.removeItem(annotationDraftKey(sessionId, revision));
     storage.removeItem(handledKey(sessionId, revision));
   } catch {}
 }
@@ -77,7 +85,7 @@ export function carryUnsubmittedDraft(
   revisions: RevisionState[],
 ): number | null {
   try {
-    const targetKey = storageKey(sessionId, targetRevision);
+    const targetKey = annotationDraftKey(sessionId, targetRevision);
     if (hasDraftContent(parseState(storage.getItem(targetKey)))) {
       storage.setItem(handledKey(sessionId, targetRevision), "1");
       return null;
@@ -89,9 +97,21 @@ export function carryUnsubmittedDraft(
       .sort((left, right) => right.revision - left.revision);
 
     for (const revision of previous) {
-      if (revision.hasFeedback) return null;
+      if (revision.hasFeedback) {
+        const sourceKey = annotationDraftKey(sessionId, revision.revision, "next");
+        const source = parseState(storage.getItem(sourceKey));
+        if (!hasDraftContent(source)) return null;
 
-      const source = parseState(storage.getItem(storageKey(sessionId, revision.revision)));
+        storage.setItem(targetKey, JSON.stringify({
+          ...source,
+          feedbackEntries: [],
+        }));
+        storage.setItem(handledKey(sessionId, targetRevision), "1");
+        storage.removeItem(sourceKey);
+        return revision.revision;
+      }
+
+      const source = parseState(storage.getItem(annotationDraftKey(sessionId, revision.revision)));
       if (!hasDraftContent(source)) {
         if (storage.getItem(handledKey(sessionId, revision.revision)) !== null) return null;
         continue;

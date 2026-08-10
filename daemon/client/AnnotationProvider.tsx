@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { AnnotationCtx } from "#canvas/runtime";
 import type { Annotation, AnnotationContext, PlanResponse, FeedbackEntry, AnnotationContextValue } from "#canvas/runtime";
-import { clearPersistedDraft } from "./annotationDraft";
+import { annotationDraftKey, clearPersistedDraft, type AnnotationDraftPhase } from "./annotationDraft";
 import { generateAnnotationId } from "./utils";
 
 // Re-export types for convenience
@@ -12,6 +12,7 @@ interface AnnotationProviderProps {
   sessionId: string;
   revision: number;
   isReadOnly: boolean;
+  draftPhase: AnnotationDraftPhase;
   /** Remote annotations fetched from shared views. Merged read-only into
    *  the annotation list so they render alongside the author's own. */
   remoteAnnotations?: Annotation[];
@@ -25,13 +26,9 @@ interface PersistedState {
   feedbackEntries?: [string, FeedbackEntry][];
 }
 
-function storageKey(sessionId: string, revision: number): string {
-  return `canvas:${sessionId}:rev:${revision}`;
-}
-
-function loadPersisted(sessionId: string, revision: number): PersistedState | null {
+function loadPersisted(sessionId: string, revision: number, phase: AnnotationDraftPhase): PersistedState | null {
   try {
-    const raw = localStorage.getItem(storageKey(sessionId, revision));
+    const raw = localStorage.getItem(annotationDraftKey(sessionId, revision, phase));
     if (!raw) return null;
     return JSON.parse(raw);
   } catch {
@@ -39,15 +36,15 @@ function loadPersisted(sessionId: string, revision: number): PersistedState | nu
   }
 }
 
-function savePersisted(sessionId: string, revision: number, state: PersistedState) {
+function savePersisted(sessionId: string, revision: number, phase: AnnotationDraftPhase, state: PersistedState) {
   try {
-    localStorage.setItem(storageKey(sessionId, revision), JSON.stringify(state));
+    localStorage.setItem(annotationDraftKey(sessionId, revision, phase), JSON.stringify(state));
   } catch {}
 }
 
-export function AnnotationProvider({ sessionId, revision, isReadOnly, remoteAnnotations, children }: AnnotationProviderProps) {
+export function AnnotationProvider({ sessionId, revision, isReadOnly, draftPhase, remoteAnnotations, children }: AnnotationProviderProps) {
   const [localAnnotations, setAnnotations] = useState<Annotation[]>(() => {
-    const saved = loadPersisted(sessionId, revision);
+    const saved = loadPersisted(sessionId, revision, draftPhase);
     return (saved?.annotations ?? []).map((a) => ({ ...a, source: a.source ?? "local" as const }));
   });
 
@@ -61,35 +58,38 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, remoteAnno
     return [...localAnnotations, ...filtered.map((a) => ({ ...a, source: "remote" as const }))];
   }, [localAnnotations, remoteAnnotations]);
   const [generalNote, setGeneralNote] = useState(() => {
-    const saved = loadPersisted(sessionId, revision);
+    const saved = loadPersisted(sessionId, revision, draftPhase);
     return saved?.generalNote ?? "";
   });
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
   const [responses, setResponses] = useState<Map<string, PlanResponse>>(() => {
-    const saved = loadPersisted(sessionId, revision);
+    const saved = loadPersisted(sessionId, revision, draftPhase);
     return saved?.responses ? new Map(saved.responses) : new Map();
   });
   const [feedbackEntries, setFeedbackEntries] = useState<Map<string, FeedbackEntry>>(() => {
-    const saved = loadPersisted(sessionId, revision);
+    const saved = loadPersisted(sessionId, revision, draftPhase);
     return saved?.feedbackEntries ? new Map(saved.feedbackEntries) : new Map();
   });
 
-  // Persist to localStorage (debounced)
+  // Post-feedback drafts save immediately so a new revision can carry the latest edit.
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (isReadOnly) return;
+    if (isReadOnly && draftPhase !== "next") return;
     if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
-    persistTimerRef.current = setTimeout(() => {
-      savePersisted(sessionId, revision, {
-        // Persist only local annotations — remote ones are re-fetched on load.
-        annotations: localAnnotations,
-        generalNote,
-        responses: Array.from(responses.entries()),
-        feedbackEntries: Array.from(feedbackEntries.entries()),
-      });
-    }, 300);
+    const state = {
+      // Persist only local annotations — remote ones are re-fetched on load.
+      annotations: localAnnotations,
+      generalNote,
+      responses: Array.from(responses.entries()),
+      feedbackEntries: Array.from(feedbackEntries.entries()),
+    };
+    if (draftPhase === "next") {
+      savePersisted(sessionId, revision, draftPhase, state);
+      return;
+    }
+    persistTimerRef.current = setTimeout(() => savePersisted(sessionId, revision, draftPhase, state), 300);
     return () => { if (persistTimerRef.current) clearTimeout(persistTimerRef.current); };
-  }, [localAnnotations, generalNote, responses, feedbackEntries, sessionId, revision, isReadOnly]);
+  }, [localAnnotations, generalNote, responses, feedbackEntries, sessionId, revision, isReadOnly, draftPhase]);
 
   const addAnnotationWithId = useCallback((id: string, snippet: string, note: string, filePath?: string, context?: AnnotationContext, images?: string[], canvasFile?: string) => {
     setAnnotations((prev) => [...prev, { id, snippet, note, createdAt: new Date().toISOString(), filePath, context, ...(images?.length ? { images } : {}), ...(canvasFile ? { canvasFile } : {}) }]);
@@ -159,8 +159,12 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, remoteAnno
     setActiveAnnotationId(null);
     setResponses(new Map());
     setFeedbackEntries(new Map());
-    clearPersistedDraft(localStorage, sessionId, revision);
-  }, [sessionId, revision]);
+    if (draftPhase === "next") {
+      localStorage.removeItem(annotationDraftKey(sessionId, revision, draftPhase));
+    } else {
+      clearPersistedDraft(localStorage, sessionId, revision);
+    }
+  }, [sessionId, revision, draftPhase]);
 
   return (
     <AnnotationCtx.Provider
