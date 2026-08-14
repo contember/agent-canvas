@@ -10,26 +10,71 @@ export type CompileResult =
   | { ok: true; js: string }
   | { ok: false; error: string };
 
+type RequiredPropKind = "array" | "string";
+
+/**
+ * One name the compiler makes available to authored JSX without an import.
+ *
+ * `requiredProps` is enforced during the render validation pass below, so a
+ * canvas that forgets a prop fails at push time with a precise message instead
+ * of rendering blank in the browser.
+ */
+export interface CanvasComponentSpec {
+  requiredProps?: Record<string, RequiredPropKind>;
+}
+
+export type CanvasComponents = Record<string, CanvasComponentSpec>;
+
+/**
+ * The components every canvas host provides. Order is the order they appear in
+ * the injected destructure, so keep it stable for readable generated code.
+ */
+export const KERNEL_COMPONENTS: CanvasComponents = {
+  Section: { requiredProps: { title: "string" } },
+  Item: { requiredProps: { id: "string", label: "string" } },
+  Task: { requiredProps: { id: "string", label: "string" } },
+  FilePreview: { requiredProps: { path: "string" } },
+  CodeBlock: {},
+  Callout: {},
+  Mermaid: {},
+  Table: { requiredProps: { headers: "array", rows: "array" } },
+  Priority: { requiredProps: { level: "string" } },
+  Checklist: { requiredProps: { items: "array" } },
+  Note: {},
+  Diff: { requiredProps: { before: "string", after: "string" } },
+  Choice: { requiredProps: { id: "string", label: "string", options: "array" } },
+  MultiChoice: { requiredProps: { id: "string", label: "string", options: "array" } },
+  UserInput: { requiredProps: { id: "string", label: "string" } },
+  RangeInput: { requiredProps: { id: "string", label: "string" } },
+  ImageView: { requiredProps: { src: "string" } },
+  Markdown: {},
+  useFeedback: {},
+  useAnnotations: {},
+};
+
 export interface CompileOptions {
   /** Resolves `<FilePreview>` / `<Markdown file>` references at compile time. */
   projectRoot?: string;
   /** Scratch dir for the temp `.jsx` handed to Bun.build. Created on demand. */
   tempDir?: string;
+  /**
+   * Host components to add on top of KERNEL_COMPONENTS, keyed by name. Each one
+   * must also be exported from the host's `#canvas/components` barrel — that is
+   * what the injected import actually reads at runtime. Re-declaring a kernel
+   * name overrides its spec.
+   */
+  components?: CanvasComponents;
 }
 
 /** Fallback scratch dir for hosts that compile without wiring CanvasPaths. */
 const FALLBACK_COMPILE_DIR = join(tmpdir(), "canvas-kernel", "compile");
 
-const COMPONENT_IMPORTS = `import React from 'react';
+function componentImports(components: CanvasComponents): string {
+  return `import React from 'react';
 import * as C from '#canvas/components';
-const { Section, Item, Task, FilePreview, CodeBlock, Callout,
-        Mermaid, Table, Priority, Checklist, Note, Diff,
-        Choice, MultiChoice, UserInput, RangeInput, SecretInput, ImageView,
-        Markdown, useFeedback, useAnnotations } = C;
+const { ${Object.keys(components).join(", ")} } = C;
 `;
-
-/** Number of lines in COMPONENT_IMPORTS — used to adjust error line numbers */
-const COMPONENT_IMPORTS_LINES = COMPONENT_IMPORTS.split("\n").length - 1;
+}
 
 // --- Validation via Preact --------------------------------------------------
 // After Bun.build() succeeds we strip ESM syntax from the compiled output,
@@ -51,8 +96,6 @@ interface StubProps {
 /** Passthrough component — just renders its children */
 const Stub = ({ children }: StubProps) => h(Fragment, null, children);
 
-type RequiredPropKind = "array" | "string";
-
 function validatingStub(component: string, requiredProps: Record<string, RequiredPropKind>) {
   return (props: StubProps) => {
     for (const [prop, kind] of Object.entries(requiredProps)) {
@@ -66,38 +109,29 @@ function validatingStub(component: string, requiredProps: Record<string, Require
   };
 }
 
-const STUB_COMPONENTS: Record<string, any> = {};
-for (const name of [
-  "CodeBlock", "Callout", "Note", "Markdown",
-]) {
-  STUB_COMPONENTS[name] = Stub;
-}
-Object.assign(STUB_COMPONENTS, {
-  Section: validatingStub("Section", { title: "string" }),
-  Item: validatingStub("Item", { id: "string", label: "string" }),
-  Task: validatingStub("Task", { id: "string", label: "string" }),
-  FilePreview: validatingStub("FilePreview", { path: "string" }),
-  Table: validatingStub("Table", { headers: "array", rows: "array" }),
-  Priority: validatingStub("Priority", { level: "string" }),
-  Checklist: validatingStub("Checklist", { items: "array" }),
-  Diff: validatingStub("Diff", { before: "string", after: "string" }),
-  Choice: validatingStub("Choice", { id: "string", label: "string", options: "array" }),
-  MultiChoice: validatingStub("MultiChoice", { id: "string", label: "string", options: "array" }),
-  UserInput: validatingStub("UserInput", { id: "string", label: "string" }),
-  RangeInput: validatingStub("RangeInput", { id: "string", label: "string" }),
-  SecretInput: validatingStub("SecretInput", { id: "string", label: "string", env: "string" }),
-  ImageView: validatingStub("ImageView", { src: "string" }),
-});
 // Mermaid stub collects diagram sources for post-render validation
 let collectedMermaidSources: string[] = [];
-STUB_COMPONENTS.Mermaid = ({ children }: any) => {
-  const source = typeof children === "string" ? children : String(children ?? "");
-  if (source.trim()) collectedMermaidSources.push(source.trim());
-  return null;
+
+/** Names whose stub does more than check props, so a manifest entry cannot
+ *  describe them. Hooks return shapes that survive destructuring. */
+const SPECIAL_STUBS: Record<string, any> = {
+  Mermaid: ({ children }: any) => {
+    const source = typeof children === "string" ? children : String(children ?? "");
+    if (source.trim()) collectedMermaidSources.push(source.trim());
+    return null;
+  },
+  useFeedback: () => ({ submit: () => {}, value: null }),
+  useAnnotations: () => ({ annotations: [], addAnnotation: () => {} }),
 };
-// Hook stubs — return shapes that won't blow up when destructured
-STUB_COMPONENTS.useFeedback = () => ({ submit: () => {}, value: null });
-STUB_COMPONENTS.useAnnotations = () => ({ annotations: [], addAnnotation: () => {} });
+
+function buildStubs(components: CanvasComponents): Record<string, any> {
+  const stubs: Record<string, any> = {};
+  for (const [name, spec] of Object.entries(components)) {
+    const special = SPECIAL_STUBS[name];
+    stubs[name] = special ?? (spec.requiredProps ? validatingStub(name, spec.requiredProps) : Stub);
+  }
+  return stubs;
+}
 
 const MOCK_REACT = {
   createElement: h,
@@ -127,7 +161,7 @@ const MOCK_REACT = {
   StrictMode: Stub,
 };
 
-async function validateCompiledPlan(js: string): Promise<{ ok: true } | { ok: false; error: string }> {
+async function validateCompiledPlan(js: string, stubs: Record<string, any>): Promise<{ ok: true } | { ok: false; error: string }> {
   let code = js;
 
   // Strip ESM import statements
@@ -155,7 +189,7 @@ async function validateCompiledPlan(js: string): Promise<{ ok: true } | { ok: fa
   try {
     collectedMermaidSources = [];
     const fn = new Function("React", "C", "jsxDEV", "jsx", "Fragment", code + callDefault);
-    const vnode = fn(MOCK_REACT, STUB_COMPONENTS, mockJsxDEV, mockJsxDEV, Fragment);
+    const vnode = fn(MOCK_REACT, stubs, mockJsxDEV, mockJsxDEV, Fragment);
     if (vnode) renderToString(vnode);
   } catch (e: any) {
     return { ok: false, error: e?.message || String(e) };
@@ -216,6 +250,8 @@ function formatBuildError(err: any, lineOffset: number): string {
 
 export async function compileJsx(jsx: string, options: CompileOptions = {}): Promise<CompileResult> {
   const { projectRoot } = options;
+  const components = options.components ? { ...KERNEL_COMPONENTS, ...options.components } : KERNEL_COMPONENTS;
+  const componentPreamble = componentImports(components);
   // Strip leading pragma / block / line comments (e.g. `/** @jsxImportSource ... */`).
   // Authored JSX sometimes carries a JSX-runtime pragma from another toolchain;
   // Canvas injects its own imports and uses the React automatic runtime, so the
@@ -244,13 +280,13 @@ export async function compileJsx(jsx: string, options: CompileOptions = {}): Pro
   const hasDefaultExport = /export\s+default\b/.test(strippedJsx);
 
   const source = hasDefaultExport
-    ? `${COMPONENT_IMPORTS}\n${jsx}`
-    : `${COMPONENT_IMPORTS}\nexport default function Plan() {\n  return (<>${jsx}</>);\n}\n`;
+    ? `${componentPreamble}\n${jsx}`
+    : `${componentPreamble}\nexport default function Plan() {\n  return (<>${jsx}</>);\n}\n`;
 
-  // Offset: COMPONENT_IMPORTS lines + wrapper lines (export default function
+  // Offset: injected import lines + wrapper lines (export default function
   // Plan() + return). Used to map Bun's line numbers back to the authored file.
   const wrapperLines = hasDefaultExport ? 1 : 2;
-  const lineOffset = COMPONENT_IMPORTS_LINES + wrapperLines;
+  const lineOffset = componentPreamble.split("\n").length - 1 + wrapperLines;
 
   // Pre-validate syntax with Bun.Transpiler — gives precise error positions,
   // unlike Bun.build() which throws opaque "Bundle failed" for syntax errors.
@@ -285,7 +321,7 @@ export async function compileJsx(jsx: string, options: CompileOptions = {}): Pro
       }
 
       const js = await result.outputs[0].text();
-      const validation = await validateCompiledPlan(js);
+      const validation = await validateCompiledPlan(js, buildStubs(components));
       if (!validation.ok) {
         return { ok: false, error: `Runtime error: ${validation.error}` };
       }

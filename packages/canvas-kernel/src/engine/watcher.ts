@@ -1,6 +1,6 @@
 import { watch, existsSync, readFileSync, readdirSync } from "fs";
 import { join } from "path";
-import { compileJsx } from "./compiler";
+import { compileJsx, type CanvasComponents } from "./compiler";
 import type { SessionManager } from "./session";
 
 type BroadcastFn = (sessionId: string) => void;
@@ -8,6 +8,9 @@ type BroadcastFn = (sessionId: string) => void;
 export interface WatchOptions {
   /** Scratch dir for recompiles, from `createCanvasPaths()`. */
   tempDir?: string;
+  /** Host components, same value the push path compiles with — a recompile
+   *  that dropped them would fail on canvases the original push accepted. */
+  components?: CanvasComponents;
 }
 
 const watchers = new Map<string, ReturnType<typeof watch>[]>();
@@ -49,6 +52,7 @@ export function watchSession(
           const result = await compileJsx(jsx, {
             projectRoot: session.projectRoot,
             tempDir: options.tempDir,
+            ...(options.components ? { components: options.components } : {}),
           });
           if (result.ok) {
             sessionManager.saveCompiled(sessionId, filename, result.js, rev);

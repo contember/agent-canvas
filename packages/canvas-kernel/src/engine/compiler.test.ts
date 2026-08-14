@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { compilePlan } from "./compiler";
+import { compileJsx, compilePlan } from "./compiler";
 
 // Regression coverage for the error-reporting path. Bun surfaces JSX syntax
 // errors through three shapes (Transpiler throw, build logs, AggregateError
@@ -38,9 +38,24 @@ test("well-formed canvas compiles", async () => {
   expect(result.ok).toBe(true);
 });
 
-test("runbook secret input compiles", async () => {
-  const result = await compilePlan(`<SecretInput id="service-token" label="Service token" env="SERVICE_TOKEN" required />`);
-  expect(result.ok).toBe(true);
+test("a host component is unknown until the host declares it", async () => {
+  const jsx = `<SecretInput id="service-token" label="Service token" env="SERVICE_TOKEN" required />`;
+  const components = { SecretInput: { requiredProps: { id: "string", label: "string", env: "string" } } } as const;
+
+  expect((await compileJsx(jsx, { components })).ok).toBe(true);
+  // Without the declaration the name is not destructured, so it is a free
+  // variable and the render check catches it.
+  expect((await compileJsx(jsx)).ok).toBe(false);
+});
+
+test("host components are validated like kernel ones", async () => {
+  const result = await compileJsx(`<SecretInput id="service-token" label="Service token" />`, {
+    components: { SecretInput: { requiredProps: { id: "string", label: "string", env: "string" } } },
+  });
+
+  expect(result.ok).toBe(false);
+  if (result.ok) return;
+  expect(result.error).toBe("Runtime error: SecretInput: required prop `env` must be a string");
 });
 
 test("missing required component prop fails before the browser renders", async () => {

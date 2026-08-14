@@ -8,6 +8,7 @@ import {
 } from "@fabrika/canvas-kernel/server";
 import { loadShareConfig, shareRevision, revokeShare } from "../share";
 import { COMPILE_TEMP_DIR } from "../paths";
+import { HOST_COMPONENTS } from "../components";
 
 const SECRET_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const MAX_SECRET_BYTES = 64 * 1024;
@@ -86,7 +87,7 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
       const errors: Record<string, string> = {};
       await Promise.all(
         [...canvasFiles.entries()].map(async ([filename, jsx]) => {
-          const result = await compileJsx(jsx, { projectRoot, tempDir: COMPILE_TEMP_DIR });
+          const result = await compileJsx(jsx, { projectRoot, tempDir: COMPILE_TEMP_DIR, components: HOST_COMPONENTS });
           if (result.ok) {
             compiled.set(filename, result.js);
           } else {
@@ -109,7 +110,7 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
       }
 
       broadcastPlanUpdate(sessionId);
-      watchSession(sessionId, sessionManager, broadcastPlanUpdate, { tempDir: COMPILE_TEMP_DIR });
+      watchSession(sessionId, sessionManager, broadcastPlanUpdate, { tempDir: COMPILE_TEMP_DIR, components: HOST_COMPONENTS });
 
       const browserUrl = `http://localhost:${port}/s/${sessionId}`;
       return jsonResponse({
@@ -139,7 +140,7 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
       if (session) {
         const jsx = sessionManager.readRevisionJsx(sessionId, rev, jsxFilename);
         if (jsx) {
-          const result = await compileJsx(jsx, { projectRoot: session.projectRoot, tempDir: COMPILE_TEMP_DIR });
+          const result = await compileJsx(jsx, { projectRoot: session.projectRoot, tempDir: COMPILE_TEMP_DIR, components: HOST_COMPONENTS });
           if (result.ok) {
             sessionManager.saveCompiled(sessionId, jsxFilename, result.js, rev);
             compiled = result.js;

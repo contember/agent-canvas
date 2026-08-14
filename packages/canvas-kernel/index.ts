@@ -10,8 +10,13 @@
 // and `#canvas/runtime`.
 
 // --- Compile pipeline (JSX -> Bun.build) -----------------------------------
-export { compileJsx, compilePlan } from "./src/engine/compiler";
-export type { CompileResult, CompileOptions } from "./src/engine/compiler";
+export { compileJsx, compilePlan, KERNEL_COMPONENTS } from "./src/engine/compiler";
+export type {
+  CompileResult,
+  CompileOptions,
+  CanvasComponents,
+  CanvasComponentSpec,
+} from "./src/engine/compiler";
 
 // --- Session / revision / feedback store -----------------------------------
 export { SessionManager } from "./src/engine/session";
