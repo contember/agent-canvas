@@ -1,10 +1,13 @@
 import { readFileSync, readdirSync, existsSync } from "fs";
-import type { SessionManager } from "../session";
-import { compilePlan } from "../compiler";
-import { watchSession } from "../watcher";
-import { jsonResponse } from "./utils";
+import {
+  compileJsx,
+  jsonResponse,
+  watchSession,
+  type Route,
+  type SessionManager,
+} from "@fabrika/canvas-kernel/server";
 import { loadShareConfig, shareRevision, revokeShare } from "../share";
-import type { Route } from "../router";
+import { COMPILE_TEMP_DIR } from "../paths";
 
 const SECRET_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const MAX_SECRET_BYTES = 64 * 1024;
@@ -83,7 +86,7 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
       const errors: Record<string, string> = {};
       await Promise.all(
         [...canvasFiles.entries()].map(async ([filename, jsx]) => {
-          const result = await compilePlan(jsx, projectRoot);
+          const result = await compileJsx(jsx, { projectRoot, tempDir: COMPILE_TEMP_DIR });
           if (result.ok) {
             compiled.set(filename, result.js);
           } else {
@@ -106,7 +109,7 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
       }
 
       broadcastPlanUpdate(sessionId);
-      watchSession(sessionId, sessionManager, broadcastPlanUpdate);
+      watchSession(sessionId, sessionManager, broadcastPlanUpdate, { tempDir: COMPILE_TEMP_DIR });
 
       const browserUrl = `http://localhost:${port}/s/${sessionId}`;
       return jsonResponse({
@@ -136,7 +139,7 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
       if (session) {
         const jsx = sessionManager.readRevisionJsx(sessionId, rev, jsxFilename);
         if (jsx) {
-          const result = await compilePlan(jsx, session.projectRoot);
+          const result = await compileJsx(jsx, { projectRoot: session.projectRoot, tempDir: COMPILE_TEMP_DIR });
           if (result.ok) {
             sessionManager.saveCompiled(sessionId, jsxFilename, result.js, rev);
             compiled = result.js;

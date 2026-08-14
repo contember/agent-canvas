@@ -1,4 +1,4 @@
-import type { SessionManager, RemoteFeedbackEntry, RemoteAnnotation } from "./session";
+import type { SessionManager, RemoteFeedbackEntry, RemoteAnnotation } from "@fabrika/canvas-kernel/server";
 import { loadShareConfig } from "./share";
 import { importShareKey, decryptString } from "../client/shareCrypto";
 

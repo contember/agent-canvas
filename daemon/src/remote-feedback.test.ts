@@ -8,7 +8,7 @@ import { describe, expect, test, afterEach, beforeEach } from "bun:test";
 import { mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { SessionManager } from "./session";
+import { SessionManager } from "@fabrika/canvas-kernel/server";
 import { startRemoteFeedbackPoller } from "./remote-feedback";
 
 let testDir: string;

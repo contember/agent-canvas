@@ -1,9 +1,7 @@
 import { writeFileSync } from "fs";
 import { join } from "path";
+import { jsonResponse, type Route, type SessionManager } from "@fabrika/canvas-kernel/server";
 import { UPLOADS_DIR } from "../paths";
-import type { SessionManager } from "../session";
-import { jsonResponse } from "./utils";
-import type { Route } from "../router";
 
 const IMAGE_MIME: Record<string, string> = {
   png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",

@@ -7,11 +7,12 @@
   },
   "scripts": {
     "build": "bun daemon/build.ts",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p daemon/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/canvas-kernel/tsconfig.json && tsc --noEmit -p daemon/tsconfig.json",
     "test": "bun test",
     "prepublishOnly": "bun daemon/build.ts"
   },
   "dependencies": {
+    "@fabrika/canvas-kernel": "workspace:*",
     "marked": "^17.0.4",
     "mermaid-parser-bundle": "^0.1.2",
     "preact": "^10.25.0",
@@ -30,6 +31,7 @@
     "url": "https://github.com/contember/agent-canvas"
   },
   "workspaces": [
+    "packages/*",
     "workers/*"
   ],
   "license": "MIT",

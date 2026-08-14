@@ -1,29 +1,15 @@
 import { join } from "path";
-import { homedir, tmpdir } from "os";
-import { mkdirSync } from "fs";
+import { createCanvasPaths } from "@fabrika/canvas-kernel/server";
 
-/** Persistent data — survives reboots */
-export const DATA_DIR = join(homedir(), ".claude", "agent-canvas");
+/** agent-canvas's on-disk layout. Kept in sync with bin/lib/config.ts. */
+export const paths = createCanvasPaths({ appName: "agent-canvas" });
 
-/** Session storage */
-export const SESSIONS_DIR = join(DATA_DIR, "sessions");
-
-/** Ephemeral — can be lost on reboot */
-export const TEMP_DIR = join(tmpdir(), "agent-canvas");
-
-/** PID file for daemon process */
-export const PID_FILE = join(TEMP_DIR, "daemon.pid");
+export const DATA_DIR = paths.dataDir;
+export const SESSIONS_DIR = paths.sessionsDir;
+export const TEMP_DIR = paths.tempDir;
+export const PID_FILE = paths.pidFile;
+export const COMPILE_TEMP_DIR = paths.compileTempDir;
+export const UPLOADS_DIR = paths.uploadsDir;
 
 /** Capability used only by the CLI to resolve secret values */
-export const CLI_AUTH_FILE = join(TEMP_DIR, "daemon-auth-token");
-
-/** Temp dir for JSX compilation */
-export const COMPILE_TEMP_DIR = join(TEMP_DIR, "compile");
-
-/** Uploaded annotation images */
-export const UPLOADS_DIR = join(TEMP_DIR, "uploads");
-
-// Ensure dirs exist
-mkdirSync(SESSIONS_DIR, { recursive: true });
-mkdirSync(COMPILE_TEMP_DIR, { recursive: true });
-mkdirSync(UPLOADS_DIR, { recursive: true });
+export const CLI_AUTH_FILE = join(paths.tempDir, "daemon-auth-token");

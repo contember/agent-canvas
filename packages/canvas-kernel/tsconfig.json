@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["@types/bun"],
+    "paths": {
+      "#canvas/runtime": ["./src/client/runtime.ts"],
+      "#canvas/components": ["./src/client/components/index.ts"]
+    }
+  },
+  "include": ["index.ts", "src/**/*"]
+}

@@ -1,4 +1,4 @@
-import type { SessionManager, ShareEntry } from "./session";
+import type { SessionManager, ShareEntry } from "@fabrika/canvas-kernel/server";
 import {
   generateShareKey,
   exportShareKey,

@@ -1,14 +1,24 @@
-import { writeFileSync, unlinkSync, readFileSync } from "fs";
+import { writeFileSync, unlinkSync, readFileSync, mkdirSync } from "fs";
 import { join } from "path";
+import { tmpdir } from "os";
 import { randomUUID } from "crypto";
 import { h, Fragment, type ComponentChildren } from "preact";
 import renderToString from "preact-render-to-string";
 import { parse as parseMermaid } from "mermaid-parser-bundle";
-import { COMPILE_TEMP_DIR } from "./paths";
 
-type CompileResult =
+export type CompileResult =
   | { ok: true; js: string }
   | { ok: false; error: string };
+
+export interface CompileOptions {
+  /** Resolves `<FilePreview>` / `<Markdown file>` references at compile time. */
+  projectRoot?: string;
+  /** Scratch dir for the temp `.jsx` handed to Bun.build. Created on demand. */
+  tempDir?: string;
+}
+
+/** Fallback scratch dir for hosts that compile without wiring CanvasPaths. */
+const FALLBACK_COMPILE_DIR = join(tmpdir(), "canvas-kernel", "compile");
 
 const COMPONENT_IMPORTS = `import React from 'react';
 import * as C from '#canvas/components';
@@ -204,7 +214,8 @@ function formatBuildError(err: any, lineOffset: number): string {
   return `${message}${loc}${frame}`;
 }
 
-export async function compilePlan(jsx: string, projectRoot?: string): Promise<CompileResult> {
+export async function compileJsx(jsx: string, options: CompileOptions = {}): Promise<CompileResult> {
+  const { projectRoot } = options;
   // Strip leading pragma / block / line comments (e.g. `/** @jsxImportSource ... */`).
   // Authored JSX sometimes carries a JSX-runtime pragma from another toolchain;
   // Canvas injects its own imports and uses the React automatic runtime, so the
@@ -250,7 +261,9 @@ export async function compilePlan(jsx: string, projectRoot?: string): Promise<Co
     return { ok: false, error: formatBuildError(syntaxError, lineOffset) };
   }
 
-  const tmpFile = join(COMPILE_TEMP_DIR, `plan-${randomUUID()}.jsx`);
+  const compileDir = options.tempDir ?? FALLBACK_COMPILE_DIR;
+  mkdirSync(compileDir, { recursive: true });
+  const tmpFile = join(compileDir, `plan-${randomUUID()}.jsx`);
 
   try {
     writeFileSync(tmpFile, source);
@@ -357,4 +370,9 @@ function resolveFilePreviews(jsx: string, projectRoot: string): string {
       }
     }
   );
+}
+
+/** @deprecated Use `compileJsx(jsx, { projectRoot, tempDir })`. */
+export async function compilePlan(jsx: string, projectRoot?: string): Promise<CompileResult> {
+  return compileJsx(jsx, { projectRoot });
 }

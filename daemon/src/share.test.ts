@@ -8,7 +8,7 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { SessionManager } from "./session";
+import { SessionManager } from "@fabrika/canvas-kernel/server";
 import { buildSharePayload, pushShareToWorker, shareRevision, loadShareConfig, encryptSharePayload } from "./share";
 import { generateShareKey, importShareKey, decryptString } from "../client/shareCrypto";
 

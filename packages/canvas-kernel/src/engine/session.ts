@@ -1,6 +1,5 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, renameSync, copyFileSync } from "fs";
 import { join } from "path";
-import { SESSIONS_DIR } from "./paths";
 
 export interface DiffStats {
   added: number;
@@ -156,13 +155,12 @@ export class SessionManager {
   private readonly sessionsDir: string;
 
   /**
-   * @param sessionsDir Override the on-disk sessions root. Defaults to
-   *   the global SESSIONS_DIR (`~/.claude/agent-canvas/sessions`).
+   * @param sessionsDir On-disk sessions root, from `createCanvasPaths()`.
    *   Tests pass an isolated temp directory so they don't interfere with
    *   the user's real sessions.
    */
-  constructor(sessionsDir?: string) {
-    this.sessionsDir = sessionsDir ?? SESSIONS_DIR;
+  constructor(sessionsDir: string) {
+    this.sessionsDir = sessionsDir;
     mkdirSync(this.sessionsDir, { recursive: true });
     this.loadFromDisk();
   }

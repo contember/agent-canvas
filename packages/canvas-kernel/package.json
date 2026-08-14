@@ -1,0 +1,35 @@
+{
+  "name": "@fabrika/canvas-kernel",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Host-agnostic canvas engine: JSX→Bun.build compiler, session/revision store, JSX watcher, WebSocket feedback protocol, and the component library + annotation runtime.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/contember/agent-canvas",
+    "directory": "packages/canvas-kernel"
+  },
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": {
+      "types": "./index.ts",
+      "default": "./index.ts"
+    },
+    "./server": {
+      "types": "./index.ts",
+      "default": "./index.ts"
+    },
+    "./engine/*": "./src/engine/*"
+  },
+  "dependencies": {
+    "marked": "^17.0.4",
+    "mermaid-parser-bundle": "^0.1.2",
+    "preact": "^10.25.0",
+    "preact-render-to-string": "^6.6.6"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1"
+  }
+}

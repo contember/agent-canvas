@@ -1,9 +1,14 @@
 import { watch, existsSync, readFileSync, readdirSync } from "fs";
 import { join } from "path";
-import { compilePlan } from "./compiler";
+import { compileJsx } from "./compiler";
 import type { SessionManager } from "./session";
 
 type BroadcastFn = (sessionId: string) => void;
+
+export interface WatchOptions {
+  /** Scratch dir for recompiles, from `createCanvasPaths()`. */
+  tempDir?: string;
+}
 
 const watchers = new Map<string, ReturnType<typeof watch>[]>();
 
@@ -11,6 +16,7 @@ export function watchSession(
   sessionId: string,
   sessionManager: SessionManager,
   broadcast: BroadcastFn,
+  options: WatchOptions = {},
 ) {
   // Close existing watchers for this session
   unwatchSession(sessionId);
@@ -40,7 +46,10 @@ export function watchSession(
         debounceTimers.delete(filename);
         try {
           const jsx = readFileSync(filePath, "utf-8");
-          const result = await compilePlan(jsx, session.projectRoot);
+          const result = await compileJsx(jsx, {
+            projectRoot: session.projectRoot,
+            tempDir: options.tempDir,
+          });
           if (result.ok) {
             sessionManager.saveCompiled(sessionId, filename, result.js, rev);
             broadcast(sessionId);

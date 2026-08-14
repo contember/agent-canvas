@@ -16,7 +16,7 @@ import { tmpdir } from "os";
 
 import workerHandler from "../../workers/canvas-share/src/index";
 import type { Env } from "../../workers/canvas-share/src/types";
-import { SessionManager } from "./session";
+import { SessionManager } from "@fabrika/canvas-kernel/server";
 import { buildSharePayload, encryptSharePayload } from "./share";
 import {
   generateShareKey,
