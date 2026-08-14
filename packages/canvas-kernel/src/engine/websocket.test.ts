@@ -97,3 +97,55 @@ describe("canvas render errors", () => {
     expect(watcher.closed).toBe(false);
   });
 });
+
+describe("feedback consumption mode", () => {
+  function submitWithWaiter(mode?: "on-delivery" | "external") {
+    const sessionManager = createSessionManager();
+    const websocket = createWebSocketManager(
+      sessionManager,
+      mode ? { feedbackConsumption: mode } : undefined,
+    );
+    const waiter = new FakeSocket({ type: "wait", sessionId: "session" });
+    websocket.handlers.open(waiter);
+
+    const browser = new FakeSocket({ type: "browser", sessionId: "session" });
+    websocket.handlers.open(browser);
+    websocket.handlers.message(browser, JSON.stringify({ type: "submit", feedback: "looks good" }));
+
+    return { sessionManager, waiter };
+  }
+
+  test("the waiting client is handed the feedback in both modes", () => {
+    for (const mode of ["on-delivery", "external"] as const) {
+      const { waiter } = submitWithWaiter(mode);
+      expect(waiter.sent.map((m) => JSON.parse(m).feedback)).toEqual(["looks good"]);
+      expect(waiter.closed).toBe(true);
+    }
+  });
+
+  test("on-delivery (default) leaves nothing for a second consumer to replay", () => {
+    const { sessionManager } = submitWithWaiter();
+    expect(sessionManager.getLatestUnconsumedFeedback("session")).toBeNull();
+  });
+
+  test("external leaves the feedback pending for a separate gate to claim", () => {
+    const { sessionManager } = submitWithWaiter("external");
+    expect(sessionManager.getLatestUnconsumedFeedback("session")?.feedback).toBe("looks good");
+  });
+});
+
+describe("session project root", () => {
+  test("a later push from a different cwd does not repoint the session", () => {
+    const sessionManager = createSessionManager();
+    const original = sessionManager.get("session")!.projectRoot;
+
+    const updated = sessionManager.upsert(
+      "session",
+      new Map([["architecture.jsx", "<Section title=\"Architecture v2\" />"]]),
+      "/tmp/some-other-cwd",
+    );
+
+    expect(updated.projectRoot).toBe(original);
+    expect(updated.currentRevision).toBe(2);
+  });
+});

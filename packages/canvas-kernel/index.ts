@@ -29,7 +29,7 @@ export type {
 
 // --- WebSocket feedback protocol -------------------------------------------
 export { createWebSocketManager } from "./src/engine/websocket";
-export type { WSData, CanvasSocket } from "./src/engine/websocket";
+export type { WSData, CanvasSocket, WebSocketManagerOptions } from "./src/engine/websocket";
 
 // --- JSX watcher -----------------------------------------------------------
 export { watchSession, unwatchSession, unwatchAll } from "./src/engine/watcher";

@@ -385,7 +385,11 @@ export class SessionManager {
 
     const session: SessionData = {
       id,
-      projectRoot,
+      // A session belongs to the project it was created in. Callers send their
+      // cwd, so a later push from elsewhere must not repoint it — that would
+      // send project-relative reads (file previews, phase state) to the wrong
+      // tree.
+      projectRoot: existing?.projectRoot ?? projectRoot,
       canvasFiles: filenames,
       currentRevision: revision,
       revisions,

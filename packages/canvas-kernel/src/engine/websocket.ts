@@ -26,7 +26,24 @@ function isCanvasRenderError(value: unknown): value is CanvasRenderError {
     && (!("componentStack" in value) || value.componentStack === undefined || typeof value.componentStack === "string");
 }
 
-export function createWebSocketManager(sessionManager: SessionManager) {
+export interface WebSocketManagerOptions {
+  /**
+   * Who marks feedback consumed once a waiting client has been handed it.
+   *
+   * `"on-delivery"` (default) clears it in the same step, so the same feedback
+   * can never be delivered twice — right when the waiting client *is* the
+   * consumer. `"external"` leaves it pending for a separate gate to claim
+   * through the consume endpoint, for hosts where delivery and consumption are
+   * different steps.
+   */
+  feedbackConsumption?: "on-delivery" | "external";
+}
+
+export function createWebSocketManager(
+  sessionManager: SessionManager,
+  options: WebSocketManagerOptions = {},
+) {
+  const consumeOnDelivery = (options.feedbackConsumption ?? "on-delivery") === "on-delivery";
   const browserSockets = new Map<string, Set<CanvasSocket>>();
   const waitSockets = new Map<string, Set<CanvasSocket>>();
   const pendingRenderErrors = new Map<string, CanvasRenderError>();
@@ -165,8 +182,10 @@ export function createWebSocketManager(sessionManager: SessionManager) {
 
               const waiters = waitSockets.get(sessionId);
               if (waiters && waiters.size > 0) {
-                sessionManager.consumeFeedback(sessionId, session.currentRevision);
-                broadcastRevisionUpdate(sessionId);
+                if (consumeOnDelivery) {
+                  sessionManager.consumeFeedback(sessionId, session.currentRevision);
+                  broadcastRevisionUpdate(sessionId);
+                }
                 const payload = JSON.stringify({ type: "submit", feedback });
                 for (const waiter of waiters) {
                   waiter.send(payload);
