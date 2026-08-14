@@ -321,7 +321,7 @@ function AnnotationSidebarInner({ onSubmit, agentWatching, collapseButton }: Omi
     addAnnotationImage, removeAnnotationImage,
     generalNote, setGeneralNote,
     activeAnnotationId, setActiveAnnotationId,
-    responses, feedbackEntries,
+    submittableResponses, feedbackEntries,
   } = useAnnotations();
   const sessionId = useContext(SessionContext);
   const { setActiveView } = React.useContext(ActiveViewContext);
@@ -380,7 +380,7 @@ function AnnotationSidebarInner({ onSubmit, agentWatching, collapseButton }: Omi
     });
   }, []);
 
-  const hasResponses = Array.from(responses.values()).some(hasValue);
+  const hasResponses = Array.from(submittableResponses.values()).some(hasValue);
   const hasFeedback = feedbackEntries.size > 0;
   const hasContent = annotations.length > 0 || generalNote.trim().length > 0 || hasResponses || hasFeedback;
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -572,7 +572,7 @@ function AnnotationSidebarInner({ onSubmit, agentWatching, collapseButton }: Omi
           <button
             onClick={() => {
               setValidationError(null);
-              const md = generateMarkdown(annotations, generalNote, responses, feedbackEntries, includedRemoteIds);
+              const md = generateMarkdown(annotations, generalNote, submittableResponses, feedbackEntries, includedRemoteIds);
               onSubmit(md);
             }}
             className="text-[11px] text-text-tertiary hover:text-text-secondary font-body whitespace-nowrap underline"
@@ -594,13 +594,13 @@ function AnnotationSidebarInner({ onSubmit, agentWatching, collapseButton }: Omi
             </button>
             <button
               onClick={() => {
-                const allMissing = getMissingRequiredLabels(responses, feedbackEntries);
+                const allMissing = getMissingRequiredLabels(submittableResponses, feedbackEntries);
                 if (allMissing.length > 0) {
                   setValidationError(`Please answer: ${allMissing.join(", ")}`);
                   return;
                 }
                 setValidationError(null);
-                const md = generateMarkdown(annotations, generalNote, responses, feedbackEntries, includedRemoteIds);
+                const md = generateMarkdown(annotations, generalNote, submittableResponses, feedbackEntries, includedRemoteIds);
                 onSubmit(md);
               }}
               className="flex-1 py-2 rounded-lg font-body text-[13px] font-medium transition-all bg-btn-primary text-btn-primary-text hover:opacity-90 hover:-translate-y-px shadow-sm"

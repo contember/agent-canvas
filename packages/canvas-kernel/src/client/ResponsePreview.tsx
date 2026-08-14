@@ -12,7 +12,7 @@ interface ResponsePreviewProps {
 }
 
 export function ResponsePreview({ open, onClose, onSubmit, includedRemoteIds, onToggleRemoteId }: ResponsePreviewProps) {
-  const { annotations, generalNote, responses, feedbackEntries } = useAnnotations();
+  const { annotations, generalNote, submittableResponses, feedbackEntries } = useAnnotations();
   const [editedText, setEditedText] = useState("");
   const [manuallyEdited, setManuallyEdited] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -40,8 +40,8 @@ export function ResponsePreview({ open, onClose, onSubmit, includedRemoteIds, on
   }
 
   const generatedText = useMemo(
-    () => generateMarkdown(annotations, generalNote, responses, feedbackEntries, includedRemoteIds),
-    [annotations, generalNote, responses, feedbackEntries, includedRemoteIds],
+    () => generateMarkdown(annotations, generalNote, submittableResponses, feedbackEntries, includedRemoteIds),
+    [annotations, generalNote, submittableResponses, feedbackEntries, includedRemoteIds],
   );
   const text = manuallyEdited ? editedText : generatedText;
 
@@ -151,7 +151,7 @@ export function ResponsePreview({ open, onClose, onSubmit, includedRemoteIds, on
           </button>
           <button
             onClick={() => {
-              const allMissing = getMissingRequiredLabels(responses, feedbackEntries);
+              const allMissing = getMissingRequiredLabels(submittableResponses, feedbackEntries);
               if (allMissing.length > 0) {
                 setValidationError(`Please answer: ${allMissing.join(", ")}`);
                 return;

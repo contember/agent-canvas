@@ -71,6 +71,7 @@ export {
   wrapRangeWithMark,
 } from "./highlightRange";
 export {
+  canPruneResponses,
   generateMarkdown,
   getMissingRequired,
   getMissingRequiredFeedback,

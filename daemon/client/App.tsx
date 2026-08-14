@@ -498,6 +498,7 @@ function App() {
             isReadOnly={isReadOnly}
             draftPhase={draftPhase}
             remoteAnnotations={remoteAnnotationsByRev.get(selectedRevision)}
+            canvasFiles={canvasFiles}
           >
           <ActiveViewContext.Provider value={{ activeView, setActiveView, openFiles, closeFile, canvasFiles }}>
           <ActiveViewCtx.Provider value={{ setActiveView }}>

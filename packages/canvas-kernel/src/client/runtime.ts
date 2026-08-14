@@ -75,12 +75,18 @@ export interface AnnotationContextValue {
   clearAll: () => void;
   activeAnnotationId: string | null;
   setActiveAnnotationId: (id: string | null) => void;
+  /** Every answer held for this draft, including ones carried in from an
+   *  earlier revision. Controls read and write this one. */
   responses: Map<string, PlanResponse>;
   setResponse: (id: string, response: PlanResponse) => void;
-  /** IDs of response controls currently mounted in the active canvas. */
-  visibleResponseIds: ReadonlySet<string>;
+  /** `responses` narrowed to the questions this revision actually asks.
+   *  Everything that reports feedback — markdown, validation, "has content" —
+   *  reads this instead, so a carried-over answer to a since-removed question
+   *  is not submitted. Identical to `responses` until the host supplies the
+   *  canvas file list and every one of them has rendered. */
+  submittableResponses: Map<string, PlanResponse>;
   registerResponse: (id: string) => void;
-  unregisterResponse: (id: string) => void;
+  registerCanvasRendered: (filename: string) => void;
   feedbackEntries: Map<string, FeedbackEntry>;
   setFeedbackEntry: (id: string, entry: FeedbackEntry) => void;
   removeFeedbackEntry: (id: string) => void;
@@ -94,14 +100,15 @@ export function useAnnotations(): AnnotationContextValue {
   return useContext(AnnotationCtx);
 }
 
-/** Register a response control for exactly as long as it is mounted, so
- *  submission reads the live question set instead of guessing from the DOM. */
+/** Record that this revision asks the question, so submission can tell it from
+ *  an answer carried in for a question that is gone. Deliberately has no
+ *  cleanup: unmounting means the reader navigated away, not that the question
+ *  disappeared. */
 export function useResponseRegistration(id: string): void {
-  const { registerResponse, unregisterResponse } = useAnnotations();
+  const { registerResponse } = useAnnotations();
   useEffect(() => {
     registerResponse(id);
-    return () => unregisterResponse(id);
-  }, [id, registerResponse, unregisterResponse]);
+  }, [id, registerResponse]);
 }
 
 export function useFeedback(

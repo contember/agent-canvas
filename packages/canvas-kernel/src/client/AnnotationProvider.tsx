@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { AnnotationCtx } from "#canvas/runtime";
 import type { Annotation, AnnotationContext, PlanResponse, FeedbackEntry, AnnotationContextValue } from "#canvas/runtime";
 import { annotationDraftKey, clearPersistedDraft, type AnnotationDraftPhase } from "./annotationDraft";
+import { canPruneResponses, pruneStaleResponses } from "./generateMarkdown";
 import { generateAnnotationId } from "./utils";
 
 // Re-export types for convenience
@@ -23,6 +24,10 @@ interface AnnotationProviderProps {
   /** Remote annotations fetched from shared views. Merged read-only into
    *  the annotation list so they render alongside the author's own. */
   remoteAnnotations?: Annotation[];
+  /** Canvas files this revision is made of. Supplying it enables pruning of
+   *  answers to questions the revision no longer asks; omit it and every
+   *  answer is submitted, which is what a host without canvas tabs wants. */
+  canvasFiles?: readonly string[];
   /** Server-authoritative persistence. When supplied, the draft is loaded and
    *  saved through these instead of localStorage, so it survives reloads and
    *  follows the author across browsers. Omit for the localStorage default. */
@@ -47,7 +52,21 @@ function savePersisted(sessionId: string, revision: number, phase: AnnotationDra
   } catch {}
 }
 
-export function AnnotationProvider({ sessionId, revision, isReadOnly, draftPhase, remoteAnnotations, loadState, saveState, children }: AnnotationProviderProps) {
+/** What the reader has been shown for one draft. Stamped with the draft it
+ *  belongs to rather than cleared in an effect: response controls register from
+ *  their own effects, which run before the provider's, so an effect-based reset
+ *  would wipe registrations that already happened. */
+interface SeenState {
+  draft: string;
+  responseIds: Set<string>;
+  canvases: Set<string>;
+}
+
+function seenFor(draft: string): SeenState {
+  return { draft, responseIds: new Set(), canvases: new Set() };
+}
+
+export function AnnotationProvider({ sessionId, revision, isReadOnly, draftPhase, remoteAnnotations, canvasFiles, loadState, saveState, children }: AnnotationProviderProps) {
   // Server-authoritative persistence loads asynchronously, so that mode starts
   // empty and hydrates in an effect. localStorage mode seeds synchronously.
   const serverMode = !!loadState;
@@ -71,8 +90,10 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, draftPhase
   const [responses, setResponses] = useState<Map<string, PlanResponse>>(() =>
     seed?.responses ? new Map(seed.responses) : new Map(),
   );
-  const [visibleResponseIds, setVisibleResponseIds] = useState<Set<string>>(() => new Set());
-  const responseMountCounts = useRef<Map<string, number>>(new Map());
+  const draftId = `${sessionId}:${revision}:${draftPhase}`;
+  const draftIdRef = useRef(draftId);
+  draftIdRef.current = draftId;
+  const [seen, setSeen] = useState<SeenState>(() => seenFor(draftId));
   const [feedbackEntries, setFeedbackEntries] = useState<Map<string, FeedbackEntry>>(() =>
     seed?.feedbackEntries ? new Map(seed.feedbackEntries) : new Map(),
   );
@@ -170,33 +191,32 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, draftPhase
     });
   }, []);
 
-  // Response controls register while mounted, so submission can tell a live
-  // question from an answer left over by an earlier revision of the canvas.
+  // Both registrations accumulate for the life of one draft and are idempotent,
+  // so re-running the caller's effect cannot loop.
   const registerResponse = useCallback((id: string) => {
-    const count = responseMountCounts.current.get(id) ?? 0;
-    responseMountCounts.current.set(id, count + 1);
-    if (count > 0) return;
-    setVisibleResponseIds((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
+    setSeen((prev) => {
+      const base = prev.draft === draftIdRef.current ? prev : seenFor(draftIdRef.current);
+      if (base.responseIds.has(id)) return base;
+      return { ...base, responseIds: new Set(base.responseIds).add(id) };
     });
   }, []);
 
-  const unregisterResponse = useCallback((id: string) => {
-    const count = responseMountCounts.current.get(id) ?? 0;
-    if (count > 1) {
-      responseMountCounts.current.set(id, count - 1);
-      return;
-    }
-    responseMountCounts.current.delete(id);
-    setVisibleResponseIds((prev) => {
-      if (!prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
+  const registerCanvasRendered = useCallback((filename: string) => {
+    setSeen((prev) => {
+      const base = prev.draft === draftIdRef.current ? prev : seenFor(draftIdRef.current);
+      if (base.canvases.has(filename)) return base;
+      return { ...base, canvases: new Set(base.canvases).add(filename) };
     });
   }, []);
+
+  // Answers survive until a canvas proves the question is gone. `seen` can lag
+  // the draft by a render when the host keeps the provider mounted across
+  // revisions, and stale evidence must never prune.
+  const current = seen.draft === draftId ? seen : null;
+  const submittableResponses = useMemo(() => {
+    if (!current || !canPruneResponses(canvasFiles, current.canvases)) return responses;
+    return pruneStaleResponses(responses, current.responseIds);
+  }, [current, canvasFiles, responses]);
 
   const setFeedbackEntry = useCallback((id: string, entry: FeedbackEntry) => {
     setFeedbackEntries((prev) => {
@@ -243,8 +263,8 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, draftPhase
         annotations, addAnnotation, addAnnotationWithId, updateAnnotation, removeAnnotation, addAnnotationImage, removeAnnotationImage,
         generalNote, setGeneralNote, clearAll,
         activeAnnotationId, setActiveAnnotationId,
-        responses, setResponse,
-        visibleResponseIds, registerResponse, unregisterResponse,
+        responses, setResponse, submittableResponses,
+        registerResponse, registerCanvasRendered,
         feedbackEntries, setFeedbackEntry, removeFeedbackEntry,
         isReadOnly,
       }}

@@ -3,19 +3,39 @@ import { formatSnippetInContext } from "./annotationContext";
 import { RESPONSE_ANNOTATION_PATH } from "./utils";
 
 /**
- * Drop answers whose control is no longer on the canvas. A new revision can
- * remove a question while its answer is still in the restored draft; submitting
- * that would report an answer to a question the author was never asked.
+ * Drop answers whose question is not in this revision's canvas. A draft carried
+ * forward by carryUnsubmittedDraft() can hold an answer to a question the new
+ * revision removed; submitting that would report an answer the author was never
+ * asked for.
+ *
+ * `seenResponseIds` must be the sticky set of controls that have mounted at any
+ * point in this draft, never the currently-mounted ones — see canPruneResponses.
  */
 export function pruneStaleResponses(
   responses: Map<string, PlanResponse>,
-  visibleResponseIds: ReadonlySet<string>,
+  seenResponseIds: ReadonlySet<string>,
 ): Map<string, PlanResponse> {
   const out = new Map<string, PlanResponse>();
   for (const [id, r] of responses) {
-    if (visibleResponseIds.has(id)) out.set(id, r);
+    if (seenResponseIds.has(id)) out.set(id, r);
   }
   return out;
+}
+
+/**
+ * Whether the set of seen response ids is complete enough to prune against.
+ *
+ * An id is only evidence of absence once every canvas that could host it has
+ * rendered. Until then "not seen" means "not looked at yet" — the host opens
+ * multi-canvas sessions on the overview, where no canvas is mounted at all, so
+ * pruning early would throw away every answer the author gave.
+ */
+export function canPruneResponses(
+  canvasFiles: readonly string[] | undefined,
+  renderedCanvases: ReadonlySet<string>,
+): boolean {
+  if (!canvasFiles || canvasFiles.length === 0) return false;
+  return canvasFiles.every((filename) => renderedCanvases.has(filename));
 }
 
 /**

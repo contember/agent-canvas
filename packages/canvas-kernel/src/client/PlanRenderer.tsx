@@ -71,7 +71,7 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { annotations: allAnnotations, addAnnotationWithId, removeAnnotation, updateAnnotation, addAnnotationImage, removeAnnotationImage, activeAnnotationId, setActiveAnnotationId } = useAnnotations();
+  const { annotations: allAnnotations, addAnnotationWithId, removeAnnotation, updateAnnotation, addAnnotationImage, removeAnnotationImage, activeAnnotationId, setActiveAnnotationId, registerCanvasRendered } = useAnnotations();
   // Filter annotations to this canvas file
   const annotations = useMemo(() => allAnnotations.filter(a => !a.filePath && (!a.canvasFile || a.canvasFile === filename)), [allAnnotations, filename]);
   const [editingAnn, setEditingAnn] = useState<{ id: string; note: string } | null>(null);
@@ -103,6 +103,12 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
         });
       });
   }, [sessionId, revision, filename, reportError]);
+
+  // Report the canvas only once its tree is committed — the response controls
+  // inside register from their own effects, which React runs before this one.
+  useEffect(() => {
+    if (PlanComponent) registerCanvasRendered(filename);
+  }, [PlanComponent, filename, registerCanvasRendered]);
 
   const scrollContainer = document.getElementById("plan-scroll-container");
 
