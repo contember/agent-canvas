@@ -17,6 +17,7 @@ export {
   useFeedback,
   useCanvasFile,
   useResponseRegistration,
+  AnnotationCtx,
   SessionContext,
   ActiveViewCtx,
   CanvasFileCtx,
@@ -39,6 +40,9 @@ export { PlanRenderer } from "./PlanRenderer";
 export { Popover, AnnotationPopover, AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 export { ResponsePreview, MarkdownPreview } from "./ResponsePreview";
 export { FileIcon } from "./FileIcon";
+
+/** The kernel component set, as a namespace for hosts that inject it wholesale. */
+export * as components from "./components";
 export { useTextAnnotation } from "./useTextAnnotation";
 
 // --- Host-provided context -------------------------------------------------

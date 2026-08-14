@@ -27,7 +27,7 @@ interface AnnotationProviderProps {
    *  saved through these instead of localStorage, so it survives reloads and
    *  follows the author across browsers. Omit for the localStorage default. */
   loadState?: (sessionId: string, revision: number, phase: AnnotationDraftPhase) => Promise<PersistedState | null>;
-  saveState?: (sessionId: string, revision: number, phase: AnnotationDraftPhase, state: PersistedState) => void;
+  saveState?: (sessionId: string, revision: number, state: PersistedState, phase: AnnotationDraftPhase) => void;
   children: React.ReactNode;
 }
 
@@ -121,7 +121,7 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, draftPhase
       feedbackEntries: Array.from(feedbackEntries.entries()),
     };
     const persist = () => {
-      if (saveState) saveState(sessionId, revision, draftPhase, state);
+      if (saveState) saveState(sessionId, revision, state, draftPhase);
       else savePersisted(sessionId, revision, draftPhase, state);
     };
     if (draftPhase === "next") {
@@ -229,7 +229,7 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, draftPhase
     setResponses(new Map());
     setFeedbackEntries(new Map());
     if (saveState) {
-      saveState(sessionId, revision, draftPhase, { annotations: [], generalNote: "", responses: [], feedbackEntries: [] });
+      saveState(sessionId, revision, { annotations: [], generalNote: "", responses: [], feedbackEntries: [] }, draftPhase);
     } else if (draftPhase === "next") {
       localStorage.removeItem(annotationDraftKey(sessionId, revision, draftPhase));
     } else {

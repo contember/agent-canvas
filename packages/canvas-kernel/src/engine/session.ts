@@ -11,6 +11,12 @@ export interface CanvasFileInfo {
   diffStats?: DiffStats;
 }
 
+/** How the caller selected the canvases in a revision. New revisions always
+ * carry this explicitly; its absence identifies legacy metadata. */
+export type CanvasScope =
+  | { kind: "view"; filename: string }
+  | { kind: "directory" };
+
 export interface RevisionInfo {
   revision: number;
   label?: string;
@@ -19,6 +25,7 @@ export interface RevisionInfo {
   hasFeedback: boolean;
   feedbackConsumed: boolean;
   response?: string;
+  canvasScope?: CanvasScope;
 }
 
 /**
@@ -334,7 +341,7 @@ export class SessionManager {
    * Create or update a session with a set of canvas files.
    * @param canvasFiles Map of filename -> JSX content
    */
-  upsert(id: string, canvasFiles: Map<string, string>, projectRoot: string, label?: string, response?: string): SessionData {
+  upsert(id: string, canvasFiles: Map<string, string>, projectRoot: string, label?: string, response?: string, canvasScope?: CanvasScope): SessionData {
     const existing = this.sessions.get(id);
     const now = new Date().toISOString();
     // Stable session IDs must never recycle revision numbers used as browser draft keys.
@@ -365,6 +372,7 @@ export class SessionManager {
       feedbackConsumed: false,
       ...(label ? { label } : {}),
       ...(response ? { response } : {}),
+      ...(canvasScope ? { canvasScope } : {}),
     };
     const revisions = existing ? [...existing.revisions, revInfo] : [revInfo];
     // Order: files from previous revision first (preserving their order), then new files alphabetically
@@ -605,6 +613,36 @@ export class SessionManager {
       return JSON.parse(readFileSync(join(this.revisionDir(id, rev), "remote_feedback.json"), "utf-8"));
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Server-side backing store for an in-progress draft. Hosts that wire the
+   * AnnotationProvider's loadState/saveState to these endpoints get drafts that
+   * survive a reload and follow the author across browsers, instead of living
+   * in one browser's localStorage. Opaque payload — the shape is the client's.
+   */
+  saveResponses(id: string, rev: number, payload: unknown): void {
+    const revDir = this.revisionDir(id, rev);
+    mkdirSync(revDir, { recursive: true });
+    writeFileSync(join(revDir, "responses.json"), JSON.stringify(payload));
+  }
+
+  getResponses(id: string, rev: number): unknown | null {
+    try {
+      return JSON.parse(readFileSync(join(this.revisionDir(id, rev), "responses.json"), "utf-8"));
+    } catch {
+      return null;
+    }
+  }
+
+  /** Drop sessions untouched for longer than `maxAge` (default 24h). */
+  cleanupStale(maxAge = 24 * 60 * 60 * 1000) {
+    const now = Date.now();
+    for (const [id, session] of this.sessions) {
+      if (now - new Date(session.updatedAt).getTime() > maxAge) {
+        this.remove(id);
+      }
     }
   }
 }

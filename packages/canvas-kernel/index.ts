@@ -19,6 +19,7 @@ export type {
   SessionData,
   RevisionInfo,
   CanvasFileInfo,
+  CanvasScope,
   DiffStats,
   SecretResolution,
   RemoteFeedbackEntry,
