@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import ReactDOM from "react-dom";
-import { useAnnotations, useCanvasFile, Annotation } from "#canvas/runtime";
+import { useAnnotations, useCanvasFile } from "#canvas/runtime";
+import type { Annotation } from "#canvas/runtime";
 import { AnnotationCreatePopover } from "../Popover";
 
 interface MermaidProps {
@@ -429,8 +430,8 @@ function highlightAnnotatedNodes(container: HTMLElement, annotations: Annotation
   // Collect annotated diagram snippets
   const annotatedSnippets = new Map<string, string>();
   for (const ann of annotations) {
-    const match = ann.snippet.match(/^\[Diagram (?:node|edge)\] (.+)$/);
-    if (match) annotatedSnippets.set(match[1], ann.id);
+    const label = ann.snippet.match(/^\[Diagram (?:node|edge)\] (.+)$/)?.[1];
+    if (label) annotatedSnippets.set(label, ann.id);
   }
 
   // Reset all node outlines

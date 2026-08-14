@@ -131,10 +131,11 @@ export function restoreMarks(
       searchFrom = idx + 1;
     }
 
-    if (occurrences.length === 0) continue;
+    const [firstOccurrence] = occurrences;
+    if (firstOccurrence === undefined) continue;
 
     // Pick the best occurrence using context
-    let bestIdx = occurrences[0];
+    let bestIdx = firstOccurrence;
     if (occurrences.length > 1 && ann.context) {
       let bestScore = -1;
       for (const idx of occurrences) {
@@ -196,12 +197,12 @@ function offsetToNode(
   offset: number
 ): { node: Text; offset: number } | null {
   for (let i = textNodes.length - 1; i >= 0; i--) {
-    if (textNodes[i].start <= offset) {
-      const localOffset = offset - textNodes[i].start;
-      const nodeLen = textNodes[i].node.textContent?.length ?? 0;
-      if (localOffset <= nodeLen) {
-        return { node: textNodes[i].node, offset: localOffset };
-      }
+    const entry = textNodes[i];
+    if (!entry || entry.start > offset) continue;
+    const localOffset = offset - entry.start;
+    const nodeLen = entry.node.textContent?.length ?? 0;
+    if (localOffset <= nodeLen) {
+      return { node: entry.node, offset: localOffset };
     }
   }
   return null;

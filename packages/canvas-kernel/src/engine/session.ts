@@ -145,14 +145,15 @@ function computeLineDiffStats(oldText: string, newText: string): DiffStats {
   let curr = new Uint32Array(n + 1);
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
+      // The `?? 0` fallbacks are for the checker only — both rows are n+1 long.
       curr[j] = oldLines[i - 1] === newLines[j - 1]
-        ? prev[j - 1] + 1
-        : Math.max(prev[j], curr[j - 1]);
+        ? (prev[j - 1] ?? 0) + 1
+        : Math.max(prev[j] ?? 0, curr[j - 1] ?? 0);
     }
     [prev, curr] = [curr, prev];
     curr.fill(0);
   }
-  const lcsLen = prev[n];
+  const lcsLen = prev[n] ?? 0;
   return { added: n - lcsLen, removed: m - lcsLen };
 }
 
@@ -238,7 +239,8 @@ export class SessionManager {
         let meta = raw as SessionMeta;
 
         // Migrate single-sourceFile revision format to canvasFiles
-        if (meta.revisions.length > 0 && !("canvasFiles" in meta.revisions[0])) {
+        const [firstRevision] = meta.revisions;
+        if (firstRevision && !("canvasFiles" in firstRevision)) {
           meta = {
             ...meta,
             revisions: (meta.revisions as unknown as LegacyRevisionInfo[]).map(r => ({
@@ -580,7 +582,7 @@ export class SessionManager {
     if (!session) return null;
     for (let i = session.revisions.length - 1; i >= 0; i--) {
       const ri = session.revisions[i];
-      if (ri.hasFeedback && !ri.feedbackConsumed) {
+      if (ri?.hasFeedback && !ri.feedbackConsumed) {
         const feedback = this.getFeedback(id, ri.revision);
         if (feedback) return { revision: ri.revision, feedback };
       }

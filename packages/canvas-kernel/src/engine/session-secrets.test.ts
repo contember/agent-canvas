@@ -12,6 +12,13 @@ function createManager(): SessionManager {
   return new SessionManager(directory);
 }
 
+/** Storage dir of the most recently created manager. */
+function currentDirectory(): string {
+  const directory = testDirectories.at(-1);
+  if (!directory) throw new Error("createManager() has not run");
+  return directory;
+}
+
 function createSession(manager: SessionManager, id = "runbook"): void {
   manager.upsert(id, new Map([["runbook.jsx", "<Section title=\"Runbook\" />"]]), process.cwd());
 }
@@ -46,7 +53,7 @@ describe("session secret vault", () => {
       ok: true,
       values: new Map([["service-token", "test-secret-value"]]),
     });
-    expect(readTextFiles(testDirectories[0])).not.toContain("test-secret-value");
+    expect(readTextFiles(currentDirectory())).not.toContain("test-secret-value");
   });
 
   test("reports every missing field without returning partial values", () => {

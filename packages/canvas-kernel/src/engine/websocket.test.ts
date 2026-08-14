@@ -62,7 +62,7 @@ describe("canvas render errors", () => {
     websocket.handlers.open(watcher);
 
     expect(watcher.sent).toHaveLength(1);
-    expect(JSON.parse(watcher.sent[0])).toEqual({
+    expect(JSON.parse(watcher.sent[0] ?? "")).toEqual({
       type: "render-error",
       error: {
         revision: 1,
@@ -71,7 +71,7 @@ describe("canvas render errors", () => {
       },
     });
     expect(watcher.closed).toBe(true);
-    expect(sessionManager.get("session")?.revisions[0].hasFeedback).toBe(false);
+    expect(sessionManager.get("session")?.revisions[0]?.hasFeedback).toBe(false);
   });
 
   test("drops a pending error when a new revision is pushed", () => {

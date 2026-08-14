@@ -234,7 +234,7 @@ function formatBuildError(err: any, lineOffset: number): string {
     try { candidates.push(...err); } catch {}
   }
   const detail = candidates.find((c) => c?.position) ?? candidates[0] ?? err;
-  const message = String(detail?.message || err?.message || "Syntax error").split("\n")[0];
+  const [message = "Syntax error"] = String(detail?.message || err?.message || "Syntax error").split("\n");
 
   const pos = detail?.position;
   if (!pos || typeof pos.line !== "number") return message;
@@ -320,7 +320,10 @@ export async function compileJsx(jsx: string, options: CompileOptions = {}): Pro
         return { ok: false, error: errors || "Bundle failed" };
       }
 
-      const js = await result.outputs[0].text();
+      const [output] = result.outputs;
+      if (!output) return { ok: false, error: "Bundle produced no output" };
+
+      const js = await output.text();
       const validation = await validateCompiledPlan(js, buildStubs(components));
       if (!validation.ok) {
         return { ok: false, error: `Runtime error: ${validation.error}` };
@@ -355,10 +358,9 @@ function resolveMarkdownFiles(jsx: string, projectRoot: string): string {
   return jsx.replace(
     /<Markdown\b([^>]*?)\/>/g,
     (match, attrs: string) => {
-      const fileMatch = attrs.match(/file=["']([^"']+)["']/);
-      if (!fileMatch) return match;
+      const filePath = attrs.match(/file=["']([^"']+)["']/)?.[1];
+      if (!filePath) return match;
 
-      const filePath = fileMatch[1];
       const absPath = join(projectRoot, filePath);
 
       try {
@@ -381,10 +383,9 @@ function resolveFilePreviews(jsx: string, projectRoot: string): string {
   return jsx.replace(
     /<FilePreview\b([^>]*?)\/>/g,
     (match, attrs: string) => {
-      const pathMatch = attrs.match(/path=["']([^"']+)["']/);
-      if (!pathMatch) return match;
+      const filePath = attrs.match(/path=["']([^"']+)["']/)?.[1];
+      if (!filePath) return match;
 
-      const filePath = pathMatch[1];
       const absPath = join(projectRoot, filePath);
 
       try {
@@ -392,7 +393,7 @@ function resolveFilePreviews(jsx: string, projectRoot: string): string {
 
         // Apply lines filter if present
         const linesMatch = attrs.match(/lines=\{?\[(\d+)\s*,\s*(\d+)\]\}?/);
-        if (linesMatch) {
+        if (linesMatch?.[1] && linesMatch[2]) {
           const start = parseInt(linesMatch[1], 10);
           const end = parseInt(linesMatch[2], 10);
           content = content.split("\n").slice(start - 1, end).join("\n");

@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback, useState, useContext, useMemo } from "react";
-import { useAnnotations, Annotation } from "./AnnotationProvider";
+import { useAnnotations } from "./AnnotationProvider";
+import type { Annotation } from "./AnnotationProvider";
 import { setMarkActive } from "./highlightRange";
 import { generateMarkdown, hasValue, getMissingRequiredLabels } from "./generateMarkdown";
 import { RevisionContext, ActiveViewContext, type ActiveView } from "./appContext";

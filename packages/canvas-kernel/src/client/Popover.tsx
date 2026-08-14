@@ -121,7 +121,7 @@ export function AnnotationPopover({
   const matches = note.trim().length > 0
     ? ALL_SUGGESTIONS.filter((s) => s.toLowerCase().startsWith(note.trim().toLowerCase()))
     : ALL_SUGGESTIONS;
-  const filtered = !showSuggestions || suppressed ? [] : matches.length === 1 && matches[0].toLowerCase() === note.trim().toLowerCase() ? [] : matches;
+  const filtered = !showSuggestions || suppressed ? [] : matches.length === 1 && matches[0]?.toLowerCase() === note.trim().toLowerCase() ? [] : matches;
   const matchSet = new Set(filtered);
 
   const filteredGroups = SUGGESTION_GROUPS
@@ -129,27 +129,29 @@ export function AnnotationPopover({
     .filter((g) => g.items.length > 0);
 
   const colItems = filteredGroups.map((g) => g.items);
+  /** All the arrow-key math indexes columns; out of range simply means empty. */
+  const colLength = (c: number) => colItems[c]?.length ?? 0;
   const flatFiltered = colItems.flat();
 
   const selectedCol = useMemo(() => {
     if (selectedIdx === null) return 0;
     let count = 0;
     for (let c = 0; c < colItems.length; c++) {
-      if (selectedIdx < count + colItems[c].length) return c;
-      count += colItems[c].length;
+      if (selectedIdx < count + colLength(c)) return c;
+      count += colLength(c);
     }
     return 0;
   }, [selectedIdx, colItems]);
   const selectedRow = useMemo(() => {
     if (selectedIdx === null) return 0;
     let count = 0;
-    for (let c = 0; c < selectedCol; c++) count += colItems[c].length;
+    for (let c = 0; c < selectedCol; c++) count += colLength(c);
     return selectedIdx - count;
   }, [selectedIdx, selectedCol, colItems]);
 
   const colRowToFlat = (col: number, row: number) => {
     let idx = 0;
-    for (let c = 0; c < col; c++) idx += colItems[c].length;
+    for (let c = 0; c < col; c++) idx += colLength(c);
     return idx + row;
   };
 
@@ -171,25 +173,26 @@ export function AnnotationPopover({
       e.preventDefault();
       if (selectedIdx === null) { setSelectedIdx(0); return; }
       if (e.key === "ArrowDown") {
-        const newRow = Math.min(selectedRow + 1, colItems[selectedCol].length - 1);
+        const newRow = Math.min(selectedRow + 1, colLength(selectedCol) - 1);
         setSelectedIdx(colRowToFlat(selectedCol, newRow));
       } else if (e.key === "ArrowUp") {
         const newRow = Math.max(selectedRow - 1, 0);
         setSelectedIdx(colRowToFlat(selectedCol, newRow));
       } else if (e.key === "ArrowRight") {
         const newCol = Math.min(selectedCol + 1, colItems.length - 1);
-        const newRow = Math.min(selectedRow, colItems[newCol].length - 1);
+        const newRow = Math.min(selectedRow, colLength(newCol) - 1);
         setSelectedIdx(colRowToFlat(newCol, newRow));
       } else if (e.key === "ArrowLeft") {
         const newCol = Math.max(selectedCol - 1, 0);
-        const newRow = Math.min(selectedRow, colItems[newCol].length - 1);
+        const newRow = Math.min(selectedRow, colLength(newCol) - 1);
         setSelectedIdx(colRowToFlat(newCol, newRow));
       }
       return;
     }
-    if (selectedIdx !== null && flatFiltered.length > 0) {
-      if (e.key === "Tab") { e.preventDefault(); applySuggestion(flatFiltered[selectedIdx]); return; }
-      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onConfirm(flatFiltered[selectedIdx], images); return; }
+    const selected = selectedIdx === null ? undefined : flatFiltered[selectedIdx];
+    if (selected !== undefined) {
+      if (e.key === "Tab") { e.preventDefault(); applySuggestion(selected); return; }
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onConfirm(selected, images); return; }
     }
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); return; }
     if (e.key === "Escape") {
