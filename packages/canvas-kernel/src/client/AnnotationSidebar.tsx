@@ -558,10 +558,10 @@ function AnnotationSidebarInner({ onSubmit, agentWatching, collapseButton }: Omi
       <div className="border-t border-border-subtle px-4 py-3 flex-shrink-0">
         <textarea
           value={generalNote}
-          onChange={(e) => setGeneralNote(e.target.value)}
+          onChange={(e) => setGeneralNote(e.currentTarget.value)}
           className="w-full bg-transparent text-[13px] font-body text-text-primary resize-none leading-relaxed p-0 border-none ring-0 shadow-none outline-none focus:outline-none focus:ring-0 focus:border-none placeholder:text-text-disabled min-h-[40px]"
           placeholder="General notes..."
-          onInput={(e) => autoResizeTextarea(e.target as HTMLTextAreaElement, 40)}
+          onInput={(e) => autoResizeTextarea(e.currentTarget, 40)}
           ref={(el) => { if (el) autoResizeTextarea(el, 40); }}
         />
       </div>

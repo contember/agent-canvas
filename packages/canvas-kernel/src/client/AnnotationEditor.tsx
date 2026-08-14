@@ -15,7 +15,7 @@ interface AnnotationEditorProps {
   autoResize?: boolean;
   readOnly?: boolean;
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  onTextareaClick?: (e: React.MouseEvent) => void;
+  onTextareaClick?: (e: React.MouseEvent<HTMLTextAreaElement>) => void;
   textareaRef?: React.MutableRefObject<HTMLTextAreaElement | null>;
   textareaClassName?: string;
   textareaStyle?: React.CSSProperties;
@@ -97,9 +97,8 @@ export function AnnotationEditor({
     }
   }, [host, onAddImage]);
 
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    const items = e.clipboardData.items;
-    for (const item of items) {
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    for (const item of e.clipboardData?.items ?? []) {
       if (item.type.startsWith("image/")) {
         e.preventDefault();
         const file = item.getAsFile();
@@ -109,36 +108,36 @@ export function AnnotationEditor({
     }
   }, [doUpload]);
 
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     dragCounter.current++;
     if (dragCounter.current === 1) setIsDragging(true);
   }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
   }, []);
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     dragCounter.current--;
     if (dragCounter.current === 0) setIsDragging(false);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     dragCounter.current = 0;
     setIsDragging(false);
-    for (const file of e.dataTransfer.files) {
+    for (const file of e.dataTransfer?.files ?? []) {
       if (file.type.startsWith("image/")) doUpload(file);
     }
   }, [doUpload]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onNoteChange(e.target.value);
+    onNoteChange(e.currentTarget.value);
     if (autoResize) {
-      e.target.style.height = "auto";
-      e.target.style.height = (minHeight ? Math.max(minHeight, e.target.scrollHeight) : e.target.scrollHeight) + "px";
+      e.currentTarget.style.height = "auto";
+      e.currentTarget.style.height = (minHeight ? Math.max(minHeight, e.currentTarget.scrollHeight) : e.currentTarget.scrollHeight) + "px";
     }
   }, [onNoteChange, autoResize, minHeight]);
 
@@ -191,9 +190,9 @@ export function AnnotationEditor({
           multiple
           style={{ display: "none" }}
           onChange={(e) => {
-            const files = e.target.files;
+            const files = e.currentTarget.files;
             if (files) for (const f of files) doUpload(f);
-            e.target.value = "";
+            e.currentTarget.value = "";
           }}
         />
       )}

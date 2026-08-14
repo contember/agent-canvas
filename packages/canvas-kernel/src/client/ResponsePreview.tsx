@@ -108,7 +108,7 @@ export function ResponsePreview({ open, onClose, onSubmit, includedRemoteIds, on
           <textarea
             ref={textareaRef}
             value={text}
-            onChange={(e) => { setEditedText(e.target.value); setManuallyEdited(true); }}
+            onChange={(e) => { setEditedText(e.currentTarget.value); setManuallyEdited(true); }}
             className="flex-1 w-full bg-bg-base p-5 text-[13px] font-mono text-text-code resize-none focus:outline-none leading-relaxed placeholder:text-text-disabled"
             placeholder="Your feedback will appear here..."
           />

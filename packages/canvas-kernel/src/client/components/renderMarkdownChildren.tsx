@@ -15,10 +15,13 @@ const INLINE_COMPONENTS = new Set(["Priority"]);
 function isInlineNode(node: React.ReactNode): boolean {
   if (typeof node === "string" || typeof node === "number") return true;
   if (!React.isValidElement(node)) return false;
-  const type = node.type;
+  // Read `type` structurally: preact/compat's isValidElement is not a type
+  // guard, so the narrowing React's typings give here does not survive there.
+  if (typeof node !== "object" || node === null || !("type" in node)) return false;
+  const type: unknown = node.type;
   if (typeof type === "string") return INLINE_TAGS.has(type);
   if (typeof type === "function") {
-    const name = (type as { displayName?: string; name?: string }).displayName ?? (type as { name?: string }).name;
+    const name = "displayName" in type && typeof type.displayName === "string" ? type.displayName : type.name;
     return name ? INLINE_COMPONENTS.has(name) : false;
   }
   return false;

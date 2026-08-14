@@ -604,7 +604,7 @@ function EditAnnotationModal({ note, onSave, onCancel }: { note: string; onSave:
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" onClick={onCancel}>
       <div className="bg-bg-elevated border border-border-hover rounded-lg shadow-md p-4 w-80" onClick={(e) => e.stopPropagation()}>
         <div className="text-tiny uppercase tracking-widest text-text-tertiary font-body mb-2">Edit annotation</div>
-        <textarea ref={ref} value={text} onChange={(e) => setText(e.target.value)}
+        <textarea ref={ref} value={text} onChange={(e) => setText(e.currentTarget.value)}
           className="w-full bg-transparent border-none text-body font-body text-text-primary resize-vertical focus:outline-none min-h-[60px]"
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) onSave(text.trim());

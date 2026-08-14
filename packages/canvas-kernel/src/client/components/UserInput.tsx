@@ -42,12 +42,12 @@ export function UserInput({ id, label, placeholder, multiline, required }: UserI
       <textarea
         ref={ref}
         value={value}
-        onChange={(e) => { handleChange(e.target.value); autoResize(e.target); }}
+        onChange={(e) => { handleChange(e.currentTarget.value); autoResize(e.currentTarget); }}
         placeholder={placeholder || "Type your response..."}
         rows={multiline ? 3 : 1}
         className="w-full bg-bg-input text-[13px] font-body text-text-primary rounded-lg px-3 py-2 resize-none focus:outline-none border border-border-subtle focus:border-border-hover placeholder:text-text-tertiary transition-colors"
-        onInput={(e) => autoResize(e.target as HTMLTextAreaElement)}
-        onFocus={(e) => autoResize(e.target)}
+        onInput={(e) => autoResize(e.currentTarget)}
+        onFocus={(e) => autoResize(e.currentTarget)}
       />
       <ResponseNote show={showNote} note={note} onToggle={() => setShowNote(!showNote)} onChange={(n) => setResponse(id, { ...current!, note: n })} />
       {showError && <p className="text-[11px] text-accent-red font-body mt-1">This field is required.</p>}
@@ -146,7 +146,7 @@ export function RangeInput({ id, label, min = 1, max = 10, step = 1, required, m
           max={max}
           step={step}
           value={displayValue}
-          onChange={(e) => handleChange(Number(e.target.value))}
+          onChange={(e) => handleChange(Number(e.currentTarget.value))}
           className="absolute inset-0 w-full opacity-0 cursor-pointer"
         />
       </div>

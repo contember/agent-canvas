@@ -18,6 +18,16 @@ const ZOOM_STEP = 0.2;
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 4;
 
+/** The wheel fields React's synthetic event and Preact's native one both carry.
+ *  Named structurally because preact/compat aliases no `React.WheelEvent`, and
+ *  a handler taking less than the event supplies is accepted by either. */
+interface WheelLike {
+  deltaY: number;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  preventDefault(): void;
+}
+
 function ZoomToolbar({ zoom, onZoomIn, onZoomOut, onZoomReset, onFullscreen }: {
   zoom: number;
   onZoomIn: () => void;
@@ -76,20 +86,20 @@ function MermaidFullscreenModal({ svgHtml, source, onClose }: {
   }, [onClose]);
 
   // Wheel zoom
-  const handleWheel = useCallback((e: React.WheelEvent) => {
+  const handleWheel = useCallback((e: WheelLike) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
     setZoom(z => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, +(z + delta).toFixed(2))));
   }, [setZoom]);
 
   // Pan via mouse drag
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     dragging.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
     e.preventDefault();
   }, [pan]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!dragging.current) return;
     setPan({
       x: dragging.current.panX + (e.clientX - dragging.current.startX),
@@ -222,7 +232,7 @@ export function Mermaid({ children }: MermaidProps) {
   }, [annotations, activeAnnotationId]);
 
   // Wheel zoom on inline diagram
-  const handleWheel = useCallback((e: React.WheelEvent) => {
+  const handleWheel = useCallback((e: WheelLike) => {
     if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
     const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
