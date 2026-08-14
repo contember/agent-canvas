@@ -8,16 +8,14 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "rootDir": ".",
     "types": ["@types/bun"],
     "paths": {
-      "#canvas/runtime": ["./client/runtime.ts"],
+      "#canvas/runtime": ["../packages/canvas-kernel/src/client/runtime.ts"],
       "#canvas/components": ["./client/components/index.ts"]
     }
   },
   "include": ["src/**/*", "client/**/*"],
   "exclude": [
-    "client/compat/**/*",
     "src/share-e2e.test.ts"
   ]
 }

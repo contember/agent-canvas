@@ -20,7 +20,26 @@
       "types": "./index.ts",
       "default": "./index.ts"
     },
-    "./engine/*": "./src/engine/*"
+    "./client": {
+      "types": "./src/client/index.ts",
+      "default": "./src/client/index.ts"
+    },
+    "./components": {
+      "types": "./src/client/components/index.ts",
+      "default": "./src/client/components/index.ts"
+    },
+    "./runtime": {
+      "types": "./src/client/runtime.ts",
+      "default": "./src/client/runtime.ts"
+    },
+    "./client/*": "./src/client/*",
+    "./engine/*": "./src/engine/*",
+    "./styles.css": "./src/client/styles.css",
+    "./theme.css": "./src/client/theme.css"
+  },
+  "imports": {
+    "#canvas/components": "./src/client/components/index.ts",
+    "#canvas/runtime": "./src/client/runtime.ts"
   },
   "dependencies": {
     "marked": "^17.0.4",

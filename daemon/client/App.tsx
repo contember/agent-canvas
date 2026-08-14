@@ -2,29 +2,46 @@ import React, { useEffect, useLayoutEffect, useState, useCallback, useRef, creat
 import { createRoot } from "react-dom/client";
 import { marked } from "marked";
 import { SessionContext, ActiveViewCtx } from "#canvas/runtime";
-import { AnnotationProvider, useAnnotations } from "./AnnotationProvider";
-import { PlanRenderer } from "./PlanRenderer";
-import { AnnotationSidebar } from "./AnnotationSidebar";
+import {
+  ActiveViewContext,
+  AnnotationCreatePopover,
+  AnnotationEditPopover,
+  AnnotationProvider,
+  AnnotationSidebar,
+  CanvasHostContext,
+  FileIcon,
+  PlanRenderer,
+  RenderErrorContext,
+  RevisionContext,
+  RESPONSE_ANNOTATION_PATH,
+  carryUnsubmittedDraft,
+  clearPersistedDraft,
+  extractContext,
+  generateAnnotationId,
+  renameMarkId,
+  restoreMarks,
+  unwrapMarks,
+  updateAllMarkStates,
+  useAnnotations,
+  wrapRangeWithMark,
+  type ActiveView,
+  type AnnotationDraftPhase,
+  type CanvasFileInfo,
+  type CanvasRenderError,
+  type RevisionInfo,
+} from "@fabrika/canvas-kernel/client";
 import { FileBrowser } from "./FileBrowser";
-import { FileIcon } from "./FileIcon";
 import { FileViewer } from "./FileViewer";
 import { SessionSwitcher } from "./SessionSwitcher";
 import { exportCanvasToMarkdown } from "./exportMarkdown";
 import { CompareView } from "./CompareView";
 import { OverviewView, categorizeChanges, getAffectedFiles } from "./OverviewView";
 import { RevisionSelect } from "./RevisionSelect";
-import { generateAnnotationId, RESPONSE_ANNOTATION_PATH } from "./utils";
-import { wrapRangeWithMark, restoreMarks, renameMarkId, unwrapMarks, updateAllMarkStates } from "./highlightRange";
-import { extractContext } from "./annotationContext";
-import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 import { ShareDialog, ShareButton, type ShareEntry } from "./ShareDialog";
 import { ReviewerIdentityDialog } from "./ReviewerIdentityDialog";
 import type { Annotation } from "#canvas/runtime";
-import { MODE, fetchMeta, FS_AVAILABLE, WS_AVAILABLE, submitSharedFeedback, getReviewerIdentity, setReviewerIdentity } from "./clientApi";
-import { carryUnsubmittedDraft, clearPersistedDraft, type AnnotationDraftPhase } from "./annotationDraft";
-import { RenderErrorContext, type CanvasRenderError } from "./RenderErrorContext";
+import { MODE, fetchMeta, FS_AVAILABLE, WS_AVAILABLE, submitSharedFeedback, getReviewerIdentity, setReviewerIdentity, canvasHost } from "./clientApi";
 
-export type ActiveView = { type: "overview" } | { type: "canvas"; filename: string } | { type: "file"; path: string };
 
 /**
  * Wire shape of a remote feedback entry as delivered by the daemon
@@ -61,55 +78,6 @@ function remoteFeedbackToAnnotations(entries: RemoteFeedbackEntry[]): Annotation
   }
   return out;
 }
-
-export interface CanvasFileInfo {
-  filename: string;
-  diffStats?: { added: number; removed: number };
-}
-
-export interface RevisionInfo {
-  revision: number;
-  label?: string;
-  canvasFiles: CanvasFileInfo[];
-  createdAt: string;
-  hasFeedback: boolean;
-  feedbackConsumed: boolean;
-  response?: string;
-}
-
-export const ActiveViewContext = createContext<{
-  activeView: ActiveView;
-  setActiveView: (v: ActiveView) => void;
-  openFiles: string[];
-  closeFile: (path: string) => void;
-  canvasFiles: string[];
-}>({
-  activeView: { type: "overview" },
-  setActiveView: () => {},
-  openFiles: [],
-  closeFile: () => {},
-  canvasFiles: [],
-});
-
-export const RevisionContext = createContext<{
-  currentRevision: number;
-  selectedRevision: number;
-  revisions: RevisionInfo[];
-  setSelectedRevision: (rev: number) => void;
-  isReadOnly: boolean;
-  compareRevision: { left: number; right: number } | null;
-  setCompareRevision: (rev: { left: number; right: number } | null) => void;
-  agentWatching: boolean;
-}>({
-  currentRevision: 1,
-  selectedRevision: 1,
-  revisions: [],
-  setSelectedRevision: () => {},
-  isReadOnly: false,
-  compareRevision: null,
-  setCompareRevision: () => {},
-  agentWatching: false,
-});
 
 function resolveTheme(pref: string): "light" | "dark" {
   if (pref === "auto") return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -519,6 +487,7 @@ function App() {
   }
 
   return (
+    <CanvasHostContext.Provider value={canvasHost}>
     <SessionContext.Provider value={sessionId}>
       <RenderErrorContext.Provider value={reportRenderError}>
         <RevisionContext.Provider value={{ currentRevision, selectedRevision, revisions, setSelectedRevision, isReadOnly, compareRevision, setCompareRevision, agentWatching }}>
@@ -707,6 +676,7 @@ function App() {
         </RevisionContext.Provider>
       </RenderErrorContext.Provider>
     </SessionContext.Provider>
+    </CanvasHostContext.Provider>
   );
 }
 

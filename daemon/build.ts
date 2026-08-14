@@ -4,6 +4,8 @@ import { $ } from "bun";
 
 const ROOT = dirname(import.meta.path);
 const DIST = join(ROOT, "dist");
+/** The kernel ships the runtime, the component library and the base stylesheet. */
+const KERNEL_CLIENT = join(ROOT, "..", "packages", "canvas-kernel", "src", "client");
 
 async function build() {
   console.log("Building canvas client...");
@@ -15,7 +17,7 @@ async function build() {
   // 0. Build preact-compat bundle
   console.log("  Building preact-compat...");
   const preactResult = await Bun.build({
-    entrypoints: [join(ROOT, "client/compat/preact-all.ts")],
+    entrypoints: [join(KERNEL_CLIENT, "preact-all.ts")],
     outdir: DIST,
     format: "esm",
     naming: "preact-compat.js",
@@ -35,7 +37,7 @@ async function build() {
   // 1. Build runtime (shared context between app and components)
   console.log("  Building #canvas/runtime...");
   const runtimeResult = await Bun.build({
-    entrypoints: [join(ROOT, "client/runtime.ts")],
+    entrypoints: [join(KERNEL_CLIENT, "runtime.ts")],
     outdir: DIST,
     format: "esm",
     external: [...REACT_EXTERNALS],
@@ -85,7 +87,7 @@ async function build() {
   await $`cd ${ROOT} && npx @tailwindcss/cli -i client/styles.css -o dist/client.css --minify`.quiet();
 
   // 5. Read theme.css to inline into HTML for browser Tailwind runtime
-  const themeCss = readFileSync(join(ROOT, "client/theme.css"), "utf-8");
+  const themeCss = readFileSync(join(KERNEL_CLIENT, "theme.css"), "utf-8");
 
   // 6. Create index.html
   console.log("  Creating index.html...");
@@ -155,17 +157,18 @@ ${themeCss}
 
 build().then(() => {
   if (process.argv.includes("--watch")) {
-    const clientDir = join(ROOT, "client");
     let timeout: ReturnType<typeof setTimeout> | null = null;
-    console.log("Watching for changes in client/...");
-    fsWatch(clientDir, { recursive: true }, (_event: string, filename: string | null) => {
-      if (!filename || filename.endsWith("~")) return;
-      if (timeout) clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        console.log(`\n  Changed: ${filename}`);
-        build().catch((e) => console.error("Rebuild failed:", e));
-      }, 200);
-    });
+    console.log("Watching for changes in client/ and the kernel client...");
+    for (const dir of [join(ROOT, "client"), KERNEL_CLIENT]) {
+      fsWatch(dir, { recursive: true }, (_event: string, filename: string | null) => {
+        if (!filename || filename.endsWith("~")) return;
+        if (timeout) clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          console.log(`\n  Changed: ${filename}`);
+          build().catch((e) => console.error("Rebuild failed:", e));
+        }, 200);
+      });
+    }
   }
 }).catch((e) => {
   console.error("Build failed:", e);

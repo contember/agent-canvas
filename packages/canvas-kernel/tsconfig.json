@@ -14,5 +14,8 @@
       "#canvas/components": ["./src/client/components/index.ts"]
     }
   },
-  "include": ["index.ts", "src/**/*"]
+  "include": ["index.ts", "src/**/*"],
+  "exclude": [
+    "src/client/preact-all.ts"
+  ]
 }

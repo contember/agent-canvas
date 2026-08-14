@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo, useContext } from "react";
 import { RevisionSelect } from "./RevisionSelect";
-import { RevisionContext, type RevisionInfo, type CanvasFileInfo } from "./App";
+import { RevisionContext, type RevisionInfo, type CanvasFileInfo } from "@fabrika/canvas-kernel/client";
 import { runDomDiff } from "./domDiff";
 import { extractBlockTree, matchBlocks, buildUnifiedDom } from "./unifiedDiff";
-import { useAnnotations } from "./AnnotationProvider";
-import { useTextAnnotation } from "./useTextAnnotation";
-import { extractContext } from "./annotationContext";
+import { useAnnotations } from "@fabrika/canvas-kernel/client";
+import { useTextAnnotation } from "@fabrika/canvas-kernel/client";
+import { extractContext } from "@fabrika/canvas-kernel/client";
 
 interface CompareViewProps {
   initialLeft: number;

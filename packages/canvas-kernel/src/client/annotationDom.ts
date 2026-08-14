@@ -1,5 +1,5 @@
 import type { Annotation } from "./AnnotationProvider";
-import type { ActiveView } from "./App";
+import type { ActiveView } from "./appContext";
 
 /** All blocks that can be annotated via block-level comments */
 const ANNOTATABLE_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='image']";

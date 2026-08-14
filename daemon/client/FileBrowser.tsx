@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useContext, useCallback, useMemo } from "react";
 import { SessionContext } from "#canvas/runtime";
-import { useAnnotations } from "./AnnotationProvider";
-import { ActiveViewContext } from "./App";
-import { FileIcon } from "./FileIcon";
-import { RESPONSE_ANNOTATION_PATH } from "./utils";
+import { useAnnotations } from "@fabrika/canvas-kernel/client";
+import { ActiveViewContext } from "@fabrika/canvas-kernel/client";
+import { FileIcon } from "@fabrika/canvas-kernel/client";
+import { RESPONSE_ANNOTATION_PATH } from "@fabrika/canvas-kernel/client";
 import { FS_AVAILABLE } from "./clientApi";
 
 interface TreeEntry { name: string; type: "file" | "dir"; }

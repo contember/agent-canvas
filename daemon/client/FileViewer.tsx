@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useContext, useCallback, useRef, useMemo } from "react";
 import { SessionContext } from "#canvas/runtime";
 import type { AnnotationContext } from "#canvas/runtime";
-import { useAnnotations } from "./AnnotationProvider";
-import { wrapRangeWithMark } from "./highlightRange";
+import { useAnnotations } from "@fabrika/canvas-kernel/client";
+import { wrapRangeWithMark } from "@fabrika/canvas-kernel/client";
 import { LANG_MAP } from "../langMap";
-import { generateAnnotationId } from "./utils";
-import { useTextAnnotation } from "./useTextAnnotation";
+import { generateAnnotationId } from "@fabrika/canvas-kernel/client";
+import { useTextAnnotation } from "@fabrika/canvas-kernel/client";
 import { FS_AVAILABLE } from "./clientApi";
 
 /** Walk up from a node to find the parent line div with data-line-num */

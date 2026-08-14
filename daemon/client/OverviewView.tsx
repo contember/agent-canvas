@@ -1,8 +1,8 @@
 import React, { useState, useContext, useMemo, useRef, useEffect, useCallback } from "react";
 import { SessionContext } from "#canvas/runtime";
-import { PlanRenderer } from "./PlanRenderer";
+import { PlanRenderer } from "@fabrika/canvas-kernel/client";
 import { ComparePanelRenderer } from "./CompareView";
-import { ActiveViewContext, RevisionContext, type CanvasFileInfo, type RevisionInfo } from "./App";
+import { ActiveViewContext, RevisionContext, type CanvasFileInfo, type RevisionInfo } from "@fabrika/canvas-kernel/client";
 import { extractBlockTree, matchBlocks, buildUnifiedDom } from "./unifiedDiff";
 import { runDomDiff } from "./domDiff";
 

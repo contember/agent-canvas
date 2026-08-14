@@ -1,17 +1,4 @@
-export { Section } from "./Section";
-export { Item, Task } from "./Task";
-export { CodeBlock } from "./CodeBlock";
-export { Callout } from "./Callout";
-export { Note } from "./Note";
-export { Table } from "./Table";
-export { Checklist } from "./Checklist";
-export { Priority } from "./Priority";
-export { FilePreview } from "./FilePreview";
-export { Mermaid } from "./Mermaid";
-export { Diff } from "./Diff";
-export { Choice, MultiChoice } from "./Choice";
-export { UserInput, RangeInput } from "./UserInput";
+// agent-canvas's canvas component set: the kernel's components plus the ones
+// only this host can back (SecretInput needs the daemon's secret endpoints).
+export * from "@fabrika/canvas-kernel/components";
 export { SecretInput } from "./SecretInput";
-export { ImageView } from "./Image";
-export { Markdown } from "./Markdown";
-export { useFeedback } from "#canvas/runtime";

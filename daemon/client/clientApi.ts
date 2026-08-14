@@ -28,6 +28,7 @@ import {
   ENCRYPTION_META,
   type EncryptionMeta,
 } from "./shareCrypto";
+import type { CanvasHost } from "@fabrika/canvas-kernel/client";
 
 declare global {
   interface Window {
@@ -334,3 +335,20 @@ export const FS_AVAILABLE: boolean = !MODE.isShared;
 
 /** Is live WebSocket session updates available? */
 export const WS_AVAILABLE: boolean = !MODE.isShared;
+
+// --- Kernel host binding ----------------------------------------------------
+
+/**
+ * What the kernel's annotation surface needs from this host. agent-canvas
+ * serves canvases in two modes, so these cannot use the kernel's local-only
+ * defaults: shared canvases come from the worker (and may be encrypted).
+ */
+export const canvasHost: CanvasHost = {
+  get sessionId() {
+    return getIdentifier();
+  },
+  isShared: MODE.isShared,
+  fsAvailable: FS_AVAILABLE,
+  uploadUrl,
+  loadCanvasModule,
+};

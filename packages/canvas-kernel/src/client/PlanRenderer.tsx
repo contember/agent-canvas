@@ -6,7 +6,7 @@ import { extractContext } from "./annotationContext";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 import { generateAnnotationId } from "./utils";
 import { useTextAnnotation } from "./useTextAnnotation";
-import { loadCanvasModule } from "./clientApi";
+import { useCanvasHost } from "./hostContext";
 import { RenderErrorContext, type CanvasRenderError } from "./RenderErrorContext";
 
 /** All navigable blocks (keyboard arrows) */
@@ -65,6 +65,7 @@ function CanvasErrorDisplay({ message }: { message: string }) {
 
 export function PlanRenderer({ revision, filename }: PlanRendererProps) {
   const sessionId = useContext(SessionContext);
+  const host = useCanvasHost();
   const reportError = useContext(RenderErrorContext);
   const [PlanComponent, setPlanComponent] = useState<React.ComponentType | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -87,8 +88,8 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
     setLoading(true);
     setError(null);
     setFocusedBlockIndex(null);
-    void sessionId; // sessionId is implied by the URL in clientApi (shared or local)
-    loadCanvasModule(filename, revision)
+    void sessionId; // the host resolves the session from the URL (shared or local)
+    host.loadCanvasModule(filename, revision)
       .then((mod) => { setPlanComponent(() => mod.default); setLoading(false); })
       .catch((cause: unknown) => {
         const moduleError = cause instanceof Error ? cause : new Error(String(cause));

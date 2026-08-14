@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { autoResizeTextarea } from "./utils";
-import { uploadUrl, MODE } from "./clientApi";
+import { useCanvasHost, type CanvasHost } from "./hostContext";
 
 interface AnnotationEditorProps {
   note: string;
@@ -37,15 +37,15 @@ export function imageToUrl(path: string): string {
   return `/api/uploads/${filename}`;
 }
 
-async function uploadImage(_sessionId: string, file: File): Promise<string | null> {
+async function uploadImage(host: CanvasHost, file: File): Promise<string | null> {
   const formData = new FormData();
   formData.append("image", file);
   try {
-    const resp = await fetch(uploadUrl(), { method: "POST", body: formData });
+    const resp = await fetch(host.uploadUrl(), { method: "POST", body: formData });
     const data = await resp.json();
     // Local daemon returns { path }; worker returns { url }. Normalise to
     // a single string that `imageToUrl` can resolve.
-    if (MODE.isShared) return data.url || null;
+    if (host.isShared) return data.url || null;
     return data.path || null;
   } catch {
     return null;
@@ -59,6 +59,7 @@ export function AnnotationEditor({
   textareaClassName, textareaStyle, minHeight,
   attachButton = "always", openFilePickerRef,
 }: AnnotationEditorProps) {
+  const host = useCanvasHost();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -89,12 +90,12 @@ export function AnnotationEditor({
     if (!file.type.startsWith("image/")) return;
     setIsUploading(true);
     try {
-      const path = await uploadImage(sessionId, file);
+      const path = await uploadImage(host, file);
       if (path) onAddImage(path);
     } finally {
       setIsUploading(false);
     }
-  }, [sessionId, onAddImage]);
+  }, [host, onAddImage]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = e.clipboardData.items;

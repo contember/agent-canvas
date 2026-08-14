@@ -2,14 +2,14 @@ import React, { useRef, useEffect, useCallback, useState, useContext, useMemo } 
 import { useAnnotations, Annotation } from "./AnnotationProvider";
 import { setMarkActive } from "./highlightRange";
 import { generateMarkdown, hasValue, getMissingRequiredLabels } from "./generateMarkdown";
-import { RevisionContext, ActiveViewContext, type ActiveView } from "./App";
+import { RevisionContext, ActiveViewContext, type ActiveView } from "./appContext";
 import { SessionContext } from "#canvas/runtime";
 import { MarkdownPreview } from "./ResponsePreview";
 import { FileIcon } from "./FileIcon";
 import { autoResizeTextarea, RESPONSE_ANNOTATION_PATH } from "./utils";
 import { AnnotationEditor, ImageThumbnails } from "./AnnotationEditor";
 import { findAnnotationElement, scrollToAnnotation } from "./annotationDom";
-import { MODE, FS_AVAILABLE } from "./clientApi";
+import { useCanvasHost } from "./hostContext";
 import { ResponsePreview } from "./ResponsePreview";
 
 interface AnnotationSidebarProps {
@@ -33,7 +33,8 @@ export function AnnotationSidebar({ onSubmit, collapseButton }: AnnotationSideba
 }
 
 function FeedbackDisplay({ sessionId, revision, label, waitingForUpdate, feedbackConsumed, agentWatching, collapseButton }: { sessionId: string; revision: number; label: string; waitingForUpdate?: boolean; feedbackConsumed?: boolean; agentWatching?: boolean; collapseButton?: React.ReactNode }) {
-  const isSharedMode = MODE.isShared;
+  const host = useCanvasHost();
+  const isSharedMode = host.isShared;
   const [feedback, setFeedback] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -41,7 +42,7 @@ function FeedbackDisplay({ sessionId, revision, label, waitingForUpdate, feedbac
     setLoading(true);
     // Shared mode has no prior local feedback to fetch — shared canvases
     // are always one-off snapshots. Skip the call entirely.
-    if (!FS_AVAILABLE) { setFeedback(null); setLoading(false); return; }
+    if (!host.fsAvailable) { setFeedback(null); setLoading(false); return; }
     fetch(`/api/session/${sessionId}/revision/${revision}/feedback`)
       .then((r) => r.json())
       .then((data: any) => { setFeedback(data.feedback || null); setLoading(false); })
@@ -158,6 +159,7 @@ function ReadOnlyAnnotationSidebar({ sessionId, revision, label, waitingForUpdat
 }
 
 function FeedbackDisplayContent({ sessionId, revision }: { sessionId: string; revision: number }) {
+  const host = useCanvasHost();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -165,7 +167,7 @@ function FeedbackDisplayContent({ sessionId, revision }: { sessionId: string; re
     setLoading(true);
     // Shared mode has no prior local feedback to fetch — shared canvases
     // are always one-off snapshots. Skip the call entirely.
-    if (!FS_AVAILABLE) { setFeedback(null); setLoading(false); return; }
+    if (!host.fsAvailable) { setFeedback(null); setLoading(false); return; }
     fetch(`/api/session/${sessionId}/revision/${revision}/feedback`)
       .then((r) => r.json())
       .then((data: any) => { setFeedback(data.feedback || null); setLoading(false); })
@@ -312,6 +314,7 @@ function ReadOnlyAnnotationList({ annotations, generalNote, activeAnnotationId, 
 }
 
 function AnnotationSidebarInner({ onSubmit, agentWatching, collapseButton }: Omit<AnnotationSidebarProps, "onPreview"> & { agentWatching: boolean }) {
+  const host = useCanvasHost();
   const [previewOpen, setPreviewOpen] = useState(false);
   const {
     annotations, updateAnnotation, removeAnnotation,
@@ -503,7 +506,7 @@ function AnnotationSidebarInner({ onSubmit, agentWatching, collapseButton }: Omi
           {annotations.length > 0 && (
             <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-border-subtle text-[10px] font-medium text-text-secondary">{annotations.length}</span>
           )}
-          {!MODE.isShared && (
+          {!host.isShared && (
             <span
               className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${agentWatching ? "bg-accent-green" : "bg-accent-amber"}`}
               title={agentWatching ? "Agent connected" : "Agent disconnected"}
