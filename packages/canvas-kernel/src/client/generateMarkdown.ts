@@ -3,6 +3,22 @@ import { formatSnippetInContext } from "./annotationContext";
 import { RESPONSE_ANNOTATION_PATH } from "./utils";
 
 /**
+ * Drop answers whose control is no longer on the canvas. A new revision can
+ * remove a question while its answer is still in the restored draft; submitting
+ * that would report an answer to a question the author was never asked.
+ */
+export function pruneStaleResponses(
+  responses: Map<string, PlanResponse>,
+  visibleResponseIds: ReadonlySet<string>,
+): Map<string, PlanResponse> {
+  const out = new Map<string, PlanResponse>();
+  for (const [id, r] of responses) {
+    if (visibleResponseIds.has(id)) out.set(id, r);
+  }
+  return out;
+}
+
+/**
  * Generate human-readable markdown feedback from annotations and responses.
  */
 export function generateMarkdown(

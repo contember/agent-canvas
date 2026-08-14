@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useAnnotations } from "#canvas/runtime";
+import { useAnnotations, useResponseRegistration } from "#canvas/runtime";
 import { ResponseNote } from "./ResponseNote";
 
 export type ChoiceOption = string | { value: string; label?: string };
@@ -24,6 +24,7 @@ interface ChoiceProps {
 
 export function Choice({ id, label, options, required }: ChoiceProps) {
   const { responses, setResponse } = useAnnotations();
+  useResponseRegistration(id);
   const normalized = useMemo(() => normalizeOptions(options), [options]);
   const current = responses.get(id);
   const selected = current?.value as string | undefined;
@@ -101,6 +102,7 @@ interface MultiChoiceProps {
 
 export function MultiChoice({ id, label, options, required }: MultiChoiceProps) {
   const { responses, setResponse } = useAnnotations();
+  useResponseRegistration(id);
   const normalized = useMemo(() => normalizeOptions(options), [options]);
   const current = responses.get(id);
   const selected: string[] = (current?.value as string[]) || [];

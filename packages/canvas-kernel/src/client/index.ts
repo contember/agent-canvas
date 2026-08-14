@@ -11,10 +11,12 @@
 // would bundle a second copy, and the provider and its consumers would then be
 // writing to and reading from different contexts.
 export { AnnotationProvider } from "./AnnotationProvider";
+export type { PersistedState } from "./AnnotationProvider";
 export {
   useAnnotations,
   useFeedback,
   useCanvasFile,
+  useResponseRegistration,
   SessionContext,
   ActiveViewCtx,
   CanvasFileCtx,
@@ -70,5 +72,6 @@ export {
   getMissingRequiredFeedback,
   getMissingRequiredLabels,
   hasValue,
+  pruneStaleResponses,
 } from "./generateMarkdown";
 export { autoResizeTextarea, generateAnnotationId, RESPONSE_ANNOTATION_PATH } from "./utils";

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { useAnnotations } from "#canvas/runtime";
+import { useAnnotations, useResponseRegistration } from "#canvas/runtime";
 import { ResponseNote } from "./ResponseNote";
 import { autoResizeTextarea } from "../utils";
 
@@ -14,6 +14,7 @@ interface UserInputProps {
 
 export function UserInput({ id, label, placeholder, multiline, required }: UserInputProps) {
   const { responses, setResponse } = useAnnotations();
+  useResponseRegistration(id);
   const current = responses.get(id);
   const value = (current?.value as string) ?? "";
   const note = current?.note || "";
@@ -68,6 +69,7 @@ interface RangeInputProps {
 
 export function RangeInput({ id, label, min = 1, max = 10, step = 1, required, minLabel, maxLabel }: RangeInputProps) {
   const { responses, setResponse } = useAnnotations();
+  useResponseRegistration(id);
   const current = responses.get(id);
   const value = current?.value as number | null;
   const note = current?.note || "";

@@ -77,15 +77,31 @@ export interface AnnotationContextValue {
   setActiveAnnotationId: (id: string | null) => void;
   responses: Map<string, PlanResponse>;
   setResponse: (id: string, response: PlanResponse) => void;
+  /** IDs of response controls currently mounted in the active canvas. */
+  visibleResponseIds: ReadonlySet<string>;
+  registerResponse: (id: string) => void;
+  unregisterResponse: (id: string) => void;
   feedbackEntries: Map<string, FeedbackEntry>;
   setFeedbackEntry: (id: string, entry: FeedbackEntry) => void;
   removeFeedbackEntry: (id: string) => void;
+  /** Canvas is rendered read-only (reviewing history). */
+  isReadOnly: boolean;
 }
 
 export const AnnotationCtx = createContext<AnnotationContextValue>(null!);
 
 export function useAnnotations(): AnnotationContextValue {
   return useContext(AnnotationCtx);
+}
+
+/** Register a response control for exactly as long as it is mounted, so
+ *  submission reads the live question set instead of guessing from the DOM. */
+export function useResponseRegistration(id: string): void {
+  const { registerResponse, unregisterResponse } = useAnnotations();
+  useEffect(() => {
+    registerResponse(id);
+    return () => unregisterResponse(id);
+  }, [id, registerResponse, unregisterResponse]);
 }
 
 export function useFeedback(
