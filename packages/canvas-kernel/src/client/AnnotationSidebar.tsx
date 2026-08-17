@@ -7,7 +7,7 @@ import { RevisionContext, ActiveViewContext, type ActiveView } from "./appContex
 import { SessionContext } from "#canvas/runtime";
 import { MarkdownPreview } from "./ResponsePreview";
 import { FileIcon } from "./FileIcon";
-import { autoResizeTextarea, RESPONSE_ANNOTATION_PATH } from "./utils";
+import { autoResizeTextarea, fileAnnotationPath, RESPONSE_ANNOTATION_PATH } from "./utils";
 import { AnnotationEditor, ImageThumbnails } from "./AnnotationEditor";
 import { findAnnotationElement, scrollToAnnotation } from "./annotationDom";
 import { useCanvasHost } from "./hostContext";
@@ -220,8 +220,9 @@ function ReadOnlyAnnotationList({ annotations, generalNote, activeAnnotationId, 
       setActiveAnnotationId(null);
     } else {
       setActiveAnnotationId(ann.id);
-      if (ann.filePath) {
-        setActiveView({ type: "file", path: ann.filePath });
+      const filePath = fileAnnotationPath(ann);
+      if (filePath) {
+        setActiveView({ type: "file", path: filePath });
         setTimeout(() => {
           const el = findAnnotationElement(ann);
           if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -406,8 +407,9 @@ function AnnotationSidebarInner({ onSubmit, agentWatching, collapseButton }: Omi
           setActiveAnnotationId(null);
         } else {
           setActiveAnnotationId(ann.id);
-          if (ann.filePath) {
-            setActiveView({ type: "file", path: ann.filePath });
+          const filePath = fileAnnotationPath(ann);
+          if (filePath) {
+            setActiveView({ type: "file", path: filePath });
             setTimeout(() => {
               const el = findAnnotationElement(ann);
               if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });

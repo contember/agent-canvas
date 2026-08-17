@@ -10,6 +10,7 @@ import {
   getBlockSnippet,
   scrollToAnnotation,
 } from "./annotationDom";
+import { RESPONSE_ANNOTATION_PATH } from "./utils";
 
 function annotation(props: { snippet: string; id?: string; filePath?: string }): Annotation {
   return {
@@ -313,6 +314,26 @@ describe("scrollToAnnotation", () => {
     const scrolled = recordScrolls(el);
     await waitForFlash(el);
     expect(scrolled).toEqual([el]);
+  });
+
+  test("a response annotation is revealed in place, not in a file tab", () => {
+    const container = mountContainer(
+      `<div><mark data-annotation-id="ann-resp">the third option</mark></div>`,
+    );
+    const el = target(container, "mark");
+    const scrolled = recordScrolls(el);
+    const views: ActiveView[] = [];
+
+    scrollToAnnotation(
+      annotation({ id: "ann-resp", snippet: "the third option", filePath: RESPONSE_ANNOTATION_PATH }),
+      (view) => { views.push(view); },
+    );
+
+    // The sentinel rides in filePath but names no file — switching to it opened
+    // a tab for "__agent-response__" over a blank pane.
+    expect(views).toEqual([]);
+    expect(scrolled).toEqual([el]);
+    expect(el.classList.contains("ann-flash")).toBe(true);
   });
 
   test("an annotation that is no longer on the page is a no-op", () => {

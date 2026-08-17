@@ -79,4 +79,4 @@ export {
   hasValue,
   pruneStaleResponses,
 } from "./generateMarkdown";
-export { autoResizeTextarea, generateAnnotationId, RESPONSE_ANNOTATION_PATH } from "./utils";
+export { autoResizeTextarea, fileAnnotationPath, generateAnnotationId, RESPONSE_ANNOTATION_PATH } from "./utils";

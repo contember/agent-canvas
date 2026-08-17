@@ -1,7 +1,12 @@
 // The harness registers the DOM globals, so it has to be evaluated first.
 import { mountContainer } from "./testing/dom";
 import { describe, expect, spyOn, test } from "bun:test";
-import { autoResizeTextarea, generateAnnotationId, RESPONSE_ANNOTATION_PATH } from "./utils";
+import {
+  autoResizeTextarea,
+  fileAnnotationPath,
+  generateAnnotationId,
+  RESPONSE_ANNOTATION_PATH,
+} from "./utils";
 
 function mountTextarea(): HTMLTextAreaElement {
   const el = mountContainer("<textarea></textarea>").querySelector("textarea");
@@ -25,13 +30,24 @@ describe("RESPONSE_ANNOTATION_PATH", () => {
     // It rides in the same `filePath` field as real paths. Bucketing code that
     // compares against it needs it non-empty; a falsy value would put response
     // annotations in the file and canvas buckets at once.
-    //
-    // Not every consumer does compare: annotationDom.ts:88 and
-    // AnnotationSidebar.tsx:223 branch on bare `if (ann.filePath)`, which is why
-    // scrolling to a response annotation opens a phantom file tab. That defect
-    // belongs to those call sites, not to the constant.
     expect(RESPONSE_ANNOTATION_PATH.length).toBeGreaterThan(0);
     expect(RESPONSE_ANNOTATION_PATH).toMatch(/^__.+__$/);
+  });
+});
+
+describe("fileAnnotationPath", () => {
+  test("gives back the path of an annotation that lives in a file", () => {
+    expect(fileAnnotationPath({ filePath: "src/server.ts" })).toBe("src/server.ts");
+  });
+
+  test("a response annotation has no file, though it carries a filePath", () => {
+    // Reading the field directly is what opened a tab named after the sentinel.
+    expect(fileAnnotationPath({ filePath: RESPONSE_ANNOTATION_PATH })).toBeUndefined();
+  });
+
+  test("a canvas annotation has no file either", () => {
+    expect(fileAnnotationPath({})).toBeUndefined();
+    expect(fileAnnotationPath({ filePath: "" })).toBeUndefined();
   });
 });
 

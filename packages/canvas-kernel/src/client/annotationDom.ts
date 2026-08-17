@@ -1,5 +1,6 @@
 import type { Annotation } from "./AnnotationProvider";
 import type { ActiveView } from "./appContext";
+import { fileAnnotationPath } from "./utils";
 
 /** Every block the keyboard arrows walk through. */
 export const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='choice-option'], [data-md='multichoice-option'], [data-md='userinput'], [data-md='rangeinput'], [data-md='image']";
@@ -110,8 +111,9 @@ function flashElement(el: HTMLElement) {
  * Handles file annotations by switching view first.
  */
 export function scrollToAnnotation(ann: Annotation, setActiveView: (view: ActiveView) => void) {
-  if (ann.filePath) {
-    setActiveView({ type: "file", path: ann.filePath });
+  const filePath = fileAnnotationPath(ann);
+  if (filePath) {
+    setActiveView({ type: "file", path: filePath });
     setTimeout(() => {
       const el = findAnnotationElement(ann);
       if (el) {
