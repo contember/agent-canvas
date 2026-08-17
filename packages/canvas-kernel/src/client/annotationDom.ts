@@ -12,6 +12,23 @@ export const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='
  */
 export const ANNOTATABLE_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='image']";
 
+/**
+ * A block's text as a reader sees it. Decorative markup — the callout icon,
+ * anything else marked aria-hidden — is skipped, so the glyph does not ride
+ * along into the sidebar label and into feedback.md.
+ */
+function readableText(block: HTMLElement): string {
+  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+  let text = "";
+  let node: Text | null;
+  while ((node = walker.nextNode() as Text | null)) {
+    const hidden = node.parentElement?.closest("[aria-hidden='true']");
+    if (hidden && block.contains(hidden)) continue;
+    text += node.textContent ?? "";
+  }
+  return text.trim();
+}
+
 /** Extract snippet identifier for a block element — the key a block annotation is stored under. */
 export function getBlockSnippet(block: HTMLElement): string | null {
   const md = block.getAttribute("data-md");
@@ -25,11 +42,11 @@ export function getBlockSnippet(block: HTMLElement): string | null {
   }
   if (md === "callout") {
     const type = block.getAttribute("data-md-type") || "info";
-    const text = block.textContent?.trim().slice(0, 60) || "Callout";
+    const text = readableText(block).slice(0, 60) || "Callout";
     return `[Callout:${type}] ${text}`;
   }
   if (md === "note") {
-    const text = block.textContent?.trim().slice(0, 60) || "Note";
+    const text = readableText(block).slice(0, 60) || "Note";
     return `[Note] ${text}`;
   }
   if (block.tagName === "TR") {

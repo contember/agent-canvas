@@ -17,7 +17,8 @@ export function Callout({ type = "info", children }: CalloutProps) {
   const cfg = config[type];
   return (
     <div className={`${cfg.bg} relative rounded-lg px-5 py-4 mt-3 flex gap-3 items-start`} data-md="callout" data-md-type={type}>
-      <span className={`${cfg.iconColor} opacity-70 text-base leading-relaxed flex-shrink-0 mt-px`}>
+      {/* Decorative: the type it stands for is already in data-md-type. */}
+      <span aria-hidden="true" className={`${cfg.iconColor} opacity-70 text-base leading-relaxed flex-shrink-0 mt-px`}>
         {cfg.icon}
       </span>
       <div className="text-body text-text-secondary leading-relaxed">{renderMarkdownChildren(children)}</div>

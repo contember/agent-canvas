@@ -36,10 +36,10 @@ function recordScrolls(el: HTMLElement): HTMLElement[] {
 }
 
 /**
- * Callout's markup, mirroring Callout.tsx: the icon span comes before the
- * content, which is what puts the glyph at the head of the block's textContent.
- * Fixtures for it are built here rather than hand-written, because a fixture
- * tidier than production hides exactly the defects worth catching.
+ * Callout's markup, mirroring Callout.tsx: a decorative icon span ahead of the
+ * content. Built here rather than hand-written, because a fixture tidier than
+ * production hides exactly the defects worth catching — this one carried the
+ * glyph into every snippet until the span was marked aria-hidden.
  */
 const CALLOUT_ICONS = { info: "i", warning: "!", danger: "✕", tip: "✓" } as const;
 
@@ -50,7 +50,7 @@ function callout(
 ): string {
   const testid = options.target ? ` data-testid="target"` : "";
   return `<div data-md="callout" data-md-type="${type}"${testid}>`
-    + `<span>${CALLOUT_ICONS[type]}</span><div>${content}</div></div>`;
+    + `<span aria-hidden="true">${CALLOUT_ICONS[type]}</span><div>${content}</div></div>`;
 }
 
 /** The file branch resolves on a timer; poll for the result instead of sleeping a guess. */
@@ -102,14 +102,14 @@ describe("findAnnotationElement", () => {
       name: "[Callout:<type>] carries the callout type",
       html: callout("info", "Disk may fill up")
         + callout("warning", "Disk may fill up", { target: true }),
-      // The leading glyph is the icon span — see the icon-leak test below.
-      snippet: "[Callout:warning] !Disk may fill up",
+      snippet: "[Callout:warning] Disk may fill up",
     },
     {
       name: "[Callout:info] is what an untyped callout is called",
       html: callout("warning", "Nothing to worry about")
-        + `<div data-md="callout" data-testid="target"><span>i</span><div>Nothing to worry about</div></div>`,
-      snippet: "[Callout:info] iNothing to worry about",
+        + `<div data-md="callout" data-testid="target">`
+        + `<span aria-hidden="true">i</span><div>Nothing to worry about</div></div>`,
+      snippet: "[Callout:info] Nothing to worry about",
     },
     {
       name: "[Note] identifies a note by its text",
@@ -150,26 +150,33 @@ describe("findAnnotationElement", () => {
     const container = mountContainer(
       callout("warning", "Rolling this out to every tenant at once would break the nightly export job", { target: true }),
     );
-    // 60 chars counted from the glyph, which is where production counts from.
     expect(findAnnotationElement(annotation({
-      snippet: "[Callout:warning] !Rolling this out to every tenant at once would break the ni",
+      snippet: "[Callout:warning] Rolling this out to every tenant at once would break the nig",
     }))).toBe(target(container));
     // The stored snippet is the truncated one, so the untruncated text is a miss.
     expect(findAnnotationElement(annotation({
-      snippet: "[Callout:warning] !Rolling this out to every tenant at once would break the nightly export job",
+      snippet: "[Callout:warning] Rolling this out to every tenant at once would break the nightly export job",
     }))).toBeNull();
   });
 
-  // KNOWN DEFECT, pinned rather than endorsed. Callout renders its icon as the
-  // first child, and getBlockSnippet reads the whole textContent — so the glyph
-  // rides along into the sidebar label and into feedback.md. Self-consistent on
-  // both sides, so lookup works; it is the human-readable text that suffers.
-  test("the callout icon glyph leaks into the snippet", () => {
+  // The icon stands in for data-md-type, which the snippet already carries, so
+  // it is decoration. It used to be glued to the front of the text the reader
+  // sees in the sidebar and the agent reads in feedback.md.
+  test("the callout icon glyph stays out of the snippet", () => {
     const container = mountContainer(callout("danger", "Data loss ahead", { target: true }));
-    expect(findAnnotationElement(annotation({ snippet: "[Callout:danger] \u2715Data loss ahead" })))
+    expect(findAnnotationElement(annotation({ snippet: "[Callout:danger] Data loss ahead" })))
       .toBe(target(container));
-    // What a reader would expect the snippet to be finds nothing.
-    expect(findAnnotationElement(annotation({ snippet: "[Callout:danger] Data loss ahead" }))).toBeNull();
+    // The glyph the block still renders is not part of what was stored.
+    expect(findAnnotationElement(annotation({ snippet: "[Callout:danger] \u2715Data loss ahead" }))).toBeNull();
+  });
+
+  test("only the decoration is dropped, not the text beside it", () => {
+    const container = mountContainer(
+      `<div data-md="note" data-testid="target">`
+      + `<span aria-hidden="true">*</span>Numbers are from <b>March</b>, not January</div>`,
+    );
+    expect(findAnnotationElement(annotation({ snippet: "[Note] Numbers are from March, not January" })))
+      .toBe(target(container));
   });
 
   test("a block snippet that matches nothing on the page returns null", () => {
