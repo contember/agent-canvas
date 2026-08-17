@@ -83,22 +83,60 @@ describe("extractContext — surrounding text", () => {
 });
 
 describe("extractContext — hierarchy", () => {
+  /** Section.tsx's markup: the title as an attribute, and again in a header row. */
+  function section(title: string, body: string): string {
+    return `<div class="relative mb-8 p-4 group/section" data-md="section" data-md-title="${title}">`
+      + `<div class="relative mb-2">`
+      + `<button type="button"><svg></svg></button>`
+      + `<h2 class="font-heading text-section">${title}</h2>`
+      + `</div>`
+      + `<div class="mt-6">${body}</div>`
+      + `</div>`;
+  }
+
   test("lists the section heading before the task label", () => {
-    const container = mountContainer(`
-      <div class="relative mb-8 p-4" data-md="section">
-        <div class="relative mb-2">
-          <button type="button"></button>
-          <h2 class="font-heading">Rollout</h2>
-        </div>
-        <div class="mt-6">
-          <div data-task-id="ship-daemon">
-            <div class="flex"><span class="font-semibold">Ship the daemon</span></div>
-            <div>Then flip the flag on target hosts</div>
-          </div>
-        </div>
-      </div>`);
+    const container = mountContainer(section("Rollout", `
+      <div data-task-id="ship-daemon">
+        <div class="flex"><span class="font-semibold">Ship the daemon</span></div>
+        <div>Then flip the flag on target hosts</div>
+      </div>`));
     const ctx = extractContext(selectText(container, "target"), container);
     expect(ctx.hierarchy).toEqual(["Rollout", "Ship the daemon"]);
+  });
+
+  // A canvas is usually one wrapper holding several sections. That wrapper has a
+  // heading somewhere beneath it — the first section's — but it owns none.
+  test("does not take a neighbouring section's heading", () => {
+    const container = mountContainer(
+      `<div class="canvas-body">`
+      + section("Planning Poker", `<p>estimates go here</p>`)
+      + section("Project Timeline", `<p>target date</p>`)
+      + `</div>`,
+    );
+    const ctx = extractContext(selectText(container, "target"), container);
+    expect(ctx.hierarchy).toEqual(["Project Timeline"]);
+  });
+
+  // Hosts that render their own sections have no data-md attributes, so the
+  // markup is all there is to go on.
+  test("falls back to the heading markup when the block carries no title", () => {
+    const container = mountContainer(`
+      <div class="relative mb-8 p-4">
+        <div class="relative mb-2"><h2 class="font-heading">Rollout</h2></div>
+        <div class="mt-6"><p>target</p></div>
+      </div>`);
+    expect(extractContext(selectText(container, "target"), container).hierarchy).toEqual(["Rollout"]);
+  });
+
+  test("a heading nested deeper than the block's own header row is not its heading", () => {
+    const container = mountContainer(`
+      <div class="outer">
+        <div class="relative mb-8 p-4">
+          <div class="relative mb-2"><h2 class="font-heading">Rollout</h2></div>
+        </div>
+        <div class="mt-6"><p>target</p></div>
+      </div>`);
+    expect(extractContext(selectText(container, "target"), container).hierarchy).toEqual([]);
   });
 
   test("falls back to the task id when the label renders empty", () => {

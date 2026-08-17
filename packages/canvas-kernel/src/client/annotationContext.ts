@@ -81,15 +81,30 @@ function getHierarchy(node: Node, planContainer: HTMLElement): string[] {
       if (label) path.unshift(label.textContent?.trim() || taskId);
     }
 
-    if (el.tagName === "DIV" && el.querySelector(":scope > button .font-heading, :scope > div .font-heading")) {
-      const heading = el.querySelector(".font-heading");
-      if (heading) path.unshift(heading.textContent?.trim() || "");
-    }
+    const heading = ownHeading(el);
+    if (heading) path.unshift(heading);
 
     el = el.parentElement;
   }
 
   return path;
+}
+
+/**
+ * The heading this block owns, if any. Section carries its title as an
+ * attribute; hosts that render their own headings only have the markup, and
+ * there the heading must sit directly under the block's own header row —
+ * anything deeper belongs to a nested block. Detecting one heading and then
+ * reading another is what put a neighbouring section's title in the path.
+ */
+function ownHeading(el: Element): string | null {
+  if (el.getAttribute("data-md") === "section") {
+    const title = el.getAttribute("data-md-title");
+    if (title) return title;
+  }
+  if (el.tagName !== "DIV") return null;
+  const heading = el.querySelector(":scope > button > .font-heading, :scope > div > .font-heading");
+  return heading?.textContent?.trim() || null;
 }
 
 /**
