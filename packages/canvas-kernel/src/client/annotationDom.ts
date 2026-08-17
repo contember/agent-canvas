@@ -1,11 +1,19 @@
 import type { Annotation } from "./AnnotationProvider";
 import type { ActiveView } from "./appContext";
 
-/** All blocks that can be annotated via block-level comments */
-const ANNOTATABLE_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='image']";
+/** Every block the keyboard arrows walk through. */
+export const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='choice-option'], [data-md='multichoice-option'], [data-md='userinput'], [data-md='rangeinput'], [data-md='image']";
 
-/** Extract snippet identifier for a block element (mirrors PlanRenderer's getBlockSnippet) */
-function getBlockSnippet(block: HTMLElement): string | null {
+/**
+ * The blocks that can carry a block annotation — a strict subset of
+ * BLOCK_SELECTOR, since interactive controls are navigable but not annotatable.
+ * Creation and lookup must both read it from here: an annotation minted on a
+ * block this selector excludes can never be found again.
+ */
+export const ANNOTATABLE_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='image']";
+
+/** Extract snippet identifier for a block element — the key a block annotation is stored under. */
+export function getBlockSnippet(block: HTMLElement): string | null {
   const md = block.getAttribute("data-md");
   if (md === "item") {
     const label = block.getAttribute("data-md-label");

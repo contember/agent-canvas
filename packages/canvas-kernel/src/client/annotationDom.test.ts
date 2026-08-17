@@ -3,7 +3,13 @@
 import { mountContainer } from "./testing/dom";
 import { describe, expect, test } from "bun:test";
 import type { ActiveView, Annotation } from "./runtime";
-import { findAnnotationElement, scrollToAnnotation } from "./annotationDom";
+import {
+  ANNOTATABLE_SELECTOR,
+  BLOCK_SELECTOR,
+  findAnnotationElement,
+  getBlockSnippet,
+  scrollToAnnotation,
+} from "./annotationDom";
 
 function annotation(props: { snippet: string; id?: string; filePath?: string }): Annotation {
   return {
@@ -202,12 +208,11 @@ describe("findAnnotationElement", () => {
     expect(findAnnotationElement(annotation({ snippet: "[Row] prod | bo" }))).toBeNull();
   });
 
-  // KNOWN DEFECT, pinned rather than endorsed. PlanRenderer's BLOCK_SELECTOR
-  // lets the `a` shortcut annotate these four kinds and mints [Option]/[Input]/
-  // [Range] snippets for them, but ANNOTATABLE_SELECTOR here omits them — so the
-  // annotation is created and can then never be found again. Change this test
-  // when the two selectors are reconciled; do not read it as intent.
-  test("interactive controls are unreachable, so annotations on them are orphaned", () => {
+  // Interactive controls are navigable but not annotatable: the arrows walk
+  // them, no comment icon appears on them, and PlanRenderer's `a` shortcut
+  // refuses them — precisely because a snippet minted there would name a block
+  // this lookup can never return.
+  test("interactive controls hold no annotations", () => {
     const container = mountContainer(
       `<div data-md="choice-option" data-md-label="Option A"></div>`
       + `<div data-md="userinput" data-md-label="Your name"></div>`
@@ -219,6 +224,48 @@ describe("findAnnotationElement", () => {
     expect(findAnnotationElement(annotation({ snippet: "[Range] Batch size" }))).toBeNull();
     // The same scan does find an annotatable block, so the nulls are the selector, not a dead loop.
     expect(findAnnotationElement(annotation({ snippet: "[Item] Ship the beta" }))).toBe(target(container));
+  });
+
+  /** One of every kind the arrows walk, in the markup the components emit. */
+  const ALL_BLOCK_KINDS =
+    `<div data-md="item" data-md-label="Ship the beta"></div>`
+    + `<div data-md="section" data-md-title="Rollout"></div>`
+    + `<div data-md="table"><table><tbody><tr><td>prod</td><td>bo</td></tr></tbody></table></div>`
+    + callout("info", "Disk may fill up")
+    + `<div data-md="note">Numbers are from March</div>`
+    + `<li data-md="checklist-item" data-md-label="Back up the DB"></li>`
+    + `<div data-md="choice-option" data-md-label="Option A"></div>`
+    + `<div data-md="multichoice-option" data-md-label="Option B"></div>`
+    + `<div data-md="userinput" data-md-label="Your name"></div>`
+    + `<div data-md="rangeinput" data-md-label="Batch size"></div>`
+    + `<figure data-md="image" data-md-src="/img/graph.png"></figure>`;
+
+  test("every annotatable block is also navigable", () => {
+    const container = mountContainer(ALL_BLOCK_KINDS);
+    const navigable = new Set(container.querySelectorAll(BLOCK_SELECTOR));
+    const annotatable = Array.from(container.querySelectorAll(ANNOTATABLE_SELECTOR));
+
+    expect(annotatable).not.toHaveLength(0);
+    // An annotatable block the arrows cannot reach has no way to be annotated.
+    for (const el of annotatable) expect(navigable.has(el)).toBe(true);
+  });
+
+  // The round trip the `a` shortcut depends on: it mints a snippet from a block
+  // it reached, and this lookup has to give that same block back. Derived rather
+  // than hardcoded, so it keeps holding when a snippet's wording changes.
+  test("every annotatable block is found again by the snippet it mints", () => {
+    const container = mountContainer(ALL_BLOCK_KINDS);
+    const snippets: string[] = [];
+
+    for (const el of container.querySelectorAll(ANNOTATABLE_SELECTOR)) {
+      const snippet = getBlockSnippet(el as HTMLElement);
+      if (!snippet) throw new Error(`annotatable block mints no snippet: ${el.outerHTML}`);
+      expect(findAnnotationElement(annotation({ snippet }))).toBe(el as HTMLElement);
+      snippets.push(snippet);
+    }
+
+    // Pinned, so a selector that shrank cannot pass this vacuously.
+    expect(snippets).toHaveLength(7);
   });
 });
 

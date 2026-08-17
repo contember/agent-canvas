@@ -3,16 +3,12 @@ import { createPortal } from "react-dom";
 import { SessionContext, CanvasFileCtx } from "#canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
 import { extractContext } from "./annotationContext";
+import { ANNOTATABLE_SELECTOR, BLOCK_SELECTOR, getBlockSnippet } from "./annotationDom";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 import { generateAnnotationId } from "./utils";
 import { useTextAnnotation } from "./useTextAnnotation";
 import { useCanvasHost } from "./hostContext";
 import { RenderErrorContext, type CanvasRenderError } from "./RenderErrorContext";
-
-/** All navigable blocks (keyboard arrows) */
-const BLOCK_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='choice-option'], [data-md='multichoice-option'], [data-md='userinput'], [data-md='rangeinput'], [data-md='image']";
-/** Blocks eligible for annotation comment icons (excludes interactive controls) */
-const ANNOTATABLE_SELECTOR = "[data-md='item'], [data-md='section'], [data-md='table'] tbody tr, [data-md='callout'], [data-md='note'], [data-md='checklist-item'], [data-md='image']";
 
 interface PlanRendererProps {
   revision: number;
@@ -215,10 +211,13 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
         });
       } else if (e.key === "a" || e.key === "A") {
         if (focusedBlockIndex === null || !container) return;
-        e.preventDefault();
         const blocks = getOrderedBlocks(container);
         const block = blocks[focusedBlockIndex];
         if (!block) return;
+        // The arrows walk every block, but only an annotatable one can be found
+        // again — minting a snippet for anything else strands the annotation.
+        if (!block.matches(ANNOTATABLE_SELECTOR)) return;
+        e.preventDefault();
         const snippet = getBlockSnippet(block);
         if (!snippet) return;
         const existingAnnId = blockAnnotationMap.get(snippet);
@@ -406,54 +405,6 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
 /** Get all navigable blocks in DOM order */
 function getOrderedBlocks(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll(BLOCK_SELECTOR)) as HTMLElement[];
-}
-
-/** Extract a snippet identifier for a block element */
-function getBlockSnippet(block: HTMLElement): string | null {
-  const md = block.getAttribute("data-md");
-  if (md === "item") {
-    const label = block.getAttribute("data-md-label");
-    return label ? `[Item] ${label}` : null;
-  }
-  if (md === "section") {
-    const title = block.getAttribute("data-md-title");
-    return title ? `[Section] ${title}` : null;
-  }
-  if (md === "callout") {
-    const type = block.getAttribute("data-md-type") || "info";
-    const text = block.textContent?.trim().slice(0, 60) || "Callout";
-    return `[Callout:${type}] ${text}`;
-  }
-  if (md === "note") {
-    const text = block.textContent?.trim().slice(0, 60) || "Note";
-    return `[Note] ${text}`;
-  }
-  // Table row
-  if (block.tagName === "TR") {
-    const cells = Array.from(block.querySelectorAll("td")).map((td) => td.textContent?.trim()).filter(Boolean);
-    return cells.length ? `[Row] ${cells.join(" | ")}` : null;
-  }
-  if (md === "checklist-item") {
-    const label = block.getAttribute("data-md-label");
-    return label ? `[Checklist] ${label}` : null;
-  }
-  if (md === "choice-option" || md === "multichoice-option") {
-    const label = block.getAttribute("data-md-label");
-    return label ? `[Option] ${label}` : null;
-  }
-  if (md === "userinput") {
-    const label = block.getAttribute("data-md-label");
-    return label ? `[Input] ${label}` : null;
-  }
-  if (md === "rangeinput") {
-    const label = block.getAttribute("data-md-label");
-    return label ? `[Range] ${label}` : null;
-  }
-  if (md === "image") {
-    const src = block.getAttribute("data-md-src");
-    return src ? `[Image] ${src}` : null;
-  }
-  return null;
 }
 
 /** Renders comment icons: always visible on annotated blocks, on hover for others */
