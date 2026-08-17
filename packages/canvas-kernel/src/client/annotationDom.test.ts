@@ -12,13 +12,16 @@ import {
 } from "./annotationDom";
 import { RESPONSE_ANNOTATION_PATH } from "./utils";
 
-function annotation(props: { snippet: string; id?: string; filePath?: string }): Annotation {
+function annotation(
+  props: { snippet: string; id?: string; filePath?: string; canvasFile?: string },
+): Annotation {
   return {
     id: props.id ?? "ann-1",
     snippet: props.snippet,
     note: "why this matters",
     createdAt: "2026-01-01T00:00:00.000Z",
     filePath: props.filePath,
+    canvasFile: props.canvasFile,
   };
 }
 
@@ -232,6 +235,40 @@ describe("findAnnotationElement", () => {
     expect(findAnnotationElement(annotation({ snippet: "[Range] Batch size" }))).toBeNull();
     // The same scan does find an annotatable block, so the nulls are the selector, not a dead loop.
     expect(findAnnotationElement(annotation({ snippet: "[Item] Ship the beta" }))).toBe(target(container));
+  });
+
+  // The overview mounts every canvas at once, and two canvases in one push
+  // routinely share a heading or a task label.
+  describe("across several mounted canvases", () => {
+    const TWO_CANVASES =
+      `<div data-canvas-file="rollout.jsx">`
+      + `<div data-md="item" data-md-label="Ship the beta"></div></div>`
+      + `<div data-canvas-file="risks.jsx">`
+      + `<div data-md="item" data-md-label="Ship the beta" data-testid="target"></div></div>`;
+
+    test("a block annotation resolves inside the canvas it belongs to", () => {
+      const container = mountContainer(TWO_CANVASES);
+      const el = findAnnotationElement(annotation({
+        snippet: "[Item] Ship the beta",
+        canvasFile: "risks.jsx",
+      }));
+      // Document order would have handed back the one in rollout.jsx.
+      expect(el).toBe(target(container));
+    });
+
+    test("a canvas that is not mounted is a miss, not a reason to look elsewhere", () => {
+      mountContainer(TWO_CANVASES);
+      expect(findAnnotationElement(annotation({
+        snippet: "[Item] Ship the beta",
+        canvasFile: "timeline.jsx",
+      }))).toBeNull();
+    });
+
+    test("an annotation from before canvases were named still searches everywhere", () => {
+      const container = mountContainer(TWO_CANVASES);
+      expect(findAnnotationElement(annotation({ snippet: "[Item] Ship the beta" })))
+        .toBe(target(container, `[data-canvas-file="rollout.jsx"] [data-md="item"]`));
+    });
   });
 
   /** One of every kind the arrows walk, in the markup the components emit. */

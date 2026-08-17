@@ -88,7 +88,17 @@ export function findAnnotationElement(ann: Annotation): HTMLElement | null {
 
   // For block annotations (snippet starts with "["), find by matching snippet against blocks
   if (ann.snippet.startsWith("[")) {
-    for (const el of document.querySelectorAll(ANNOTATABLE_SELECTOR)) {
+    // A block snippet only identifies a block within its own canvas, and the
+    // overview mounts every canvas at once — searching the whole document lets
+    // an identical block in a different canvas win on document order. No
+    // container for the canvas means it is not on screen, which is a miss, not
+    // a reason to look elsewhere.
+    const root = ann.canvasFile
+      ? document.querySelector(`[data-canvas-file="${ann.canvasFile}"]`)
+      : document;
+    if (!root) return null;
+
+    for (const el of root.querySelectorAll(ANNOTATABLE_SELECTOR)) {
       if (getBlockSnippet(el as HTMLElement) === ann.snippet) {
         return el as HTMLElement;
       }

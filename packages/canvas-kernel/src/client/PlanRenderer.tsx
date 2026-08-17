@@ -321,7 +321,9 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
 
   return (
     <CanvasFileCtx.Provider value={filename}>
-      <div ref={containerRef} className="plan-content plan-updated">
+      {/* Names the canvas a block annotation belongs to, so looking one up
+          cannot wander into another canvas mounted beside it. */}
+      <div ref={containerRef} className="plan-content plan-updated" data-canvas-file={filename}>
         <CanvasErrorBoundary
           key={`${revision}:${filename}`}
           revision={revision}
