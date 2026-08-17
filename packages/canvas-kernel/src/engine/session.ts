@@ -556,6 +556,9 @@ export class SessionManager {
         ri.hasFeedback = true;
         ri.feedbackConsumed = false;
       }
+      // Feedback arriving is activity: it orders the session list, and it must
+      // not leave a session looking untouched while its feedback waits.
+      session.updatedAt = new Date().toISOString();
       this.persistMeta(session);
     }
   }
@@ -612,6 +615,14 @@ export class SessionManager {
     const merged = [...existing];
     for (const e of entries) if (!seen.has(e.id)) merged.push(e);
     writeFileSync(file, JSON.stringify(merged, null, 2));
+
+    // Same reason as saveFeedback — a reviewer's comment is input for this
+    // session, not something that happens beside it.
+    const session = this.sessions.get(id);
+    if (session) {
+      session.updatedAt = new Date().toISOString();
+      this.persistMeta(session);
+    }
   }
 
   getRemoteFeedback(id: string, rev: number): RemoteFeedbackEntry[] {

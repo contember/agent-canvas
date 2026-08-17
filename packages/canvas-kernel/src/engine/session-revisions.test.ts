@@ -312,6 +312,54 @@ describe("feedback lifecycle", () => {
     expect(requireRevision(session, 1).feedbackConsumed).toBe(false);
   });
 
+  test("feedback arriving counts as activity on the session", () => {
+    const directory = createDirectory();
+    setSystemTime(new Date(FIRST_PUSH));
+    const manager = new SessionManager(directory);
+    seedRevisions(manager, 1);
+    expect(requireSession(manager, "plan").updatedAt).toBe(FIRST_PUSH);
+
+    const reviewed = "2026-03-02T09:00:00.000Z";
+    setSystemTime(new Date(reviewed));
+    manager.saveFeedback("plan", 1, "please shorten step 3");
+
+    // The daemon orders its session list by this and cleanupStale reaps by it,
+    // so a session left looking untouched can be dropped with feedback pending.
+    expect(requireSession(manager, "plan").updatedAt).toBe(reviewed);
+    expect(requireSession(new SessionManager(directory), "plan").updatedAt).toBe(reviewed);
+  });
+
+  test("remote feedback counts too", () => {
+    setSystemTime(new Date(FIRST_PUSH));
+    const manager = new SessionManager(createDirectory());
+    seedRevisions(manager, 1);
+
+    const reviewed = "2026-03-02T09:00:00.000Z";
+    setSystemTime(new Date(reviewed));
+    manager.appendRemoteFeedback("plan", 1, [{
+      id: "rf-1",
+      shareId: "share-1",
+      revision: 1,
+      submittedAt: reviewed,
+      author: { id: "u1", name: "Ana" },
+      annotations: [],
+    }]);
+
+    expect(requireSession(manager, "plan").updatedAt).toBe(reviewed);
+  });
+
+  test("an empty batch of remote feedback is not activity", () => {
+    setSystemTime(new Date(FIRST_PUSH));
+    const manager = new SessionManager(createDirectory());
+    seedRevisions(manager, 1);
+
+    setSystemTime(new Date("2026-03-02T09:00:00.000Z"));
+    manager.appendRemoteFeedback("plan", 1, []);
+
+    // Polling the worker and finding nothing is not something that happened.
+    expect(requireSession(manager, "plan").updatedAt).toBe(FIRST_PUSH);
+  });
+
   test("getFeedback returns null when nothing was saved", () => {
     const manager = new SessionManager(createDirectory());
     seedRevisions(manager, 1);
@@ -462,6 +510,22 @@ describe("cleanupStale", () => {
     manager.cleanupStale(2 * 60 * 60 * 1000);
 
     expect(sessionIds(manager)).toEqual(["plan"]);
+  });
+
+  test("a session is not reaped while its feedback waits to be read", () => {
+    const manager = new SessionManager(createDirectory());
+    setSystemTime(new Date("2026-03-01T00:00:00.000Z"));
+    manager.upsert("plan", planCanvas("<Section>one</Section>"), PROJECT_ROOT);
+
+    // The reviewer came back to it a day later; the agent has not read it yet.
+    setSystemTime(new Date("2026-03-01T10:00:00.000Z"));
+    manager.saveFeedback("plan", 1, "this part needs rethinking");
+
+    setSystemTime(new Date("2026-03-01T11:00:00.000Z"));
+    manager.cleanupStale(2 * 60 * 60 * 1000);
+
+    expect(sessionIds(manager)).toEqual(["plan"]);
+    expect(manager.getLatestUnconsumedFeedback("plan")?.feedback).toBe("this part needs rethinking");
   });
 
   test("defaults to a 24 hour cutoff", () => {
