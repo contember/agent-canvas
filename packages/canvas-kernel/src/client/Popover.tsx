@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo, useContext } from "react";
 import { createPortal } from "react-dom";
-import { getPopoverPosition } from "./popoverPosition";
+import { getPopoverPosition, pxWidth } from "./popoverPosition";
 import { AnnotationEditor, AttachButton } from "./AnnotationEditor";
 import { SessionContext } from "#canvas/runtime";
 
@@ -20,7 +20,9 @@ export function Popover({ anchorEl, scrollContainer, onClose, ignoreSelector, zI
   const popRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
-  const { style: posStyle, parent } = getPopoverPosition(anchorEl, scrollContainer);
+  // Placed by the width it is about to be rendered at, or it overflows the edge
+  // it was supposed to be clamped away from.
+  const { style: posStyle, parent } = getPopoverPosition(anchorEl, scrollContainer, pxWidth(width));
 
   useEffect(() => {
     const timer = setTimeout(() => {

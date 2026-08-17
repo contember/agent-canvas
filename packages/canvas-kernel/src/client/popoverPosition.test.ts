@@ -1,7 +1,7 @@
 // The harness registers the DOM globals, so it has to be evaluated first.
 import { mountContainer } from "./testing/dom";
 import { afterEach, describe, expect, test } from "bun:test";
-import { getPopoverPosition } from "./popoverPosition";
+import { getPopoverPosition, pxWidth } from "./popoverPosition";
 
 // mountContainer replaces the body's children but not the body itself, and the
 // harness registers one document for the whole process — so a stub left on
@@ -92,6 +92,20 @@ describe("getPopoverPosition", () => {
     expect(getPopoverPosition(anchor, parent).style.left).toBe("108px");
   });
 
+  // The annotation popover renders at 420px. Clamping it as if it were the
+  // 280px default let it hang ~140px past the right edge of the canvas.
+  test("clamps left for the width the popover will actually have", () => {
+    const { parent, anchor } = inContainer(
+      { left: 0, top: 0, width: 600, height: 300 },
+      { left: 500, top: 50, width: 40, height: 20 },
+    );
+
+    // 600 - 420 - 12 is as far right as the wide popover may start...
+    expect(getPopoverPosition(anchor, parent, 420).style.left).toBe("168px");
+    // ...and the narrow one may start further right without overflowing.
+    expect(getPopoverPosition(anchor, parent).style.left).toBe("308px");
+  });
+
   test("clamps left to zero for an anchor scrolled past the parent's left edge", () => {
     const { parent, anchor } = inContainer(
       { left: 200, top: 0, width: 1000, height: 400 },
@@ -120,6 +134,19 @@ describe("getPopoverPosition", () => {
     expect(getPopoverPosition(anchor).parent).toBe(document.body);
     expect(getPopoverPosition(anchor, null).parent).toBe(document.body);
     expect(getPopoverPosition(anchor).style.top).toBe("328px");
+  });
+
+  test("does not count page scroll twice on the body", () => {
+    // The body's own rect moves up as the page scrolls, so subtracting it has
+    // already converted the anchor to document coordinates.
+    const anchor = inBody(
+      { left: 0, top: -500, width: 800, height: 2000 },
+      { left: 100, top: 300, width: 50, height: 20 },
+    );
+    window.scrollTo(0, 500);
+
+    // The anchor ends 820px down the document, so the popover goes one gap below.
+    expect(getPopoverPosition(anchor).style.top).toBe("828px");
   });
 
   test("ignores body.scrollTop — the body is not what scrolls a document", () => {
@@ -151,5 +178,21 @@ describe("getPopoverPosition", () => {
 
     getPopoverPosition(anchor);
     expect(document.body.style.position).toBe("relative");
+  });
+});
+
+describe("pxWidth", () => {
+  test("reads a px width, whole or fractional", () => {
+    expect(pxWidth("420px")).toBe(420);
+    expect(pxWidth("280.5px")).toBe(280.5);
+    expect(pxWidth("  420px  ")).toBe(420);
+  });
+
+  test("refuses a width that is not px, so the default stands in", () => {
+    // "100%" parses to 100 by any lenient reading, which would clamp the
+    // popover as if it were 100px wide.
+    for (const css of ["100%", "20rem", "auto", "", "420"]) {
+      expect(pxWidth(css)).toBeUndefined();
+    }
   });
 });
