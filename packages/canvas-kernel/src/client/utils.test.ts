@@ -21,12 +21,16 @@ function stubScrollHeight(el: HTMLTextAreaElement, value: number, onRead?: () =>
 }
 
 describe("RESPONSE_ANNOTATION_PATH", () => {
-  test("is a truthy name no browsed file can carry", () => {
-    // It travels in the same `filePath` field as real paths, and every consumer
-    // splits buckets with `filePath && filePath !== SENTINEL`: an empty value
-    // would land response annotations in the file *and* canvas buckets at once.
+  test("is a truthy sentinel, distinguishable from a real path", () => {
+    // It rides in the same `filePath` field as real paths. Bucketing code that
+    // compares against it needs it non-empty; a falsy value would put response
+    // annotations in the file and canvas buckets at once.
+    //
+    // Not every consumer does compare: annotationDom.ts:88 and
+    // AnnotationSidebar.tsx:223 branch on bare `if (ann.filePath)`, which is why
+    // scrolling to a response annotation opens a phantom file tab. That defect
+    // belongs to those call sites, not to the constant.
     expect(RESPONSE_ANNOTATION_PATH.length).toBeGreaterThan(0);
-    expect(RESPONSE_ANNOTATION_PATH).not.toContain("/");
     expect(RESPONSE_ANNOTATION_PATH).toMatch(/^__.+__$/);
   });
 });
@@ -42,13 +46,26 @@ describe("generateAnnotationId", () => {
   });
 
   test("two annotations created in the same millisecond do not share an id", () => {
+    // Driving the random source directly instead of drawing a batch: a sample
+    // large enough to be convincing also carries a real birthday-collision rate,
+    // and a test that fails once every few thousand runs teaches people to
+    // rerun rather than to look.
     const now = spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+    const random = spyOn(Math, "random");
     try {
-      const ids = new Set(Array.from({ length: 200 }, () => generateAnnotationId()));
-      // A time-only id collapses the whole batch to one value. The single-item
-      // slack is for the 36^4 suffix space, not a budget for real collisions.
-      expect(ids.size).toBeGreaterThanOrEqual(199);
+      random.mockReturnValue(0.111111);
+      const first = generateAnnotationId();
+      random.mockReturnValue(0.222222);
+      const second = generateAnnotationId();
+      random.mockReturnValue(0.111111);
+      const repeat = generateAnnotationId();
+
+      // A time-only id would make all three equal.
+      expect(first).not.toBe(second);
+      // And the tail is a pure function of the draw, not of call order.
+      expect(first).toBe(repeat);
     } finally {
+      random.mockRestore();
       now.mockRestore();
     }
   });

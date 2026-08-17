@@ -1,7 +1,15 @@
 // The harness registers the DOM globals, so it has to be evaluated first.
 import { mountContainer } from "./testing/dom";
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { getPopoverPosition } from "./popoverPosition";
+
+// mountContainer replaces the body's children but not the body itself, and the
+// harness registers one document for the whole process — so a stub left on
+// document.body would follow every later test file.
+afterEach(() => {
+  Reflect.deleteProperty(document.body, "getBoundingClientRect");
+  document.body.style.position = "";
+});
 
 interface Box {
   left: number;

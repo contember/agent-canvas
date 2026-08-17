@@ -29,6 +29,24 @@ function recordScrolls(el: HTMLElement): HTMLElement[] {
   return scrolled;
 }
 
+/**
+ * Callout's markup, mirroring Callout.tsx: the icon span comes before the
+ * content, which is what puts the glyph at the head of the block's textContent.
+ * Fixtures for it are built here rather than hand-written, because a fixture
+ * tidier than production hides exactly the defects worth catching.
+ */
+const CALLOUT_ICONS = { info: "i", warning: "!", danger: "✕", tip: "✓" } as const;
+
+function callout(
+  type: keyof typeof CALLOUT_ICONS,
+  content: string,
+  options: { target?: boolean } = {},
+): string {
+  const testid = options.target ? ` data-testid="target"` : "";
+  return `<div data-md="callout" data-md-type="${type}"${testid}>`
+    + `<span>${CALLOUT_ICONS[type]}</span><div>${content}</div></div>`;
+}
+
 /** The file branch resolves on a timer; poll for the result instead of sleeping a guess. */
 async function waitForFlash(el: HTMLElement): Promise<void> {
   const deadline = Date.now() + 2000;
@@ -76,15 +94,16 @@ describe("findAnnotationElement", () => {
     },
     {
       name: "[Callout:<type>] carries the callout type",
-      html: `<div data-md="callout" data-md-type="info">Disk may fill up</div>`
-        + `<div data-md="callout" data-md-type="warning" data-testid="target">Disk may fill up</div>`,
-      snippet: "[Callout:warning] Disk may fill up",
+      html: callout("info", "Disk may fill up")
+        + callout("warning", "Disk may fill up", { target: true }),
+      // The leading glyph is the icon span — see the icon-leak test below.
+      snippet: "[Callout:warning] !Disk may fill up",
     },
     {
       name: "[Callout:info] is what an untyped callout is called",
-      html: `<div data-md="callout" data-md-type="warning">Nothing to worry about</div>`
-        + `<div data-md="callout" data-testid="target">Nothing to worry about</div>`,
-      snippet: "[Callout:info] Nothing to worry about",
+      html: callout("warning", "Nothing to worry about")
+        + `<div data-md="callout" data-testid="target"><span>i</span><div>Nothing to worry about</div></div>`,
+      snippet: "[Callout:info] iNothing to worry about",
     },
     {
       name: "[Note] identifies a note by its text",
@@ -123,16 +142,28 @@ describe("findAnnotationElement", () => {
 
   test("a callout is identified by the first 60 characters of its text", () => {
     const container = mountContainer(
-      `<div data-md="callout" data-md-type="warning" data-testid="target">`
-      + `Rolling this out to every tenant at once would break the nightly export job</div>`,
+      callout("warning", "Rolling this out to every tenant at once would break the nightly export job", { target: true }),
     );
+    // 60 chars counted from the glyph, which is where production counts from.
     expect(findAnnotationElement(annotation({
-      snippet: "[Callout:warning] Rolling this out to every tenant at once would break the nig",
+      snippet: "[Callout:warning] !Rolling this out to every tenant at once would break the ni",
     }))).toBe(target(container));
     // The stored snippet is the truncated one, so the untruncated text is a miss.
     expect(findAnnotationElement(annotation({
-      snippet: "[Callout:warning] Rolling this out to every tenant at once would break the nightly export job",
+      snippet: "[Callout:warning] !Rolling this out to every tenant at once would break the nightly export job",
     }))).toBeNull();
+  });
+
+  // KNOWN DEFECT, pinned rather than endorsed. Callout renders its icon as the
+  // first child, and getBlockSnippet reads the whole textContent — so the glyph
+  // rides along into the sidebar label and into feedback.md. Self-consistent on
+  // both sides, so lookup works; it is the human-readable text that suffers.
+  test("the callout icon glyph leaks into the snippet", () => {
+    const container = mountContainer(callout("danger", "Data loss ahead", { target: true }));
+    expect(findAnnotationElement(annotation({ snippet: "[Callout:danger] \u2715Data loss ahead" })))
+      .toBe(target(container));
+    // What a reader would expect the snippet to be finds nothing.
+    expect(findAnnotationElement(annotation({ snippet: "[Callout:danger] Data loss ahead" }))).toBeNull();
   });
 
   test("a block snippet that matches nothing on the page returns null", () => {
@@ -171,7 +202,12 @@ describe("findAnnotationElement", () => {
     expect(findAnnotationElement(annotation({ snippet: "[Row] prod | bo" }))).toBeNull();
   });
 
-  test("interactive controls are not scroll targets — they cannot be annotated", () => {
+  // KNOWN DEFECT, pinned rather than endorsed. PlanRenderer's BLOCK_SELECTOR
+  // lets the `a` shortcut annotate these four kinds and mints [Option]/[Input]/
+  // [Range] snippets for them, but ANNOTATABLE_SELECTOR here omits them — so the
+  // annotation is created and can then never be found again. Change this test
+  // when the two selectors are reconciled; do not read it as intent.
+  test("interactive controls are unreachable, so annotations on them are orphaned", () => {
     const container = mountContainer(
       `<div data-md="choice-option" data-md-label="Option A"></div>`
       + `<div data-md="userinput" data-md-label="Your name"></div>`
