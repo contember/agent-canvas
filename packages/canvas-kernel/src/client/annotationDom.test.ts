@@ -303,9 +303,10 @@ describe("findAnnotationElement", () => {
     const snippets: string[] = [];
 
     for (const el of container.querySelectorAll(ANNOTATABLE_SELECTOR)) {
-      const snippet = getBlockSnippet(el as HTMLElement);
+      if (!(el instanceof HTMLElement)) throw new Error(`fixture emitted a ${el.nodeName}`);
+      const snippet = getBlockSnippet(el);
       if (!snippet) throw new Error(`annotatable block mints no snippet: ${el.outerHTML}`);
-      expect(findAnnotationElement(annotation({ snippet }))).toBe(el as HTMLElement);
+      expect(findAnnotationElement(annotation({ snippet }))).toBe(el);
       snippets.push(snippet);
     }
 

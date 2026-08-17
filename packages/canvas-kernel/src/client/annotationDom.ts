@@ -21,8 +21,7 @@ export const ANNOTATABLE_SELECTOR = "[data-md='item'], [data-md='section'], [dat
 function readableText(block: HTMLElement): string {
   const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
   let text = "";
-  let node: Text | null;
-  while ((node = walker.nextNode() as Text | null)) {
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const hidden = node.parentElement?.closest("[aria-hidden='true']");
     if (hidden && block.contains(hidden)) continue;
     text += node.textContent ?? "";
