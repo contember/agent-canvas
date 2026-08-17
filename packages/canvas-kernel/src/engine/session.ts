@@ -271,7 +271,13 @@ export class SessionManager {
           updatedAt: meta.updatedAt,
           ...(meta.shares ? { shares: meta.shares } : {}),
         });
-      } catch {}
+      } catch (cause) {
+        // A session that fails here vanishes from the list, and migration moves
+        // the user's files before it can fail — so staying silent loses work
+        // without saying so. Other sessions still load.
+        const reason = cause instanceof Error ? cause.message : String(cause);
+        console.warn(`[sessions] ${name.name}: could not be loaded (${reason})`);
+      }
     }
   }
 
@@ -285,10 +291,14 @@ export class SessionManager {
 
     // Migrate history files
     if (existsSync(historyDir)) {
-      const files = readdirSync(historyDir).filter((f) => f.endsWith(".jsx")).sort();
-      for (const file of files) {
-        const num = parseInt(file.replace(".jsx", ""), 10);
-        if (isNaN(num)) continue;
+      // By revision number, not by name — sorting as text puts 10 before 2, and
+      // the order of this array is the revision order everything else reads.
+      const files = readdirSync(historyDir)
+        .filter((f) => f.endsWith(".jsx"))
+        .map((file) => ({ file, num: parseInt(file.replace(".jsx", ""), 10) }))
+        .filter(({ num }) => !isNaN(num))
+        .sort((a, b) => a.num - b.num);
+      for (const { file, num } of files) {
         const revDir = this.revisionDir(id, num);
         mkdirSync(revDir, { recursive: true });
         renameSync(join(historyDir, file), join(revDir, "plan.jsx"));
@@ -300,7 +310,6 @@ export class SessionManager {
           feedbackConsumed: false,
         });
       }
-      rmSync(historyDir, { recursive: true, force: true });
     }
 
     // Migrate current version
@@ -329,6 +338,10 @@ export class SessionManager {
       revisions,
     };
     writeFileSync(join(dir, "meta.json"), JSON.stringify(meta, null, 2));
+
+    // Only once the new layout is on disk. Anything that fails above leaves the
+    // old directory in place rather than half-migrated and unrecorded.
+    rmSync(historyDir, { recursive: true, force: true });
   }
 
   readRevisionJsx(id: string, rev: number, filename: string): string | null {
