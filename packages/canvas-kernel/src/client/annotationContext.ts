@@ -1,4 +1,5 @@
 import type { AnnotationContext } from "./AnnotationProvider";
+import { isIndexedText } from "./highlightRange";
 
 /**
  * Extract disambiguation context from a Range:
@@ -27,7 +28,7 @@ function getSurroundingText(range: Range, direction: "before" | "after", maxChar
         text += (node.textContent || "").slice(0, range.startOffset);
         break;
       }
-      if (node.parentElement?.hasAttribute("data-annotation-id")) continue;
+      if (!isIndexedText(node)) continue;
       text += node.textContent || "";
     }
     if (text.length > maxChars) {
@@ -46,7 +47,7 @@ function getSurroundingText(range: Range, direction: "before" | "after", maxChar
         continue;
       }
       if (found) {
-        if (node.parentElement?.hasAttribute("data-annotation-id")) continue;
+        if (!isIndexedText(node)) continue;
         text += node.textContent || "";
       }
     }

@@ -60,6 +60,26 @@ describe("extractContext — surrounding text", () => {
     expect(ctx.after).toBe("after");
   });
 
+  test("skips marked text however deeply it is wrapped", () => {
+    const container = mountContainer(
+      `<p>keep<mark data-annotation-id="a1"><b> dropped words</b></mark> more target after</p>`,
+    );
+    const ctx = extractContext(selectText(container, "target"), container);
+    // The index excludes everything under the mark, not just its direct
+    // children, so reading the parent's own attribute was not enough.
+    expect(ctx.before).toBe("keep more");
+    expect(ctx.before).not.toContain("dropped");
+  });
+
+  test("skips the line-number gutter, which the index does not carry either", () => {
+    const container = mountContainer(
+      `<pre><code><span class="select-none">1 </span><span>const target = 1;</span></code></pre>`,
+    );
+    const ctx = extractContext(selectText(container, "target"), container);
+    // With the gutter in, the context reads "1 const" and disambiguates nothing.
+    expect(ctx.before).toBe("const");
+  });
+
   test("an over-long before keeps its tail, cut at a word boundary", () => {
     const container = mountContainer(
       "<p>alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo TARGET</p>",

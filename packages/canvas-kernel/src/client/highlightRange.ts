@@ -43,6 +43,19 @@ export function wrapRangeWithMark(range: Range, annotationId: string): HTMLEleme
   return marks;
 }
 
+/**
+ * Whether the annotation index carries this text. Line-number gutters and text
+ * that already belongs to another annotation are outside it. Everything that
+ * records a snippet or its context is matched back against that index later, so
+ * all of them have to skip exactly the same runs.
+ */
+export function isIndexedText(node: Text): boolean {
+  const parent = node.parentElement;
+  if (parent?.classList.contains("select-none")) return false;
+  if (parent?.closest("[data-annotation-id]")) return false;
+  return true;
+}
+
 function getTextNodesInRange(range: Range): Text[] {
   const nodes: Text[] = [];
   const ancestor = range.commonAncestorContainer;
@@ -55,17 +68,36 @@ function getTextNodesInRange(range: Range): Text[] {
   const walker = document.createTreeWalker(ancestor, NodeFilter.SHOW_TEXT);
   let node: Text | null;
   while ((node = walker.nextNode() as Text | null)) {
-    // Skip line numbers and existing marks
-    const parent = node.parentElement;
-    if (parent?.classList.contains("select-none")) continue;
-    if (parent?.closest("[data-annotation-id]")) continue;
-
+    if (!isIndexedText(node)) continue;
     if (range.intersectsNode(node)) {
       nodes.push(node);
     }
   }
 
   return nodes;
+}
+
+/** The part of a text node that falls inside the range. */
+function clampToRange(node: Text, range: Range): string {
+  const nodeRange = document.createRange();
+  nodeRange.selectNodeContents(node);
+  if (node === range.startContainer) nodeRange.setStart(node, range.startOffset);
+  if (node === range.endContainer) nodeRange.setEnd(node, range.endOffset);
+  return nodeRange.toString();
+}
+
+/**
+ * A selection's text as the annotation index will read it back. The raw
+ * selection is not that: it carries the gutter and any text already inside
+ * another annotation, none of which the index holds — so a snippet taken from
+ * it names something that cannot be found again.
+ */
+export function rangeIndexText(range: Range): string {
+  let text = "";
+  for (const node of getTextNodesInRange(range)) {
+    text += clampToRange(node, range);
+  }
+  return text;
 }
 
 /**
@@ -183,9 +215,7 @@ function buildTextIndex(container: HTMLElement): {
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
   let tn: Text | null;
   while ((tn = walker.nextNode() as Text | null)) {
-    const parent = tn.parentElement;
-    if (parent?.classList.contains("select-none")) continue;
-    if (parent?.closest("[data-annotation-id]")) continue;
+    if (!isIndexedText(tn)) continue;
     textNodes.push({ node: tn, start: fullText.length });
     fullText += tn.textContent || "";
   }

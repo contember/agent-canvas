@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { markIds, mountContainer, selectText } from "./testing/dom";
 import {
+  rangeIndexText,
   renameMarkId,
   restoreMarks,
   setMarkActive,
@@ -79,6 +80,59 @@ describe("wrapRangeWithMark", () => {
     expect(markedText(container, "a2")).toBe("keep  free");
     expect(markedText(container, "a1")).toBe("taken");
     expect(container.textContent).toBe("keep taken free");
+  });
+});
+
+// What a snippet is taken from at creation time. It is matched back against
+// buildTextIndex on restore, so the two have to agree about what the text is.
+describe("rangeIndexText", () => {
+  test("is the selection itself when nothing in it is skipped", () => {
+    const container = mountContainer("<p>the quick brown fox</p>");
+    const range = selectText(container, "quick brown");
+
+    expect(rangeIndexText(range)).toBe(range.toString());
+  });
+
+  test("keeps text that crosses inline elements, including the spaces between", () => {
+    const container = mountContainer("<p>alpha <b>bravo</b> charlie</p>");
+    const range = selectAcross(container, "pha", "char");
+
+    expect(rangeIndexText(range)).toBe(range.toString());
+  });
+
+  test("drops text that already belongs to another annotation", () => {
+    const container = mountContainer(`<p>keep <mark data-annotation-id="a1">taken</mark> free</p>`);
+    const range = selectAcross(container, "keep", "free");
+
+    expect(range.toString()).toBe("keep taken free");
+    expect(rangeIndexText(range)).toBe("keep  free");
+  });
+
+  test("drops the line-number gutter", () => {
+    const container = mountContainer(
+      `<pre><code><span class="select-none">1 </span><span>const a = 1;</span>`
+      + `\n<span class="select-none">2 </span><span>const b = 2;</span></code></pre>`,
+    );
+    const range = selectAcross(container, "const a", "const b");
+
+    expect(range.toString()).toContain("2 ");
+    expect(rangeIndexText(range)).toBe("const a = 1;\nconst b");
+  });
+
+  // The whole point: an annotation drawn over an existing one has to survive a
+  // reload, and it only can if its snippet names text the index holds.
+  test("a snippet taken this way is found again; the raw selection is not", () => {
+    const markup = `<p>keep <mark data-annotation-id="a1">taken</mark> free</p>`;
+
+    const indexed = mountContainer(markup);
+    const snippet = rangeIndexText(selectAcross(indexed, "keep", "free")).trim();
+    restoreMarks(indexed, [{ id: "a2", snippet }]);
+    expect(markedText(indexed, "a2")).toBe(snippet);
+
+    const raw = mountContainer(markup);
+    const rawSnippet = selectAcross(raw, "keep", "free").toString().trim();
+    restoreMarks(raw, [{ id: "a2", snippet: rawSnippet }]);
+    expect(marksFor(raw, "a2")).toHaveLength(0);
   });
 });
 

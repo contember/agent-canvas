@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import type { AnnotationContext, Annotation } from "./AnnotationProvider";
 import { useAnnotations } from "./AnnotationProvider";
-import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, restoreMarks } from "./highlightRange";
+import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, restoreMarks, rangeIndexText } from "./highlightRange";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 import { generateAnnotationId } from "./utils";
 
@@ -114,7 +114,10 @@ export function useTextAnnotation(options: UseTextAnnotationOptions) {
     const range = sel.getRangeAt(0);
     if (!containerRef.current.contains(range.startContainer)) return;
     if ((range.startContainer.parentElement as HTMLElement)?.closest?.("[data-annotation-id]")) return;
-    const snippet = sel.toString().trim();
+    // Not sel.toString(): a selection reaching over an existing annotation
+    // carries text the index does not hold, and a snippet naming that text can
+    // never be restored.
+    const snippet = rangeIndexText(range).trim();
     if (snippet.length < 2) return;
 
     // Extract context before wrapping disturbs the DOM
