@@ -23,7 +23,7 @@ export async function handleDaemon(args: string[]) {
       break;
     }
     case "stop": {
-      stopDaemon();
+      await stopDaemon();
       break;
     }
     case "start": {
@@ -35,11 +35,8 @@ export async function handleDaemon(args: string[]) {
       break;
     }
     case "restart": {
-      stopDaemon();
-      for (let i = 0; i < 10; i++) {
-        if (!(await isDaemonRunning())) break;
-        await new Promise((r) => setTimeout(r, 100));
-      }
+      // stopDaemon() already waits for the daemon to go down.
+      await stopDaemon();
       await startDaemon();
       break;
     }

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { waitForFeedback } from "./helpers";
 
 class FakeSocket {
+  onopen: ((event: Event) => void) | null = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
   onclose: ((event: CloseEvent) => void) | null = null;

@@ -1,5 +1,6 @@
 import { spawn } from "child_process";
 import { randomUUID } from "crypto";
+import { waitForEvent, type WaiterSocket, type WaitVerdict } from "@fabrika/canvas-kernel/server";
 import { BASE_URL, WS_URL, TIMEOUT_MS } from "./config.ts";
 
 export function getSessionId(session?: string): string {
@@ -33,15 +34,8 @@ export function openBrowser(url: string) {
   console.error(`Open this URL in your browser: ${url}`);
 }
 
-interface FeedbackSocket {
-  close(): void;
-  onmessage: ((event: MessageEvent) => void) | null;
-  onerror: ((event: Event) => void) | null;
-  onclose: ((event: CloseEvent) => void) | null;
-}
-
 interface FeedbackWaitOptions {
-  createSocket?: (url: string) => FeedbackSocket;
+  createSocket?: (url: string) => WaiterSocket;
   timeoutMs?: number;
   reconnectAttempts?: number;
   reconnectDelayMs?: number;
@@ -53,6 +47,10 @@ interface CanvasRenderError {
   message: string;
   stack?: string;
   componentStack?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isCanvasRenderError(value: unknown): value is CanvasRenderError {
@@ -71,76 +69,34 @@ function formatCanvasRenderError(error: CanvasRenderError): string {
   return details.join("\n");
 }
 
-class FeedbackWaitError extends Error {
-  constructor(message: string, readonly retryable: boolean) {
-    super(message);
+/** A canvas that failed to render is the answer — retrying the socket cannot fix it. */
+function readFeedbackFrame(frame: unknown): WaitVerdict<string> | undefined {
+  if (!isRecord(frame)) return undefined;
+  if (frame.type === "submit" && typeof frame.feedback === "string") {
+    return { type: "settle", value: frame.feedback };
   }
+  if (frame.type === "render-error" && isCanvasRenderError(frame.error)) {
+    return { type: "fail", error: new Error(formatCanvasRenderError(frame.error)) };
+  }
+  return undefined;
 }
 
-function waitForFeedbackConnection(
-  sessionId: string,
-  timeoutMs: number,
-  createSocket: (url: string) => FeedbackSocket,
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const ws = createSocket(`${WS_URL}/ws/wait/${sessionId}`);
-    let settled = false;
-
-    const finish = (result: string | FeedbackWaitError) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      ws.close();
-      if (result instanceof FeedbackWaitError) reject(result);
-      else resolve(result);
-    };
-
-    const timeout = setTimeout(() => {
-      finish(new FeedbackWaitError("Timeout waiting for feedback.", false));
-    }, timeoutMs);
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(typeof event.data === "string" ? event.data : "");
-        if (data.type === "submit") {
-          finish(data.feedback);
-        }
-        if (data.type === "render-error" && isCanvasRenderError(data.error)) {
-          finish(new FeedbackWaitError(formatCanvasRenderError(data.error), false));
-        }
-      } catch {}
-    };
-
-    ws.onerror = () => {
-      finish(new FeedbackWaitError("WebSocket connection failed.", true));
-    };
-
-    ws.onclose = () => {
-      finish(new FeedbackWaitError("WebSocket closed before feedback was submitted.", true));
-    };
+export function waitForFeedback(sessionId: string, options: FeedbackWaitOptions = {}): Promise<string> {
+  return waitForEvent<string>({
+    url: `${WS_URL}/ws/wait/${sessionId}`,
+    onFrame: readFeedbackFrame,
+    ...(options.createSocket ? { createSocket: options.createSocket } : {}),
+    timeoutMs: options.timeoutMs ?? TIMEOUT_MS,
+    reconnect: {
+      attempts: options.reconnectAttempts ?? 3,
+      delayMs: options.reconnectDelayMs ?? 1_000,
+    },
+    messages: {
+      timeout: "Timeout waiting for feedback.",
+      closed: "WebSocket closed before feedback was submitted.",
+      connectionFailed: "WebSocket connection failed.",
+    },
   });
-}
-
-export async function waitForFeedback(sessionId: string, options: FeedbackWaitOptions = {}): Promise<string> {
-  const createSocket = options.createSocket ?? ((url: string) => new WebSocket(url));
-  const timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
-  const reconnectAttempts = options.reconnectAttempts ?? 3;
-  const reconnectDelayMs = options.reconnectDelayMs ?? 1_000;
-  const deadline = Date.now() + timeoutMs;
-
-  for (let attempt = 0; ; attempt++) {
-    const remainingMs = deadline - Date.now();
-    if (remainingMs <= 0) throw new FeedbackWaitError("Timeout waiting for feedback.", false);
-
-    try {
-      return await waitForFeedbackConnection(sessionId, remainingMs, createSocket);
-    } catch (error) {
-      if (!(error instanceof FeedbackWaitError) || !error.retryable || attempt >= reconnectAttempts) {
-        throw error;
-      }
-      await Bun.sleep(Math.min(reconnectDelayMs, Math.max(0, deadline - Date.now())));
-    }
-  }
 }
 
 export async function readLine(): Promise<string> {

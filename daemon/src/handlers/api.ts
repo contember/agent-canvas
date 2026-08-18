@@ -164,7 +164,8 @@ export function createApiHandlers(ctx: ApiContext): Route[] {
 
   function handleHealth(): Response {
     const sessions = sessionManager.list().map((s) => s.id);
-    return jsonResponse({ ok: true, sessions, version: ctx.version });
+    // The pid is what the CLI signals to stop us — a pid file it cannot corroborate is not.
+    return jsonResponse({ ok: true, sessions, version: ctx.version, pid: process.pid });
   }
 
   function handleMeta(_req: Request, _url: URL, match: URLPatternResult): Response {

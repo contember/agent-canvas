@@ -67,7 +67,7 @@ export async function handlePush(args: string[]) {
   const shouldRestart = !result.ok && result.error === "Canvas compilation failed" && !isUserError;
   if (shouldRestart) {
     console.error("Compilation failed, restarting daemon and retrying...");
-    stopDaemon();
+    await stopDaemon();
     await startDaemon();
     const retryResponse = await fetch(`${BASE_URL}/api/session/${sessionId}/plan`, {
       method: "POST",
