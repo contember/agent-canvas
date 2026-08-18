@@ -35,6 +35,12 @@ export type {
 
 // --- Surface ---------------------------------------------------------------
 export { AnnotationSidebar } from "./AnnotationSidebar";
+// The sidebar's reusable halves. Grouping stayed with the sidebar — what an
+// annotation belongs to is the host's taxonomy, so the host slices the list.
+export { AnnotationList } from "./AnnotationList";
+export type { AnnotationListProps } from "./AnnotationList";
+export { AnnotationDraftFooter } from "./AnnotationDraftFooter";
+export type { AnnotationDraftFooterProps } from "./AnnotationDraftFooter";
 export { AnnotationEditor, imageToUrl } from "./AnnotationEditor";
 export { PlanRenderer } from "./PlanRenderer";
 export { Popover, AnnotationPopover, AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
