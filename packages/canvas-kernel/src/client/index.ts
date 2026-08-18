@@ -105,6 +105,11 @@ export {
   updateAllMarkStates,
   wrapRangeWithMark,
 } from "./highlightRange";
+// One annotation as markdown — the half of feedback that belongs to no
+// particular document format. `generateMarkdown` below is the canvas format
+// built on it; a host with its own headings calls this directly.
+export { renderAnnotation } from "./annotationMarkdown";
+export type { RenderableAnnotation } from "./annotationMarkdown";
 export {
   canPruneResponses,
   generateMarkdown,

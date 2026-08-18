@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type { Annotation, PlanResponse } from "./runtime";
+import type { Annotation, FeedbackEntry, PlanResponse } from "./runtime";
 import { canPruneResponses, generateMarkdown, pruneStaleResponses } from "./generateMarkdown";
+import { RESPONSE_ANNOTATION_PATH } from "./utils";
 
 function response(id: string, label: string): PlanResponse {
   return { id, type: "text", label, value: `${id}-answer`, required: true };
@@ -29,6 +30,96 @@ describe("generateMarkdown", () => {
     );
     expect(md).toContain("> [Item] Ship the beta");
     expect(md).toContain("> selected wording");
+  });
+
+  // The whole document, byte for byte. This is what a coding agent reads out of
+  // feedback.md, so the section order and the blank lines between them are the
+  // contract, not incidental formatting.
+  test("assembles the canvas document around the rendered annotations", () => {
+    const responses = new Map<string, PlanResponse>([
+      ["stage", { id: "stage", type: "select", label: "Stage", value: "beta", note: " careful " }],
+      ["who", { id: "who", type: "checkbox", label: "Audience", value: ["teams", "solo"] }],
+      ["vision", { id: "vision", type: "text", label: "Vision", value: "  a bright one  " }],
+      ["blank", { id: "blank", type: "text", label: "Blank", value: "   " }],
+    ]);
+    const entries = new Map<string, FeedbackEntry>([
+      ["e1", { id: "e1", markdown: "  written up separately  " }],
+      ["e2", { id: "e2", markdown: "   " }],
+    ]);
+    const annotations: Annotation[] = [
+      { ...annotation("the agent said", "wrong"), filePath: RESPONSE_ANNOTATION_PATH },
+      {
+        ...annotation("[Item] Ship", "too early"),
+        canvasFile: "plan.jsx",
+        context: { before: "", after: "", hierarchy: ["Rollout"] },
+      },
+      {
+        ...annotation("foo", "rename"),
+        filePath: "src/a.ts",
+        images: ["/u/1.png"],
+        context: { before: "const ", after: " = 1", hierarchy: [], lineStart: 12 },
+      },
+    ];
+
+    expect(generateMarkdown(annotations, "  and generally: slow down  ", responses, entries)).toBe(
+      [
+        "## Responses",
+        "",
+        "**Stage**",
+        "Answer: beta",
+        "",
+        "Note: careful",
+        "",
+        "**Audience**",
+        "- [x] teams",
+        "- [x] solo",
+        "",
+        "**Vision**",
+        "",
+        "a bright one",
+        "",
+        "written up separately",
+        "",
+        "## Annotations on agent response",
+        "",
+        "> the agent said",
+        "",
+        "wrong",
+        "",
+        "## Canvas annotations",
+        "",
+        "### plan",
+        "",
+        "### Rollout",
+        "",
+        "> [Item] Ship",
+        "",
+        "too early",
+        "",
+        "## File annotations",
+        "",
+        "### src/a.ts",
+        "",
+        "> L12: ...const  **foo**  = 1...",
+        "",
+        "rename",
+        "",
+        "![screenshot](/u/1.png)",
+        "",
+        "## General notes",
+        "",
+        "and generally: slow down",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  test("drops a remote annotation the author did not include", () => {
+    const mine: Annotation = annotation("mine", "a");
+    const theirs: Annotation = { ...annotation("theirs", "b"), id: "r1", source: "remote" };
+    expect(generateMarkdown([mine, theirs], "")).toContain("> mine");
+    expect(generateMarkdown([mine, theirs], "")).not.toContain("> theirs");
+    expect(generateMarkdown([mine, theirs], "", undefined, undefined, new Set(["r1"]))).toContain("> theirs");
   });
 });
 

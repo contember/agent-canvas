@@ -1,6 +1,7 @@
+// The canvas document format: revisions, responses, required fields, sections.
+// Rendering one annotation is host-agnostic and lives in ./annotationMarkdown.
 import type { Annotation, PlanResponse, FeedbackEntry } from "./AnnotationProvider";
-import { formatSnippetInContext } from "./annotationContext";
-import { describeSnippet } from "./annotationDom";
+import { renderAnnotation } from "./annotationMarkdown";
 import { RESPONSE_ANNOTATION_PATH } from "./utils";
 
 /**
@@ -206,72 +207,6 @@ function renderResponse(r: PlanResponse): string {
   if (r.note?.trim()) {
     lines.push("");
     lines.push(`Note: ${r.note.trim()}`);
-  }
-
-  lines.push("");
-  return lines.join("\n");
-}
-
-function renderAnnotation(ann: Annotation): string {
-  const lines: string[] = [];
-  const snippet = ann.snippet.trim();
-  const ctx = ann.context;
-  const hasLineInfo = ctx?.lineStart != null;
-  // A snippet that does not read as text — a drawn region — says what it points
-  // at in words instead, since quoting its encoding tells an agent nothing.
-  const described = describeSnippet(snippet);
-
-  if (described !== snippet) {
-    lines.push(`> ${described}`);
-  } else if (ann.filePath && hasLineInfo) {
-    // File annotation with line numbers
-    const lineStart = ctx!.lineStart!;
-    const lineEnd = ctx!.lineEnd ?? lineStart;
-    const snippetLines = snippet.split("\n");
-    const isShort = snippet.length < 30 && lineStart === lineEnd;
-
-    if (isShort && (ctx!.before || ctx!.after)) {
-      // Short snippet on single line — show full line context
-      const expanded = formatSnippetInContext(ann);
-      lines.push(`> L${lineStart}: ${expanded}`);
-    } else if (snippetLines.length <= 6) {
-      for (let i = 0; i < snippetLines.length; i++) {
-        lines.push(`> ${lineStart + i} | ${snippetLines[i]}`);
-      }
-    } else {
-      for (let i = 0; i < 3; i++) {
-        lines.push(`> ${lineStart + i} | ${snippetLines[i]}`);
-      }
-      lines.push(`> ... (${snippetLines.length} lines)`);
-      for (let i = snippetLines.length - 3; i < snippetLines.length; i++) {
-        lines.push(`> ${lineStart + i} | ${snippetLines[i]}`);
-      }
-    }
-  } else {
-    // Plan annotations or file annotations without line info
-    const context = formatSnippetInContext(ann);
-    if (snippet.split("\n").length <= 3) {
-      lines.push(`> ${context.split("\n").join("\n> ")}`);
-    } else {
-      const snippetLines = snippet.split("\n");
-      lines.push(`> ${snippetLines[0]}`);
-      lines.push(`> ... (${snippetLines.length} lines)`);
-      lines.push(`> ${snippetLines[snippetLines.length - 1]}`);
-    }
-  }
-
-  // Comment
-  if (ann.note.trim()) {
-    lines.push("");
-    lines.push(ann.note.trim());
-  }
-
-  // Attached images
-  if (ann.images?.length) {
-    lines.push("");
-    for (const img of ann.images) {
-      lines.push(`![screenshot](${img})`);
-    }
   }
 
   lines.push("");
