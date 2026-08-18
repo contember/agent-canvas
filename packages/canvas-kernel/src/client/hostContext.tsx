@@ -35,7 +35,11 @@ export const localCanvasHost: CanvasHost = {
   },
   isShared: false,
   fsAvailable: true,
-  uploadUrl: () => `/api/session/${localSessionId()}/upload`,
+  // No endpoint by default. The only hosts that reach this fallback are the
+  // ones that configured nothing, which are exactly the ones least likely to
+  // serve an upload route — claiming one on their behalf is how every host got
+  // a paperclip that posts into the void. A host with uploads names its own.
+  uploadUrl: null,
   loadCanvasModule: (filename, revision) => {
     const jsName = filename.replace(/\.jsx$/, ".js");
     const query = revision ? `?rev=${revision}&t=${Date.now()}` : `?t=${Date.now()}`;
