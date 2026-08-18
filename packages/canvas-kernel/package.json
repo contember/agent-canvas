@@ -28,6 +28,10 @@
       "types": "./src/client/index.ts",
       "default": "./src/client/index.ts"
     },
+    "./annotate": {
+      "types": "./annotate.ts",
+      "default": "./annotate.ts"
+    },
     "./components": {
       "types": "./src/client/components/index.ts",
       "default": "./src/client/components/index.ts"

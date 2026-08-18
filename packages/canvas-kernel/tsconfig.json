@@ -18,7 +18,7 @@
       "#canvas/components": ["./src/client/components/index.ts"]
     }
   },
-  "include": ["index.ts", "daemon.ts", "src/**/*"],
+  "include": ["index.ts", "daemon.ts", "annotate.ts", "src/**/*"],
   "exclude": [
     "src/client/preact-all.ts"
   ]
