@@ -1,12 +1,16 @@
+/**
+ * The canvas vocabulary on top of the generic channel: topic = session id,
+ * `submit` persists feedback, and a waiter is the CLI blocking on one answer,
+ * so a delivery closes it.
+ */
+
+import { browserFrame, createNotificationChannel, type ChannelSocket, type TopicChannel } from "./channel";
 import type { SessionManager, RemoteFeedbackEntry } from "./session";
 
 export type WSData = { type: "browser" | "wait"; sessionId: string };
 
-export interface CanvasSocket {
+export interface CanvasSocket extends ChannelSocket {
   data: WSData;
-  send(message: string): unknown;
-  close(): void;
-  ping(): unknown;
 }
 
 interface CanvasRenderError {
@@ -17,6 +21,20 @@ interface CanvasRenderError {
   componentStack?: string;
 }
 
+interface SubmitFrame {
+  type: "submit";
+  feedback: string;
+}
+
+interface RenderErrorFrame {
+  type: "render-error";
+  error: CanvasRenderError;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function isCanvasRenderError(value: unknown): value is CanvasRenderError {
   return typeof value === "object" && value !== null
     && "revision" in value && Number.isInteger(value.revision)
@@ -24,6 +42,14 @@ function isCanvasRenderError(value: unknown): value is CanvasRenderError {
     && "message" in value && typeof value.message === "string"
     && (!("stack" in value) || value.stack === undefined || typeof value.stack === "string")
     && (!("componentStack" in value) || value.componentStack === undefined || typeof value.componentStack === "string");
+}
+
+function isSubmitFrame(value: unknown): value is SubmitFrame {
+  return isRecord(value) && value.type === "submit" && typeof value.feedback === "string";
+}
+
+function isRenderErrorFrame(value: unknown): value is RenderErrorFrame {
+  return isRecord(value) && value.type === "render-error" && isCanvasRenderError(value.error);
 }
 
 export interface WebSocketManagerOptions {
@@ -44,187 +70,90 @@ export function createWebSocketManager(
   options: WebSocketManagerOptions = {},
 ) {
   const consumeOnDelivery = (options.feedbackConsumption ?? "on-delivery") === "on-delivery";
-  const browserSockets = new Map<string, Set<CanvasSocket>>();
-  const waitSockets = new Map<string, Set<CanvasSocket>>();
   const pendingRenderErrors = new Map<string, CanvasRenderError>();
+
+  /** Hands a held error to the waiters, if any showed up; the caller announces the departure. */
+  function deliverPendingRenderError(sessionId: string): boolean {
+    const error = pendingRenderErrors.get(sessionId);
+    if (!error) return false;
+    if (!channel.relayToWaiters(sessionId, { type: "render-error", error })) return false;
+    pendingRenderErrors.delete(sessionId);
+    return true;
+  }
+
+  function submit(frame: SubmitFrame, topic: TopicChannel) {
+    const sessionId = topic.topic;
+    const session = sessionManager.get(sessionId);
+    if (!session) return;
+
+    sessionManager.saveFeedback(sessionId, session.currentRevision, frame.feedback);
+    broadcastRevisionUpdate(sessionId);
+    if (!topic.hasWaiter()) return;
+
+    if (consumeOnDelivery) {
+      sessionManager.consumeFeedback(sessionId, session.currentRevision);
+      broadcastRevisionUpdate(sessionId);
+    }
+    topic.relayToWaiters({ type: "submit", feedback: frame.feedback });
+  }
+
+  function renderError(frame: RenderErrorFrame, topic: TopicChannel) {
+    const sessionId = topic.topic;
+    const session = sessionManager.get(sessionId);
+    if (!session) return;
+    if (frame.error.revision !== session.currentRevision) return;
+    if (!session.canvasFiles.includes(frame.error.filename)) return;
+
+    pendingRenderErrors.set(sessionId, frame.error);
+    if (deliverPendingRenderError(sessionId)) topic.broadcastPresence();
+  }
+
+  const channel = createNotificationChannel<CanvasSocket>({
+    roleOf: (socket) => socket.data.type,
+    topicOf: (socket) => socket.data.sessionId,
+    waiterPolicy: "close-on-delivery",
+    presenceFrame: (watching) => ({ type: "watcher-status", watching }),
+    // A render error raised before the CLI watcher connected is held for it.
+    onWaiterOpen: (topic) => { deliverPendingRenderError(topic.topic); },
+    frames: [
+      browserFrame(isSubmitFrame, submit),
+      browserFrame(isRenderErrorFrame, renderError),
+    ],
+  });
 
   function broadcastPlanUpdate(sessionId: string) {
     pendingRenderErrors.delete(sessionId);
-    const sockets = browserSockets.get(sessionId);
-    if (!sockets) return;
     const session = sessionManager.get(sessionId);
     if (!session) return;
-    const payload = JSON.stringify({
+    channel.broadcast(sessionId, {
       type: "plan-updated",
       currentRevision: session.currentRevision,
       revisions: session.revisions,
     });
-    for (const ws of sockets) {
-      ws.send(payload);
-    }
   }
 
   function broadcastRevisionUpdate(sessionId: string) {
-    const sockets = browserSockets.get(sessionId);
-    if (!sockets) return;
     const session = sessionManager.get(sessionId);
     if (!session) return;
-    const payload = JSON.stringify({
+    channel.broadcast(sessionId, {
       type: "revision-updated",
       revisions: session.revisions,
     });
-    for (const ws of sockets) {
-      ws.send(payload);
-    }
   }
 
   function broadcastRemoteFeedback(sessionId: string, revision: number, entries: RemoteFeedbackEntry[]) {
-    const sockets = browserSockets.get(sessionId);
-    if (!sockets || sockets.size === 0) return;
-    const payload = JSON.stringify({
-      type: "remote-feedback",
-      revision,
-      entries,
-    });
-    for (const ws of sockets) {
-      ws.send(payload);
-    }
+    channel.broadcast(sessionId, { type: "remote-feedback", revision, entries });
   }
 
   function broadcastWatcherStatus(sessionId: string) {
-    const sockets = browserSockets.get(sessionId);
-    if (!sockets) return;
-    const watching = (waitSockets.get(sessionId)?.size ?? 0) > 0;
-    const payload = JSON.stringify({ type: "watcher-status", watching });
-    for (const ws of sockets) {
-      ws.send(payload);
-    }
+    channel.broadcastPresence(sessionId);
   }
 
-  function deliverPendingRenderError(sessionId: string): boolean {
-    const error = pendingRenderErrors.get(sessionId);
-    const waiters = waitSockets.get(sessionId);
-    if (!error || !waiters || waiters.size === 0) return false;
-
-    pendingRenderErrors.delete(sessionId);
-    waitSockets.delete(sessionId);
-    const payload = JSON.stringify({ type: "render-error", error });
-    for (const waiter of waiters) {
-      waiter.send(payload);
-      waiter.close();
-    }
-    broadcastWatcherStatus(sessionId);
-    return true;
-  }
-
-  // Ping wait sockets periodically to detect dead connections.
-  // We can't rely on ws.close() triggering the close handler for dead sockets,
-  // so we manually remove dead sockets and broadcast status.
-  const PING_INTERVAL = 5_000;
-  const pongReceived = new WeakSet<CanvasSocket>();
-
-  function removeWaitSocket(ws: CanvasSocket, sessionId: string) {
-    const sockets = waitSockets.get(sessionId);
-    if (sockets) {
-      sockets.delete(ws);
-      if (sockets.size === 0) waitSockets.delete(sessionId);
-    }
-    try { ws.close(); } catch {}
-    broadcastWatcherStatus(sessionId);
-  }
-
-  setInterval(() => {
-    for (const [sessionId, sockets] of waitSockets) {
-      for (const ws of sockets) {
-        if (!pongReceived.has(ws)) {
-          // No pong since last ping — connection is dead
-          removeWaitSocket(ws, sessionId);
-          continue;
-        }
-        pongReceived.delete(ws);
-        try { ws.ping(); } catch {
-          removeWaitSocket(ws, sessionId);
-        }
-      }
-    }
-  }, PING_INTERVAL);
-
-  const handlers = {
-    open(ws: CanvasSocket) {
-      const { type, sessionId } = ws.data;
-      const map = type === "browser" ? browserSockets : waitSockets;
-      if (!map.has(sessionId)) map.set(sessionId, new Set());
-      map.get(sessionId)!.add(ws);
-      if (type === "browser") {
-        // Send current watcher status to newly connected browser
-        const watching = (waitSockets.get(sessionId)?.size ?? 0) > 0;
-        ws.send(JSON.stringify({ type: "watcher-status", watching }));
-      } else {
-        // CLI waiter connected — notify browsers
-        pongReceived.add(ws); // Give it a free pass on first interval
-        if (!deliverPendingRenderError(sessionId)) {
-          broadcastWatcherStatus(sessionId);
-        }
-      }
-    },
-    message(ws: CanvasSocket, message: string | Buffer) {
-      const { type, sessionId } = ws.data;
-      if (type === "browser") {
-        try {
-          const data = JSON.parse(typeof message === "string" ? message : new TextDecoder().decode(message));
-          if (data.type === "submit") {
-            const feedback = data.feedback as string;
-
-            const session = sessionManager.get(sessionId);
-            if (session) {
-              sessionManager.saveFeedback(sessionId, session.currentRevision, feedback);
-              broadcastRevisionUpdate(sessionId);
-
-              const waiters = waitSockets.get(sessionId);
-              if (waiters && waiters.size > 0) {
-                if (consumeOnDelivery) {
-                  sessionManager.consumeFeedback(sessionId, session.currentRevision);
-                  broadcastRevisionUpdate(sessionId);
-                }
-                const payload = JSON.stringify({ type: "submit", feedback });
-                for (const waiter of waiters) {
-                  waiter.send(payload);
-                  waiter.close();
-                }
-                waitSockets.delete(sessionId);
-              }
-            }
-          }
-          if (data.type === "render-error" && isCanvasRenderError(data.error)) {
-            const session = sessionManager.get(sessionId);
-            if (
-              session
-              && data.error.revision === session.currentRevision
-              && session.canvasFiles.includes(data.error.filename)
-            ) {
-              pendingRenderErrors.set(sessionId, data.error);
-              deliverPendingRenderError(sessionId);
-            }
-          }
-        } catch {}
-      }
-    },
-    pong(ws: CanvasSocket) {
-      if (ws.data.type === "wait") {
-        pongReceived.add(ws);
-      }
-    },
-    close(ws: CanvasSocket) {
-      const { type, sessionId } = ws.data;
-      const map = type === "browser" ? browserSockets : waitSockets;
-      map.get(sessionId)?.delete(ws);
-      if (map.get(sessionId)?.size === 0) map.delete(sessionId);
-      if (type === "wait") {
-        // CLI waiter disconnected — notify browsers
-        broadcastWatcherStatus(sessionId);
-      }
-    },
+  return {
+    handlers: channel.handlers,
+    broadcastPlanUpdate,
+    broadcastRevisionUpdate,
+    broadcastWatcherStatus,
+    broadcastRemoteFeedback,
   };
-
-  return { handlers, broadcastPlanUpdate, broadcastRevisionUpdate, broadcastWatcherStatus, broadcastRemoteFeedback };
 }

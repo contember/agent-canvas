@@ -1,7 +1,8 @@
 // @fabrika/canvas-kernel — server entry.
 //
 // The host-agnostic canvas engine: compile pipeline, session/revision store,
-// JSX watcher, WebSocket feedback protocol, router, and the on-disk layout.
+// JSX watcher, WebSocket notification channel, daemon lifecycle, CLI waiter,
+// router, and the on-disk layout.
 // Imports nothing from preact/DOM, so a Bun.serve daemon can pull it in without
 // dragging the browser bundle along.
 //
@@ -32,9 +33,40 @@ export type {
   ShareEntry,
 } from "./src/engine/session";
 
-// --- WebSocket feedback protocol -------------------------------------------
+// --- WebSocket notification channel (host-agnostic) ------------------------
+export { createNotificationChannel, browserFrame } from "./src/engine/channel";
+export type {
+  ChannelRole,
+  ChannelSocket,
+  TopicChannel,
+  RelayOptions,
+  BrowserFrameHandler,
+  NotificationChannel,
+  NotificationChannelOptions,
+} from "./src/engine/channel";
+
+// --- WebSocket feedback protocol (canvas vocabulary) -----------------------
 export { createWebSocketManager } from "./src/engine/websocket";
 export type { WSData, CanvasSocket, WebSocketManagerOptions } from "./src/engine/websocket";
+
+// --- CLI waiter ------------------------------------------------------------
+export { waitForEvent, WaitError } from "./src/engine/waiter";
+export type { WaiterSocket, WaitVerdict, WaitOptions, WaitMessages, WaitFailure } from "./src/engine/waiter";
+
+// --- Daemon process lifecycle ----------------------------------------------
+export { createDaemonLifecycle, DaemonStartError } from "./src/engine/lifecycle";
+export type {
+  DaemonLifecycle,
+  DaemonLifecycleConfig,
+  DaemonHealth,
+  DaemonHealthUp,
+  DaemonHealthDown,
+  DaemonPid,
+  DaemonStopResult,
+  DaemonStopReason,
+  DaemonEvent,
+  DaemonTimeouts,
+} from "./src/engine/lifecycle";
 
 // --- JSX watcher -----------------------------------------------------------
 export { watchSession, unwatchSession, unwatchAll } from "./src/engine/watcher";
