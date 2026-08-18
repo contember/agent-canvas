@@ -2,7 +2,7 @@
   "name": "@fabrika/canvas-kernel",
   "version": "0.1.0",
   "type": "module",
-  "description": "Host-agnostic canvas engine: JSX→Bun.build compiler, session/revision store, JSX watcher, WebSocket feedback protocol, and the component library + annotation runtime.",
+  "description": "Host-agnostic canvas SDK: a daemon runtime (WebSocket channel, CLI waiter, process lifecycle), a locator-agnostic annotation surface, and the canvas engine (JSX\u2192Bun.build compiler, session/revision store, watcher).",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -19,6 +19,10 @@
     "./server": {
       "types": "./index.ts",
       "default": "./index.ts"
+    },
+    "./daemon": {
+      "types": "./daemon.ts",
+      "default": "./daemon.ts"
     },
     "./client": {
       "types": "./src/client/index.ts",

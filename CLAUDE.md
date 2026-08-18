@@ -8,11 +8,21 @@ Agent Canvas — an interactive browser-based visual canvas for Claude Code. Use
 
 ## Architecture
 
-Three components communicate via HTTP and WebSocket:
+Three processes communicate via HTTP and WebSocket, over a shared kernel:
 
 - **CLI** (`bin/agent-canvas.ts`) — pushes JSX canvases to the daemon, waits for user feedback, manages daemon lifecycle
 - **Daemon** (`daemon/src/server.ts`) — Bun HTTP+WS server on port 19400 (`CANVAS_PORT`). Compiles JSX, manages sessions, serves the browser UI
 - **Browser UI** (`daemon/client/`) — React 18 app loaded via CDN UMD with ESM import maps. Handles annotations, revision history, feedback collection, file browsing
+
+**Kernel** (`packages/canvas-kernel/`, `@fabrika/canvas-kernel`) — the reusable half, source-shipped and consumed by this repo plus `~/projects/contember/fabrika`. Three rings, each with its own entry:
+
+| Entry | Ring | What it holds |
+|---|---|---|
+| `/daemon` | daemon runtime | WebSocket channel, CLI waiter, process lifecycle, router, paths — knows nothing about canvases |
+| `/client` | annotation surface | annotation state, sidebar, popovers, and the locator strategies (text, block, region) |
+| `/server` | canvas engine | JSX compiler, session/revision store, watcher, the canvas WS vocabulary |
+
+A host takes only the rings it needs. The kernel is published, so nothing under `packages/canvas-kernel/` may import from outside it.
 
 **Data flow:** CLI pushes JSX → daemon compiles via `Bun.build()` → browser loads compiled JS module → user annotates/responds → feedback sent back to CLI via WebSocket
 
@@ -31,17 +41,18 @@ The build produces three bundles (runtime.js, components.js, client.js) plus Tai
 ## Typecheck
 
 ```bash
-bun run typecheck          # runs tsc --noEmit on both root (bin/) and daemon (client/ + src/)
+bun run typecheck          # runs tsc --noEmit across all three projects
 ```
 
-Two separate tsconfig files: `tsconfig.json` (root, covers `bin/`) and `daemon/tsconfig.json` (covers `daemon/src/` and `daemon/client/`). CI runs typecheck on every push and PR.
+Three tsconfig files: `tsconfig.json` (root, covers `bin/`), `packages/canvas-kernel/tsconfig.json`, and `daemon/tsconfig.json` (covers `daemon/src/` and `daemon/client/`). The kernel's is the strictest — it ships as sources, so it is checked under the flags its strictest consumer sets. CI runs typecheck on every push and PR.
 
 ## Key Technical Details
 
 - **Runtime is Bun only** — no Node.js compatibility needed
-- **JSX compilation** uses temp files because `Bun.build()` doesn't support `stdin`. See `daemon/src/compiler.ts`
+- **JSX compilation** uses temp files because `Bun.build()` doesn't support `stdin`. See `packages/canvas-kernel/src/engine/compiler.ts`
 - **Component imports are injected** by the compiler — authored JSX can use `Section`, `Task`, `CodeBlock`, etc. without imports
-- **Adding a new component:** create in `daemon/client/components/`, export from `index.ts`, add to `COMPONENT_IMPORTS` in `daemon/src/compiler.ts`, rebuild
+- **Adding a new component:** create in `packages/canvas-kernel/src/client/components/`, export from `index.ts`, add to `KERNEL_COMPONENTS` in `packages/canvas-kernel/src/engine/compiler.ts`, rebuild
+- **Adding a new annotation kind:** write an `AnnotationTarget` and register it in `ANNOTATION_TARGETS` (`packages/canvas-kernel/src/client/annotationDom.ts`). Creation and lookup must read the same selector — an annotation minted where the lookup does not scan can never be found again
 - **Bun's `spawn` throws synchronously** on missing executables — always check with `which` before spawning
 
 ## Testing with Demo
@@ -56,7 +67,7 @@ bun bin/agent-canvas.ts daemon start
 bun daemon/build.ts --watch
 
 # 3. Push the demo plan
-CANVAS_SESSION_ID=planner-demo bun bin/agent-canvas.ts push example/plan.jsx --label "Demo"
+CANVAS_SESSION_ID=planner-demo bun bin/agent-canvas.ts push example --label "Demo"
 
 # 4. Open in browser
 #    http://localhost:19400/s/planner-demo
