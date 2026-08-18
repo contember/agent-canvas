@@ -9,9 +9,15 @@ import { MarkdownPreview } from "./ResponsePreview";
 import { FileIcon } from "./FileIcon";
 import { autoResizeTextarea, fileAnnotationPath, RESPONSE_ANNOTATION_PATH } from "./utils";
 import { AnnotationEditor, ImageThumbnails } from "./AnnotationEditor";
-import { findAnnotationElement, scrollToAnnotation } from "./annotationDom";
+import { describeSnippet, findAnnotationElement, scrollToAnnotation } from "./annotationDom";
 import { useCanvasHost } from "./hostContext";
 import { ResponsePreview } from "./ResponsePreview";
+
+/** The one line the sidebar shows for what an annotation points at. */
+function snippetLabel(snippet: string): string {
+  const label = describeSnippet(snippet);
+  return label.length > 80 ? label.slice(0, 80) + "..." : label;
+}
 
 interface AnnotationSidebarProps {
   onSubmit: (feedback: string) => void;
@@ -244,7 +250,7 @@ function ReadOnlyAnnotationList({ annotations, generalNote, activeAnnotationId, 
       onClick={() => handleClick(ann)}
     >
       <div className="text-[11px] text-text-tertiary italic line-clamp-2 mb-1.5 leading-snug font-body border-l-2 border-border-medium pl-2">
-        {ann.snippet.length > 80 ? ann.snippet.slice(0, 80) + "..." : ann.snippet}
+        {snippetLabel(ann.snippet)}
       </div>
       {ann.note.trim() && (
         <div className="text-[13px] font-body text-text-primary leading-relaxed">
@@ -442,7 +448,7 @@ function AnnotationSidebarInner({ onSubmit, agentWatching, collapseButton }: Omi
 
       {/* Snippet quote */}
       <div className="text-[11px] text-text-tertiary italic line-clamp-2 mb-1.5 leading-snug font-body border-l-2 border-border-medium pl-2">
-        {ann.snippet.length > 80 ? ann.snippet.slice(0, 80) + "..." : ann.snippet}
+        {snippetLabel(ann.snippet)}
       </div>
 
       {/* Editable note + images — only for local annotations. Remote are read-only. */}

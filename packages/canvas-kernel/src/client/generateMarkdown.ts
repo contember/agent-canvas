@@ -1,5 +1,6 @@
 import type { Annotation, PlanResponse, FeedbackEntry } from "./AnnotationProvider";
 import { formatSnippetInContext } from "./annotationContext";
+import { describeSnippet } from "./annotationDom";
 import { RESPONSE_ANNOTATION_PATH } from "./utils";
 
 /**
@@ -216,8 +217,13 @@ function renderAnnotation(ann: Annotation): string {
   const snippet = ann.snippet.trim();
   const ctx = ann.context;
   const hasLineInfo = ctx?.lineStart != null;
+  // A snippet that does not read as text — a drawn region — says what it points
+  // at in words instead, since quoting its encoding tells an agent nothing.
+  const described = describeSnippet(snippet);
 
-  if (ann.filePath && hasLineInfo) {
+  if (described !== snippet) {
+    lines.push(`> ${described}`);
+  } else if (ann.filePath && hasLineInfo) {
     // File annotation with line numbers
     const lineStart = ctx!.lineStart!;
     const lineEnd = ctx!.lineEnd ?? lineStart;

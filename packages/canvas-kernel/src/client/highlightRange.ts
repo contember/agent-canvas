@@ -239,13 +239,20 @@ function offsetToNode(
 }
 
 /**
- * Remove marks for a given annotation ID, restoring the original text nodes.
+ * Remove the decoration for a given annotation ID, restoring the original text
+ * nodes an inline mark wrapped.
  */
 export function unwrapMarks(annotationId: string) {
   const marks = document.querySelectorAll(`[data-annotation-id="${annotationId}"]`);
   for (const mark of marks) {
     const parent = mark.parentNode;
     if (!parent) continue;
+    // Decoration that is not an inline mark — a region overlay — wraps no text
+    // and is simply taken out.
+    if (mark.tagName !== "MARK") {
+      parent.removeChild(mark);
+      continue;
+    }
     while (mark.firstChild) {
       parent.insertBefore(mark.firstChild, mark);
     }

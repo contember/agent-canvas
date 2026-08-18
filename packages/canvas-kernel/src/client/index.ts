@@ -44,6 +44,7 @@ export { FileIcon } from "./FileIcon";
 /** The kernel component set, as a namespace for hosts that inject it wholesale. */
 export * as components from "./components";
 export { useTextAnnotation } from "./useTextAnnotation";
+export { useRegionAnnotation } from "./useRegionAnnotation";
 
 // --- Host-provided context -------------------------------------------------
 export { CanvasHostContext, localCanvasHost, useCanvasHost } from "./hostContext";
@@ -55,7 +56,41 @@ export type { CanvasRenderError } from "./RenderErrorContext";
 
 // --- Annotation plumbing ---------------------------------------------------
 export { extractContext, formatSnippetInContext } from "./annotationContext";
-export { findAnnotationElement, scrollToAnnotation } from "./annotationDom";
+export {
+  ANNOTATION_TARGETS,
+  ANNOTATABLE_SELECTOR,
+  BLOCK_SELECTOR,
+  describeSnippet,
+  findAnnotationElement,
+  findSnippetElement,
+  getBlockSnippet,
+  restoreAnnotationTargets,
+  scrollToAnnotation,
+} from "./annotationDom";
+
+// --- Locator strategies ----------------------------------------------------
+// What a snippet points at is the one thing in an annotation that is domain
+// specific. A host that needs to annotate something the kernel has no target
+// for writes one of these; nothing else has to change.
+export { sealTarget } from "./annotationTarget";
+export type { AnnotationTarget, SealedAnnotationTarget, TargetAnnotation } from "./annotationTarget";
+export { blockTarget } from "./blockTarget";
+export type { BlockLocator } from "./blockTarget";
+export { textTarget } from "./textTarget";
+export type { TextLocator } from "./textTarget";
+export {
+  createRegionOverlay,
+  describeRegion,
+  findRegionHost,
+  isDrawableRegion,
+  regionBetween,
+  regionPointIn,
+  regionStyle,
+  regionTarget,
+  REGION_HOST_ATTR,
+  REGION_UNITS,
+} from "./regionTarget";
+export type { RegionBox, RegionLocator, RegionPoint, RegionShape } from "./regionTarget";
 export {
   annotationDraftKey,
   carryUnsubmittedDraft,

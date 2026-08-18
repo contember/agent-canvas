@@ -282,6 +282,12 @@ function removeMarksFromDom(id: string) {
 function unwrapMark(mark: HTMLElement) {
   const parent = mark.parentNode;
   if (!parent) return;
+  // A region overlay wraps no text; swapping it for its text content would
+  // leave a stray empty node inside the image.
+  if (mark.tagName !== "MARK") {
+    parent.removeChild(mark);
+    return;
+  }
   const text = document.createTextNode(mark.textContent || "");
   parent.replaceChild(text, mark);
   parent.normalize();

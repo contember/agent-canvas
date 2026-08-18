@@ -258,6 +258,20 @@ describe("restoreMarks", () => {
 });
 
 describe("unwrapMarks", () => {
+  // Decoration is not always an inline mark: a region overlay carries the same
+  // id and wraps no text, so unwrapping it means taking it out.
+  test("takes a region overlay out instead of unwrapping it", () => {
+    const container = mountContainer(`<div data-annotation-image="true"><img /></div>`);
+    const overlay = document.createElement("div");
+    overlay.setAttribute("data-annotation-id", "a1");
+    container.firstElementChild?.appendChild(overlay);
+
+    unwrapMarks("a1");
+
+    expect(markIds(container)).toEqual([]);
+    expect(container.textContent).toBe("");
+  });
+
   test("returns the text to exactly what it was", () => {
     const container = mountContainer("<p>alpha <b>bravo</b> charlie</p>");
     const source = container.textContent;

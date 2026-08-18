@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import type { AnnotationContext, Annotation } from "./AnnotationProvider";
 import { useAnnotations } from "./AnnotationProvider";
-import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, restoreMarks, rangeIndexText } from "./highlightRange";
+import { wrapRangeWithMark, updateAllMarkStates, renameMarkId, unwrapMarks, rangeIndexText } from "./highlightRange";
+import { restoreAnnotationTargets } from "./annotationDom";
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 import { generateAnnotationId } from "./utils";
 
@@ -43,13 +44,15 @@ export function useTextAnnotation(options: UseTextAnnotationOptions) {
   const setActiveAnnotationIdRef = useRef(setActiveAnnotationId);
   setActiveAnnotationIdRef.current = setActiveAnnotationId;
 
-  // Mark restoration after content renders or annotations change
+  // Decoration restoration after content renders or annotations change. Not
+  // only marks: every locator strategy puts its own decoration back here, so a
+  // host that mounts this hook gets region overlays restored too.
   const restoreAnnotationsLen = restoreAnnotations.length;
   useEffect(() => {
     if (!containerRef.current) return;
     const timer = setTimeout(() => {
       if (containerRef.current) {
-        restoreMarks(containerRef.current, restoreAnnotations);
+        restoreAnnotationTargets(containerRef.current, restoreAnnotations);
       }
     }, 50);
     return () => clearTimeout(timer);

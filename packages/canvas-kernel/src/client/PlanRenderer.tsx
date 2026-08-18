@@ -7,6 +7,7 @@ import { ANNOTATABLE_SELECTOR, BLOCK_SELECTOR, getBlockSnippet } from "./annotat
 import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
 import { generateAnnotationId } from "./utils";
 import { useTextAnnotation } from "./useTextAnnotation";
+import { useRegionAnnotation } from "./useRegionAnnotation";
 import { useCanvasHost } from "./hostContext";
 import { RenderErrorContext, type CanvasRenderError } from "./RenderErrorContext";
 
@@ -117,6 +118,17 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
     scrollContainer,
   });
 
+  const { popovers: regionPopovers, isDrawing, isPopoverOpen: regionPopoverOpen } = useRegionAnnotation({
+    containerRef,
+    restoreKey: PlanComponent,
+    canvasFile: filename,
+    scrollContainer,
+  });
+
+  // Text selection and region drawing both raise a popover; the block layer
+  // stands down for either.
+  const annotationPopoverOpen = textPopoverOpen || regionPopoverOpen;
+
   // Build a map of block snippets to annotation IDs for quick lookup
   const blockAnnotationMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -134,8 +146,8 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
     if (!container) return;
 
     const handleMove = (e: MouseEvent) => {
-      // Don't change hover when a popover is open
-      if (blockPopover || textPopoverOpen) return;
+      // Don't change hover when a popover is open or a region is being drawn
+      if (blockPopover || annotationPopoverOpen || isDrawing) return;
       const target = e.target as HTMLElement;
       // Ignore events on the block comment button itself
       if (target.closest("[data-block-comment-btn]")) return;
@@ -164,7 +176,7 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
     };
 
     const handleLeave = (e: MouseEvent) => {
-      if (blockPopover || textPopoverOpen) return;
+      if (blockPopover || annotationPopoverOpen) return;
       // Don't clear if moving onto the block comment button
       const related = e.relatedTarget as HTMLElement | null;
       if (related?.closest("[data-block-comment-btn]")) return;
@@ -178,7 +190,7 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
       container.removeEventListener("mousemove", handleMove);
       container.removeEventListener("mouseleave", handleLeave);
     };
-  }, [PlanComponent, blockPopover, textPopoverOpen, blockAnnotationMap, activeAnnotationId]);
+  }, [PlanComponent, blockPopover, annotationPopoverOpen, isDrawing, blockAnnotationMap, activeAnnotationId]);
 
   // Keyboard navigation: document-level key listener
   useEffect(() => {
@@ -186,7 +198,7 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
       // Guard: skip if input/textarea focused or popover open
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
-      if (blockPopover || textPopoverOpen) return;
+      if (blockPopover || annotationPopoverOpen) return;
 
       const container = containerRef.current;
       if (!container) return;
@@ -276,7 +288,7 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [focusedBlockIndex, blockPopover, textPopoverOpen, blockAnnotationMap]);
+  }, [focusedBlockIndex, blockPopover, annotationPopoverOpen, blockAnnotationMap]);
 
   // Keyboard navigation: visual focus outline + scroll into view + sidebar sync
   useEffect(() => {
@@ -342,6 +354,7 @@ export function PlanRenderer({ revision, filename }: PlanRendererProps) {
       )}
 
       {textAnnotationPopovers}
+      {regionPopovers}
 
       {/* Block annotation floating buttons */}
       <BlockCommentButtons

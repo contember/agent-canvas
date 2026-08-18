@@ -25,11 +25,14 @@ export function ImageView({ src, alt, caption, width, height }: ImageProps) {
 
   return (
     <figure className="mt-3 relative" data-md="image" data-md-src={src}>
-      <div className="rounded-md overflow-hidden border border-border-subtle bg-bg-code inline-block">
+      {/* The box a region annotation is measured against — the image alone, so
+          the caption below cannot skew the percentages. */}
+      <div data-annotation-image className="rounded-md overflow-hidden border border-border-subtle bg-bg-code inline-block">
         <img
           src={imgSrc}
           alt={alt || src}
           onError={() => setError(true)}
+          draggable={false}
           className="block max-w-full h-auto"
           {...(width ? { width } : {})}
           {...(height ? { height } : {})}
