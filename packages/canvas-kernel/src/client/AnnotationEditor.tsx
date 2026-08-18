@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { autoResizeTextarea } from "./utils";
+import { autoResizeTextarea, hostAcceptsUploads } from "./utils";
 import { useCanvasHost, type CanvasHost } from "./hostContext";
 
 interface AnnotationEditorProps {
@@ -38,10 +38,12 @@ export function imageToUrl(path: string): string {
 }
 
 async function uploadImage(host: CanvasHost, file: File): Promise<string | null> {
+  const endpoint = host.uploadUrl;
+  if (!endpoint) return null;
   const formData = new FormData();
   formData.append("image", file);
   try {
-    const resp = await fetch(host.uploadUrl(), { method: "POST", body: formData });
+    const resp = await fetch(endpoint(), { method: "POST", body: formData });
     const data = await resp.json();
     // Local daemon returns { path }; worker returns { url }. Normalise to
     // a single string that `imageToUrl` can resolve.
@@ -60,6 +62,9 @@ export function AnnotationEditor({
   attachButton = "always", openFilePickerRef,
 }: AnnotationEditorProps) {
   const host = useCanvasHost();
+  // Button, paste and drop all end in the same upload; a host with no endpoint
+  // for it gets none of them rather than three ways to fail silently.
+  const canAttach = !readOnly && hostAcceptsUploads(host);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -149,7 +154,7 @@ export function AnnotationEditor({
     ...(autoResize ? { resize: "none" as const, overflow: "hidden" } : { resize: "vertical" as const }),
   };
 
-  const showButton = !readOnly && (
+  const showButton = canAttach && (
     attachButton === "always" ||
     (attachButton === "on-focus" && isFocused)
   );
@@ -157,16 +162,16 @@ export function AnnotationEditor({
   return (
     <div
       style={{ position: "relative" }}
-      onDragEnter={readOnly ? undefined : handleDragEnter}
-      onDragOver={readOnly ? undefined : handleDragOver}
-      onDragLeave={readOnly ? undefined : handleDragLeave}
-      onDrop={readOnly ? undefined : handleDrop}
+      onDragEnter={canAttach ? handleDragEnter : undefined}
+      onDragOver={canAttach ? handleDragOver : undefined}
+      onDragLeave={canAttach ? handleDragLeave : undefined}
+      onDrop={canAttach ? handleDrop : undefined}
     >
       <textarea
         ref={setRef}
         value={note}
         onChange={readOnly ? undefined : handleChange}
-        onPaste={readOnly ? undefined : handlePaste}
+        onPaste={canAttach ? handlePaste : undefined}
         onKeyDown={onKeyDown}
         onClick={onTextareaClick}
         onFocus={() => setIsFocused(true)}
@@ -182,7 +187,7 @@ export function AnnotationEditor({
       />
 
       {/* Hidden file input — always rendered for paste/drop + external trigger */}
-      {!readOnly && (
+      {canAttach && (
         <input
           ref={fileInputRef}
           type="file"

@@ -91,4 +91,4 @@ export { extractContext, formatSnippetInContext } from "./src/client/annotationC
 // --- Host-provided context -------------------------------------------------
 export { CanvasHostContext, localCanvasHost, useCanvasHost } from "./src/client/hostContext";
 export type { CanvasHost } from "./src/client/hostContext";
-export { autoResizeTextarea, fileAnnotationPath, generateAnnotationId } from "./src/client/utils";
+export { autoResizeTextarea, fileAnnotationPath, generateAnnotationId, hostAcceptsUploads } from "./src/client/utils";

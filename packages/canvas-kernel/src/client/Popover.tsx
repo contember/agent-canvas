@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { getPopoverPosition, pxWidth } from "./popoverPosition";
 import { AnnotationEditor, AttachButton } from "./AnnotationEditor";
 import { SessionContext } from "#canvas/runtime";
+import { useCanvasHost } from "./hostContext";
+import { hostAcceptsUploads } from "./utils";
 
 interface PopoverProps {
   anchorEl: HTMLElement;
@@ -94,6 +96,10 @@ export function AnnotationPopover({
   initialNote = "", initialImages, onConfirm, onCancel, onDelete,
 }: AnnotationPopoverProps) {
   const sessionId = useContext(SessionContext);
+  // The footer draws the editor's attach button itself, so it owes the same
+  // check the editor makes: no upload endpoint, no button.
+  const host = useCanvasHost();
+  const canAttach = hostAcceptsUploads(host);
   const isEditMode = initialNote !== "" || !!onDelete;
   const [note, setNote] = useState(initialNote);
   const [images, setImages] = useState<string[]>(initialImages || []);
@@ -249,7 +255,7 @@ export function AnnotationPopover({
       {/* Action buttons */}
       {/* Action buttons */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: isEditMode ? "6px" : "8px" }}>
-        <AttachButton onClick={() => openFilePickerRef.current?.()} size={14} />
+        {canAttach && <AttachButton onClick={() => openFilePickerRef.current?.()} size={14} />}
         <div style={{ flex: 1 }} />
         {isEditMode ? (
           <button

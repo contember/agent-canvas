@@ -15,8 +15,10 @@ export interface CanvasHost {
   isShared: boolean;
   /** Host can read project files (feedback bodies, file browser). */
   fsAvailable: boolean;
-  /** Endpoint accepting annotation image uploads. */
-  uploadUrl: () => string;
+  /** Endpoint accepting annotation image uploads, or `null` for a host that
+   *  has none — the attach affordances then stay hidden rather than posting
+   *  into the void. Required, not optional, so no host can be silent about it. */
+  uploadUrl: (() => string) | null;
   /** Fetch and `import()` a compiled canvas module. */
   loadCanvasModule: (filename: string, revision?: number) => Promise<any>;
 }

@@ -5,6 +5,7 @@ import {
   autoResizeTextarea,
   fileAnnotationPath,
   generateAnnotationId,
+  hostAcceptsUploads,
   RESPONSE_ANNOTATION_PATH,
 } from "./utils";
 
@@ -122,5 +123,15 @@ describe("autoResizeTextarea", () => {
     // Measuring at the old height would report it back and the box would never shrink.
     expect(heightsWhenMeasured).toEqual(["auto"]);
     expect(el.style.height).toBe("90px");
+  });
+});
+
+describe("hostAcceptsUploads", () => {
+  test("a host with an upload endpoint keeps the attach affordances", () => {
+    expect(hostAcceptsUploads({ uploadUrl: () => "/api/session/x/upload" })).toBe(true);
+  });
+
+  test("a host with none loses them, rather than posting into the void", () => {
+    expect(hostAcceptsUploads({ uploadUrl: null })).toBe(false);
   });
 });
