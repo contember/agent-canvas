@@ -23,6 +23,10 @@ class FakeSocket implements WaiterSocket {
   drop(): void {
     this.onclose?.(new CloseEvent("close"));
   }
+
+  fail(): void {
+    this.onerror?.(new Event("error"));
+  }
 }
 
 /** Settles on `{ type: "done", value }`, fails on `{ type: "broken" }`, rechecks on `{ type: "run" }`. */
@@ -192,6 +196,41 @@ describe("reconnect", () => {
   });
 });
 
+describe("connection failures", () => {
+  test("a socket that could not be created is told apart from one that errored", async () => {
+    const failed = waitForEvent<string>({
+      url: "ws://localhost/ws/wait/topic",
+      onFrame: readFrame,
+      timeoutMs: 1_000,
+      messages: { socketCreateFailed: "Could not open the wait socket" },
+      createSocket: () => { throw new Error("connection refused"); },
+    });
+
+    await expect(failed).rejects.toThrow("Could not open the wait socket: connection refused");
+    await failed.catch((error: unknown) => {
+      expect(error instanceof WaitError && error.reason).toBe("socket-create-failed");
+      expect(error instanceof WaitError && error.retryable).toBe(true);
+    });
+
+    const errored = waitForEvent<string>({
+      url: "ws://localhost/ws/wait/topic",
+      onFrame: readFrame,
+      timeoutMs: 1_000,
+      messages: { connectionFailed: "the wait socket failed" },
+      createSocket: () => {
+        const socket = new FakeSocket();
+        queueMicrotask(() => socket.fail());
+        return socket;
+      },
+    });
+
+    await expect(errored).rejects.toThrow("the wait socket failed");
+    await errored.catch((error: unknown) => {
+      expect(error instanceof WaitError && error.reason).toBe("connection-failed");
+    });
+  });
+});
+
 describe("probe", () => {
   test("state that is already settled needs no socket", async () => {
     let created = 0;
@@ -247,6 +286,51 @@ describe("probe", () => {
     });
 
     expect(result).toBe("claimed");
+  });
+
+  test("alreadyProbed starts at the socket but keeps the re-read on open", async () => {
+    const probed: string[] = [];
+    const result = await waitForEvent<string>({
+      url: "ws://localhost/ws/wait/topic",
+      onFrame: readFrame,
+      timeoutMs: 1_000,
+      // The caller made this read itself before calling, so only the on-open one is left.
+      alreadyProbed: true,
+      probe: async () => {
+        probed.push("read");
+        return { value: "read on open" };
+      },
+      createSocket: () => {
+        const socket = new FakeSocket();
+        queueMicrotask(() => socket.open());
+        return socket;
+      },
+    });
+
+    expect(result).toBe("read on open");
+    expect(probed).toHaveLength(1);
+  });
+
+  test("alreadyProbed still rechecks on a waking frame", async () => {
+    let probes = 0;
+    const result = await waitForEvent<string>({
+      url: "ws://localhost/ws/wait/topic",
+      onFrame: readFrame,
+      timeoutMs: 1_000,
+      alreadyProbed: true,
+      probe: async () => (++probes < 2 ? undefined : { value: "claimed" }),
+      createSocket: () => {
+        const socket = new FakeSocket();
+        queueMicrotask(() => {
+          socket.open();
+          socket.deliver({ type: "run" });
+        });
+        return socket;
+      },
+    });
+
+    expect(result).toBe("claimed");
+    expect(probes).toBe(2);
   });
 
   test("a failing probe does not settle the wait", async () => {

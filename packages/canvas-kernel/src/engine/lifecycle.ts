@@ -31,7 +31,14 @@ export interface DaemonHealthDown {
 
 export type DaemonHealth<H extends DaemonPid> = DaemonHealthUp<H> | DaemonHealthDown;
 
-export type DaemonStopReason = "stopped" | "not-running" | "stale-pid" | "refused-self";
+export type DaemonStopReason =
+  | "stopped"
+  | "not-running"
+  /** Nothing was running; a pid file left behind was cleaned up. */
+  | "stale-pid"
+  /** A daemon answered `/health`, but signalling its pid failed. */
+  | "signal-failed"
+  | "refused-self";
 
 export interface DaemonStopResult {
   stopped: boolean;
@@ -241,7 +248,7 @@ export function createDaemonLifecycle<H extends DaemonPid>(
       process.kill(pid, "SIGTERM");
     } catch {
       cleanupFiles();
-      return { stopped: false, pid, reason: "stale-pid", message: `Daemon pid ${pid} could not be signalled.` };
+      return { stopped: false, pid, reason: "signal-failed", message: `Daemon pid ${pid} could not be signalled.` };
     }
 
     const deadline = Date.now() + timeouts.stop;

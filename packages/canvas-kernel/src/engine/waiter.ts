@@ -29,8 +29,13 @@ export interface WaitMessages {
   timeout?: string;
   /** Socket closed before the wait settled. Default: "Connection closed before the wait settled." */
   closed?: string;
-  /** Socket could not be opened, or errored. Default: "WebSocket connection failed." */
+  /** The socket errored. Default: "WebSocket connection failed." */
   connectionFailed?: string;
+  /**
+   * `createSocket` threw, so no socket ever existed; the factory's own message
+   * is appended after a colon. Default: "Could not create the WebSocket".
+   */
+  socketCreateFailed?: string;
 }
 
 export interface WaitOptions<T> {
@@ -39,12 +44,21 @@ export interface WaitOptions<T> {
   /** Reads a frame; returns how it settles the wait, if at all. */
   onFrame(frame: unknown): WaitVerdict<T> | undefined;
   /**
-   * Fast path against server state. Runs before connecting, again once the
-   * socket opens — closing the race where the event lands between the two —
-   * and whenever a frame asks for a recheck. A probe that rejects is dropped:
-   * the socket, not the probe, is what the wait ultimately hangs on.
+   * Fast path against server state. Runs before connecting (unless the caller
+   * already did that read — see `alreadyProbed`), again once the socket opens —
+   * closing the race where the event lands between the two — and whenever a
+   * frame asks for a recheck. A probe that rejects is dropped: the socket, not
+   * the probe, is what the wait ultimately hangs on.
    */
   probe?(): Promise<{ value: T } | undefined>;
+  /**
+   * The caller has already made the probe's read itself and it came up empty,
+   * so the wait starts at the socket. Set it when that read is the caller's own
+   * error channel — a probe that rejects is dropped here, so a caller that must
+   * report *why* the read failed has to make it before calling. The on-open
+   * re-read still runs; it is what closes the subscribe race.
+   */
+  alreadyProbed?: boolean;
   createSocket?(url: string): WaiterSocket;
   /** Deadline for the whole wait, spanning reconnects. */
   timeoutMs: number;
@@ -58,7 +72,13 @@ export interface WaitOptions<T> {
 }
 
 /** Why the wait ended without an answer; hosts map these onto their own errors. */
-export type WaitFailure = "timeout" | "closed" | "connection-failed";
+export type WaitFailure =
+  | "timeout"
+  | "closed"
+  /** The socket was created, then errored. */
+  | "connection-failed"
+  /** `createSocket` threw — nothing was ever connected to. */
+  | "socket-create-failed";
 
 export class WaitError extends Error {
   constructor(
@@ -76,6 +96,7 @@ const DEFAULT_MESSAGES: Required<WaitMessages> = {
   timeout: "Timed out waiting.",
   closed: "Connection closed before the wait settled.",
   connectionFailed: "WebSocket connection failed.",
+  socketCreateFailed: "Could not create the WebSocket",
 };
 
 function parseFrame(data: unknown): unknown {
@@ -98,7 +119,9 @@ function connectAndWait<T>(
     try {
       socket = createSocket(options.url);
     } catch (error) {
-      reject(new WaitError(messages.connectionFailed, "connection-failed", true, { cause: error }));
+      const detail = error instanceof Error ? error.message : String(error);
+      const message = `${messages.socketCreateFailed}: ${detail}`;
+      reject(new WaitError(message, "socket-create-failed", true, { cause: error }));
       return;
     }
 
@@ -146,8 +169,10 @@ export async function waitForEvent<T>(options: WaitOptions<T>): Promise<T> {
   const delayMs = options.reconnect?.delayMs ?? 1_000;
   const deadline = Date.now() + options.timeoutMs;
 
-  const known = await options.probe?.().catch(() => undefined);
-  if (known) return known.value;
+  if (!options.alreadyProbed) {
+    const known = await options.probe?.().catch(() => undefined);
+    if (known) return known.value;
+  }
 
   for (let attempt = 0; ; attempt++) {
     const remainingMs = deadline - Date.now();

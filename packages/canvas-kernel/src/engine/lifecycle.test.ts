@@ -250,6 +250,32 @@ describe("stop", () => {
     expect(existsSync(authFile)).toBe(false);
   });
 
+  test("a daemon that cannot be signalled is not a stale pid file", async () => {
+    // Up and answering, but the pid it reports is a process that has already exited.
+    const dead = Bun.spawn([process.execPath, "--version"], { stdout: "ignore", stderr: "ignore" });
+    await dead.exited;
+    const server = Bun.serve({
+      port: 0,
+      hostname: "localhost",
+      fetch: () => Response.json({ ok: true, version: "1.0.0", pid: dead.pid }),
+    });
+    servers.push(server);
+    const directory = mkdtempSync(join(tmpdir(), "canvas-lifecycle-test-"));
+    directories.push(directory);
+
+    const lifecycle = createDaemonLifecycle<FixtureHealth>({
+      baseUrl: `http://localhost:${portOf(server)}`,
+      parseHealth,
+      pidFile: join(directory, "daemon.pid"),
+      command: [process.execPath, "--version"],
+      logFile: join(directory, "daemon.log"),
+    });
+
+    const result = await lifecycle.stop();
+    expect(result).toMatchObject({ stopped: false, reason: "signal-failed", pid: dead.pid });
+    expect(result.message).toContain("could not be signalled");
+  });
+
   test("refuses to signal itself", async () => {
     const server = Bun.serve({
       port: 0,
