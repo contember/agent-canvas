@@ -6,8 +6,10 @@ import type { ActiveView, Annotation } from "./runtime";
 import {
   ANNOTATABLE_SELECTOR,
   BLOCK_SELECTOR,
+  describeSnippet,
   findAnnotationElement,
   getBlockSnippet,
+  restoreAnnotationTargets,
   scrollToAnnotation,
 } from "./annotationDom";
 import { RESPONSE_ANNOTATION_PATH } from "./utils";
@@ -313,6 +315,24 @@ describe("findAnnotationElement", () => {
     // Pinned, so a selector that shrank cannot pass this vacuously.
     expect(snippets).toHaveLength(7);
   });
+
+  // The other half of that round trip, and the reason it cannot come apart: a
+  // block outside the annotatable set mints nothing at all, so there is no
+  // snippet for the lookup to fail to resolve.
+  test("no block outside the annotatable set can mint a snippet", () => {
+    const container = mountContainer(ALL_BLOCK_KINDS);
+    for (const el of container.querySelectorAll(BLOCK_SELECTOR)) {
+      if (!(el instanceof HTMLElement)) throw new Error(`fixture emitted a ${el.nodeName}`);
+      if (el.matches(ANNOTATABLE_SELECTOR)) continue;
+      expect(getBlockSnippet(el)).toBeNull();
+    }
+  });
+
+  test("a row of a table the canvas did not emit mints nothing either", () => {
+    const container = mountContainer(`<div data-md="markdown"><table><tbody><tr><td>prod</td></tr></tbody></table></div>`);
+    const row = target(container, "tr");
+    expect(getBlockSnippet(row)).toBeNull();
+  });
 });
 
 describe("scrollToAnnotation", () => {
@@ -381,5 +401,106 @@ describe("scrollToAnnotation", () => {
       scrollToAnnotation(annotation({ snippet: "[Item] Deleted in this revision" }), (view) => { views.push(view); });
     }).not.toThrow();
     expect(views).toEqual([]);
+  });
+});
+
+
+/** An image block as ImageView emits it, box and all. */
+function imageBlock(src: string): string {
+  return `<figure data-md="image" data-md-src="${src}">`
+    + `<div data-annotation-image="true"><img /></div></figure>`;
+}
+
+/** A region on that image — the same string regionTarget.format writes. */
+const GRAPH_REGION = "[Region:rect] /img/graph.png @1234,500,900,4000";
+
+describe("annotating part of an image", () => {
+  test("a region resolves to the image it was drawn on", () => {
+    const container = mountContainer(imageBlock("/img/before.png") + imageBlock("/img/graph.png"));
+    const el = findAnnotationElement(annotation({ snippet: GRAPH_REGION }));
+    expect(el).toBe(container.querySelector(`[data-md-src="/img/graph.png"] [data-annotation-image]`));
+  });
+
+  // Region is an addition, not a replacement: the whole image stays annotatable.
+  test("the whole-image annotation still names the figure", () => {
+    const container = mountContainer(imageBlock("/img/graph.png"));
+    expect(findAnnotationElement(annotation({ snippet: "[Image] /img/graph.png" })))
+      .toBe(target(container, "[data-md='image']"));
+  });
+
+  test("a region on an image this revision dropped is a miss", () => {
+    mountContainer(imageBlock("/img/other.png"));
+    expect(findAnnotationElement(annotation({ snippet: GRAPH_REGION }))).toBeNull();
+  });
+
+  test("a region is scoped to its own canvas like any other snippet", () => {
+    const container = mountContainer(
+      `<div data-canvas-file="rollout.jsx">${imageBlock("/img/graph.png")}</div>`
+      + `<div data-canvas-file="risks.jsx">${imageBlock("/img/graph.png")}</div>`,
+    );
+    const el = findAnnotationElement(annotation({ snippet: GRAPH_REGION, canvasFile: "risks.jsx" }));
+    expect(el).toBe(container.querySelector(`[data-canvas-file="risks.jsx"] [data-annotation-image]`));
+  });
+
+  test("a region reads as words, not as its encoding", () => {
+    expect(describeSnippet(GRAPH_REGION))
+      .toBe("[Region] /img/graph.png — rect x 12.3%-21.3%, y 5%-45% of the image");
+  });
+
+  test("everything else is already readable and is left alone", () => {
+    for (const snippet of ["[Item] Ship the beta", "[Image] /img/graph.png", "plain selected text"]) {
+      expect(describeSnippet(snippet)).toBe(snippet);
+    }
+  });
+});
+
+// What a reload comes down to: the canvas renders from scratch, the annotations
+// come back from storage as strings, and every one of them has to draw its own
+// decoration again.
+describe("restoring decoration onto a freshly rendered canvas", () => {
+  const region = { id: "ann-region", snippet: GRAPH_REGION };
+  const text = { id: "ann-text", snippet: "the rollout plan" };
+
+  test("a region draws its box again, and is found by it", () => {
+    const container = mountContainer(imageBlock("/img/graph.png"));
+
+    restoreAnnotationTargets(container, [region]);
+
+    const overlay = container.querySelector("[data-annotation-id='ann-region']");
+    if (!(overlay instanceof HTMLElement)) throw new Error("the region drew no overlay");
+    expect(overlay.style.left).toBe("12.34%");
+    // The sidebar and scroll-to path resolve through the decoration, not the snippet.
+    expect(findAnnotationElement(annotation({ id: "ann-region", snippet: GRAPH_REGION }))).toBe(overlay);
+  });
+
+  test("text and regions are restored side by side", () => {
+    const container = mountContainer(`<p>the rollout plan</p>` + imageBlock("/img/graph.png"));
+
+    restoreAnnotationTargets(container, [text, region]);
+
+    expect(container.querySelector("mark[data-annotation-id='ann-text']")?.textContent)
+      .toBe("the rollout plan");
+    expect(container.querySelector("div[data-annotation-id='ann-region']")).not.toBeNull();
+  });
+
+  test("restoring again after a re-render adds nothing", () => {
+    const container = mountContainer(`<p>the rollout plan</p>` + imageBlock("/img/graph.png"));
+
+    restoreAnnotationTargets(container, [text, region]);
+    restoreAnnotationTargets(container, [text, region]);
+
+    expect(container.querySelectorAll("[data-annotation-id='ann-region']")).toHaveLength(1);
+    expect(container.querySelectorAll("[data-annotation-id='ann-text']")).toHaveLength(1);
+  });
+
+  // A block annotation needs no decoration — the block is already there — and
+  // must not be dragged into the text index looking for its own snippet.
+  test("a block annotation draws nothing and changes no text", () => {
+    const container = mountContainer(`<div data-md="item" data-md-label="Ship the beta">Ship the beta</div>`);
+    const before = container.innerHTML;
+
+    restoreAnnotationTargets(container, [{ id: "ann-block", snippet: "[Item] Ship the beta" }]);
+
+    expect(container.innerHTML).toBe(before);
   });
 });
