@@ -91,6 +91,53 @@ describe("renderAnnotation", () => {
       .toBe("> thing\n\nlook\n\n![screenshot](/u/1.png)\n![screenshot](/u/2.png)\n");
   });
 
+  // A reviewer on a shared canvas comes back with `attachments`, not `images`.
+  // Reading only one of the two fields drops their screenshot silently.
+  test("renders an attachment the wire carried, not just a local image", () => {
+    expect(renderAnnotation(ann({
+      snippet: "thing",
+      note: "look",
+      attachments: [{ url: "https://share.example/blob/a", mime: "image/png" }],
+    }))).toBe("> thing\n\nlook\n\n![screenshot](https://share.example/blob/a)\n");
+  });
+
+  test("renders both fields, local images first", () => {
+    expect(renderAnnotation(ann({
+      snippet: "thing",
+      note: "look",
+      images: ["/u/1.png"],
+      attachments: [{ url: "https://share.example/blob/a" }],
+    }))).toBe("> thing\n\nlook\n\n![screenshot](/u/1.png)\n![screenshot](https://share.example/blob/a)\n");
+  });
+
+  test("an image in both fields is emitted once", () => {
+    expect(renderAnnotation(ann({
+      snippet: "thing",
+      note: "look",
+      images: ["/u/1.png"],
+      attachments: [{ url: "/u/1.png", mime: "image/png" }, { url: "/u/2.png" }],
+    }))).toBe("> thing\n\nlook\n\n![screenshot](/u/1.png)\n![screenshot](/u/2.png)\n");
+  });
+
+  test("an attachment with no note or image still gets its own block", () => {
+    expect(renderAnnotation(ann({
+      snippet: "thing",
+      note: "  ",
+      attachments: [{ url: "/u/1.png" }],
+    }))).toBe("> thing\n\n![screenshot](/u/1.png)\n");
+  });
+
+  // `images` is what every existing local annotation carries, so its output is
+  // the byte-for-byte baseline the attachment support must not disturb.
+  test("an images-only annotation renders exactly as it did before attachments", () => {
+    const withImages = ann({ snippet: "thing", note: "look", images: ["/u/1.png", "/u/1.png", "/u/2.png"] });
+    // Duplicates within `images` are passed through, not collapsed.
+    expect(renderAnnotation(withImages))
+      .toBe("> thing\n\nlook\n\n![screenshot](/u/1.png)\n![screenshot](/u/1.png)\n![screenshot](/u/2.png)\n");
+    expect(renderAnnotation({ ...withImages, attachments: [] })).toBe(renderAnnotation(withImages));
+    expect(renderAnnotation({ ...withImages, attachments: undefined })).toBe(renderAnnotation(withImages));
+  });
+
   test("renders a record that is not the kernel's Annotation", () => {
     // The seam a host with its own annotation store reuses.
     expect(renderAnnotation({ snippet: "whatever it points at", note: "fix this" }))

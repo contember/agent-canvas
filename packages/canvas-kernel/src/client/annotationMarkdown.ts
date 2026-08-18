@@ -1,4 +1,4 @@
-import type { AnnotationContext } from "./runtime";
+import type { AnnotationAttachment, AnnotationContext } from "./runtime";
 import { formatSnippetInContext } from "./annotationContext";
 import { describeSnippet } from "./annotationDom";
 
@@ -14,7 +14,11 @@ export interface RenderableAnnotation {
    *  switches the quote to numbered source lines. */
   filePath?: string;
   context?: AnnotationContext;
+  /** Attached images as bare paths/URLs — what the local editor writes. */
   images?: string[];
+  /** Attached files carried on the wire — what a shared canvas sends back.
+   *  A host may populate either field; both are rendered. */
+  attachments?: AnnotationAttachment[];
 }
 
 /**
@@ -76,11 +80,20 @@ export function renderAnnotation(ann: RenderableAnnotation): string {
     lines.push(ann.note.trim());
   }
 
-  // Attached images
-  if (ann.images?.length) {
+  // Attached images. Both fields are read: the local editor writes `images`,
+  // a shared canvas's reviewer comes back with `attachments`, and an agent that
+  // sees only one of them is looking at feedback with a hole in it.
+  const attached = [...(ann.images ?? [])];
+  const seen = new Set(attached);
+  for (const attachment of ann.attachments ?? []) {
+    if (seen.has(attachment.url)) continue;
+    seen.add(attachment.url);
+    attached.push(attachment.url);
+  }
+  if (attached.length) {
     lines.push("");
-    for (const img of ann.images) {
-      lines.push(`![screenshot](${img})`);
+    for (const url of attached) {
+      lines.push(`![screenshot](${url})`);
     }
   }
 

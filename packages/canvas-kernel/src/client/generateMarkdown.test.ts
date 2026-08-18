@@ -121,6 +121,20 @@ describe("generateMarkdown", () => {
     expect(generateMarkdown([mine, theirs], "")).not.toContain("> theirs");
     expect(generateMarkdown([mine, theirs], "", undefined, undefined, new Set(["r1"]))).toContain("> theirs");
   });
+
+  // The end of the share path: a reviewer's screenshot arrives as `attachments`
+  // and has to survive into the markdown the agent reads.
+  test("carries a remote reviewer's attachment into the document", () => {
+    const theirs: Annotation = {
+      ...annotation("theirs", "the header overlaps"),
+      id: "r1",
+      source: "remote",
+      author: { id: "a1", name: "Reviewer" },
+      attachments: [{ url: "https://share.example/blob/a", mime: "image/png" }],
+    };
+    const md = generateMarkdown([theirs], "", undefined, undefined, new Set(["r1"]));
+    expect(md).toContain("![screenshot](https://share.example/blob/a)");
+  });
 });
 
 describe("canPruneResponses", () => {

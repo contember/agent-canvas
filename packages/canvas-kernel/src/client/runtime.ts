@@ -20,9 +20,9 @@ export interface AnnotationAuthor {
   name: string;
 }
 
-/** An image or other file attached to an annotation. Replaces the legacy
- *  `images: string[]` pattern with a richer shape that can point to either
- *  a local upload (daemon) or a remote blob (CF Worker R2). */
+/** An image or other file attached to an annotation. The richer sibling of
+ *  `images: string[]`, carrying a mime type alongside a URL that can point at
+ *  either a local upload (daemon) or a remote blob (CF Worker R2). */
 export interface AnnotationAttachment {
   url: string;
   mime?: string;
@@ -36,8 +36,11 @@ export interface Annotation {
   filePath?: string;
   canvasFile?: string;
   context?: AnnotationContext;
-  /** @deprecated use `attachments` — kept for localStorage backward compat */
+  /** Attachments written by the local editor, as bare upload paths/URLs. Still
+   *  the only field it writes, and what persisted drafts hold. */
   images?: string[];
+  /** Attachments that arrived over the wire, from a reviewer on a shared
+   *  canvas. Both fields render — see `renderAnnotation`. */
   attachments?: AnnotationAttachment[];
   /** "remote" annotations come from a shared view and are read-only locally. */
   source?: "local" | "remote";
