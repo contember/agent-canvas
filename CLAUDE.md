@@ -19,8 +19,9 @@ Three processes communicate via HTTP and WebSocket, over a shared kernel:
 | Entry | Ring | What it holds |
 |---|---|---|
 | `/daemon` | daemon runtime | WebSocket channel, CLI waiter, process lifecycle, router, paths — knows nothing about canvases |
-| `/client` | annotation surface | annotation state, sidebar, popovers, and the locator strategies (text, block, region) |
+| `/annotate` | annotation surface | annotation state and drafts, list + draft footer, editor and popovers, the locator strategies (text, block, region), `renderAnnotation` |
 | `/server` | canvas engine | JSX compiler, session/revision store, watcher, the canvas WS vocabulary |
+| `/client` | canvas client | the annotation ring plus what only a canvas has: `PlanRenderer`, `AnnotationSidebar`, `generateMarkdown`, the revision contexts, the component library |
 
 A host takes only the rings it needs. The kernel is published, so nothing under `packages/canvas-kernel/` may import from outside it.
 
