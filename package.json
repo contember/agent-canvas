@@ -5,6 +5,11 @@
   "bin": {
     "agent-canvas": "bin/agent-canvas.js"
   },
+  "files": [
+    "bin",
+    "daemon",
+    "skills"
+  ],
   "scripts": {
     "build": "bun daemon/build.ts",
     "check:versions": "bun scripts/check-release-versions.ts",

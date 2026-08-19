@@ -97,6 +97,12 @@ pushed — kernel first, then `agent-canvas`, because a tarball that pins a kern
 version the registry does not have yet is uninstallable. Do not run
 `npm publish` manually.
 
+The `agent-canvas` tarball ships `bin/`, `daemon/` and `skills/` — named by the
+`files` field, because without it npm sends everything not gitignored, which
+meant the Cloudflare worker sources, the README screenshots and a second copy of
+the kernel. `daemon/dist/` is gitignored but must ship; the `files` allow-list is
+what lets it through, so do not replace it with an `.npmignore`.
+
 Both packages publish through npm **trusted publishing** (OIDC), so no npm token
 lives in the repo or in CI secrets. The trust is configured per package on
 npmjs.com and names this repo plus `.github/workflows/release.yml`; renaming that
