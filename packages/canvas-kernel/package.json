@@ -1,6 +1,6 @@
 {
   "name": "@fabrika/canvas-kernel",
-  "version": "0.1.44",
+  "version": "0.1.45",
   "type": "module",
   "description": "Host-agnostic canvas SDK: a daemon runtime (WebSocket channel, CLI waiter, process lifecycle), a locator-agnostic annotation surface, and the canvas engine (JSX→Bun.build compiler, session/revision store, watcher).",
   "license": "MIT",

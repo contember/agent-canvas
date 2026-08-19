@@ -1,6 +1,6 @@
 {
   "name": "agent-canvas",
-  "version": "0.1.44",
+  "version": "0.1.45",
   "description": "Interactive visual canvas for Claude Code — rich annotatable documents in the browser",
   "bin": {
     "agent-canvas": "bin/agent-canvas.js"
@@ -18,7 +18,7 @@
     "prepublishOnly": "bun daemon/build.ts"
   },
   "dependencies": {
-    "@fabrika/canvas-kernel": "0.1.44",
+    "@fabrika/canvas-kernel": "0.1.45",
     "marked": "^17.0.4",
     "mermaid-parser-bundle": "^0.1.2",
     "preact": "^10.25.0",
