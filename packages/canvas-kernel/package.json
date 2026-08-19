@@ -1,14 +1,24 @@
 {
   "name": "@fabrika/canvas-kernel",
-  "version": "0.1.0",
+  "version": "0.1.44",
   "type": "module",
-  "description": "Host-agnostic canvas SDK: a daemon runtime (WebSocket channel, CLI waiter, process lifecycle), a locator-agnostic annotation surface, and the canvas engine (JSX\u2192Bun.build compiler, session/revision store, watcher).",
+  "description": "Host-agnostic canvas SDK: a daemon runtime (WebSocket channel, CLI waiter, process lifecycle), a locator-agnostic annotation surface, and the canvas engine (JSX→Bun.build compiler, session/revision store, watcher).",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/contember/agent-canvas",
     "directory": "packages/canvas-kernel"
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "index.ts",
+    "daemon.ts",
+    "annotate.ts",
+    "src",
+    "!src/**/*.test.ts"
+  ],
   "main": "./index.ts",
   "types": "./index.ts",
   "exports": {
