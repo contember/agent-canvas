@@ -43,4 +43,23 @@ describe("dom harness", () => {
   test("markIds is empty when nothing is annotated", () => {
     expect(markIds(mountContainer("<p>plain</p>"))).toEqual([]);
   });
+
+  // Registering happy-dom used to swap the global fetch for a Window
+  // implementation over node:http. Every test file shares one process, so that
+  // reached the daemon lifecycle probes and broke them — but only when a client
+  // file happened to be evaluated first, which is why it passed locally and
+  // failed in CI. Assert the capability, not the identity of the function.
+  test("leaves the runtime fetch stack alone", async () => {
+    const server = Bun.serve({
+      port: 0,
+      hostname: "localhost",
+      fetch: () => Response.json({ ok: true }),
+    });
+    try {
+      const response = await fetch(`http://localhost:${server.port}/`);
+      expect(await response.json()).toEqual({ ok: true });
+    } finally {
+      server.stop(true);
+    }
+  });
 });

@@ -15,7 +15,23 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 // Bun runs every test file in one process, so the second file to import this
 // must not register over the first.
 if (!globalThis.document) {
+  // happy-dom replaces the whole fetch stack with a Window implementation over
+  // node:http. That is not what this harness is for, and because every test
+  // file shares one process it reaches code that has nothing to do with the
+  // DOM — the daemon lifecycle probes `/health` through the global `fetch` and
+  // fails on responses Bun parses fine. Which tests broke depended on file
+  // order, so it passed locally and failed in CI. Keep Bun's stack.
+  const runtimeFetch = globalThis.fetch;
+  const runtimeResponse = globalThis.Response;
+  const runtimeRequest = globalThis.Request;
+  const runtimeHeaders = globalThis.Headers;
+
   GlobalRegistrator.register();
+
+  globalThis.fetch = runtimeFetch;
+  globalThis.Response = runtimeResponse;
+  globalThis.Request = runtimeRequest;
+  globalThis.Headers = runtimeHeaders;
 }
 
 /**
