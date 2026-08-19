@@ -23,8 +23,17 @@ jobs:
           node-version: "24.x"
           registry-url: "https://registry.npmjs.org"
 
+      # Trusted publishing (OIDC) needs npm >= 11.5.1. Pinned rather than
+      # inherited from the Node image so a runner image bump cannot silently
+      # move us off a version that supports it.
+      - name: Pin trusted-publishing npm CLI
+        run: npm install --global npm@11.6.2
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Check release versions
+        run: bun run check:versions
 
       - name: Typecheck
         run: bun run typecheck
@@ -32,5 +41,19 @@ jobs:
       - name: Build
         run: bun run build
 
-      - name: Publish to npm
+      # The kernel goes first: the agent-canvas manifest pins it exactly, so a
+      # tarball published before its kernel exists is uninstallable. Skipped
+      # when the version is already on the registry, which makes re-running a
+      # partially failed release safe.
+      - name: Publish @fabrika/canvas-kernel
+        working-directory: packages/canvas-kernel
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if npm view "@fabrika/canvas-kernel@$version" version >/dev/null 2>&1; then
+            echo "@fabrika/canvas-kernel@$version already published — skipping"
+            exit 0
+          fi
+          npm publish --provenance --access public
+
+      - name: Publish agent-canvas
         run: npm publish --provenance --access public

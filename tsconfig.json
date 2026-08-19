@@ -10,5 +10,5 @@
     "noEmit": true,
     "types": ["@types/bun"]
   },
-  "include": ["bin/**/*"]
+  "include": ["bin/**/*", "scripts/**/*"]
 }

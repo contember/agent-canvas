@@ -7,12 +7,13 @@
   },
   "scripts": {
     "build": "bun daemon/build.ts",
+    "check:versions": "bun scripts/check-release-versions.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p packages/canvas-kernel/tsconfig.json && tsc --noEmit -p daemon/tsconfig.json",
     "test": "bun test",
     "prepublishOnly": "bun daemon/build.ts"
   },
   "dependencies": {
-    "@fabrika/canvas-kernel": "workspace:*",
+    "@fabrika/canvas-kernel": "0.1.44",
     "marked": "^17.0.4",
     "mermaid-parser-bundle": "^0.1.2",
     "preact": "^10.25.0",
