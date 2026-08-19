@@ -14,7 +14,7 @@ Three processes communicate via HTTP and WebSocket, over a shared kernel:
 - **Daemon** (`daemon/src/server.ts`) — Bun HTTP+WS server on port 19400 (`CANVAS_PORT`). Compiles JSX, manages sessions, serves the browser UI
 - **Browser UI** (`daemon/client/`) — React 18 app loaded via CDN UMD with ESM import maps. Handles annotations, revision history, feedback collection, file browsing
 
-**Kernel** (`packages/canvas-kernel/`, `@fabrika/canvas-kernel`) — the reusable half, source-shipped and consumed by this repo plus `~/projects/contember/fabrika`. Three rings, each with its own entry:
+**Kernel** (`packages/canvas-kernel/`, `@fabrika/canvas-kernel`) — the reusable half, published to npm as sources and consumed by this repo, `~/projects/contember/fabrika`, and `~/projects/contember/obrazovka`. Three rings, each with its own entry:
 
 | Entry | Ring | What it holds |
 |---|---|---|
@@ -78,13 +78,29 @@ The CLI blocks waiting for feedback after push — press Ctrl+C to exit without 
 
 ## Publishing
 
+Two packages ship from this repo — `agent-canvas` and `@fabrika/canvas-kernel` —
+and they release in lockstep. The published `agent-canvas` imports the kernel by
+bare specifier, so it pins the kernel at an exact version rather than a range.
+Three numbers must therefore move together.
+
 To release a new version:
 
-1. Bump the version in `package.json`
-2. Commit the change and create a git tag: `git tag v<version>`
-3. Push both the commit and the tag: `git push && git push origin v<version>`
+1. Bump **three** places to the same number: `version` in `package.json`,
+   `version` in `packages/canvas-kernel/package.json`, and the
+   `@fabrika/canvas-kernel` entry in the root `dependencies`
+2. Run `bun run check:versions` — it fails if any of the three disagree
+3. Commit the change and create a git tag: `git tag v<version>`
+4. Push both the commit and the tag: `git push && git push origin v<version>`
 
-The CI pipeline handles `npm publish` automatically when a new version tag is pushed. Do not run `npm publish` manually.
+The CI pipeline handles `npm publish` automatically when a new version tag is
+pushed — kernel first, then `agent-canvas`, because a tarball that pins a kernel
+version the registry does not have yet is uninstallable. Do not run
+`npm publish` manually.
+
+Both packages publish through npm **trusted publishing** (OIDC), so no npm token
+lives in the repo or in CI secrets. The trust is configured per package on
+npmjs.com and names this repo plus `.github/workflows/release.yml`; renaming that
+workflow file breaks publishing until the trust is updated to match.
 
 ## Bundled Skill
 
