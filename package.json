@@ -13,7 +13,7 @@
   "scripts": {
     "build": "bun daemon/build.ts",
     "check:versions": "bun scripts/check-release-versions.ts",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/daemon-kit/tsconfig.json && tsc --noEmit -p packages/annotations/tsconfig.json && tsc --noEmit -p packages/canvas-kernel/tsconfig.json && tsc --noEmit -p daemon/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p daemon/tsconfig.json",
     "test": "bun test",
     "prepublishOnly": "bun daemon/build.ts"
   },
@@ -38,10 +38,7 @@
     "type": "git",
     "url": "https://github.com/contember/agent-canvas"
   },
-  "workspaces": [
-    "packages/*",
-    "workers/*"
-  ],
+  "workspaces": ["workers/*"],
   "license": "MIT",
   "keywords": [
     "claude-code",

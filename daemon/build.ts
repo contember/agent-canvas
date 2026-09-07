@@ -6,7 +6,7 @@ import { $ } from "bun";
 const ROOT = dirname(import.meta.path);
 const DIST = join(ROOT, "dist");
 /** The kernel ships the runtime, the component library and the base stylesheet. */
-const KERNEL_CLIENT = join(ROOT, "..", "packages", "canvas-kernel", "src", "client");
+const KERNEL_CLIENT = dirname(fileURLToPath(import.meta.resolve("@fabrika/canvas-kernel/runtime")));
 const ANNOTATIONS_RUNTIME = fileURLToPath(import.meta.resolve("@fabrika/annotations/runtime"));
 
 async function build() {

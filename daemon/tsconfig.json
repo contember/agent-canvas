@@ -10,7 +10,7 @@
     "noEmit": true,
     "types": ["@types/bun"],
     "paths": {
-      "#canvas/runtime": ["../packages/canvas-kernel/src/client/runtime.ts"],
+      "#canvas/runtime": ["./client/canvas-runtime.ts"],
       "#canvas/components": ["./client/components/index.ts"]
     }
   },

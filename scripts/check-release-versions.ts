@@ -38,21 +38,10 @@ function checkPins(manifest: Record<string, unknown>, name: string, expected: st
 }
 
 checkPins(root, "agent-canvas", packages.map((name) => `@fabrika/${name}`));
-for (const name of packages) {
-  const path = join(REPO_ROOT, "packages", name, "package.json");
-  const manifest = readManifest(path);
-  const version = versionOf(manifest, path);
-  if (version !== rootVersion) {
-    problems.push(`Version lockstep broken: agent-canvas is ${rootVersion}, @fabrika/${name} is ${version}.`);
-  }
-  if (name === "canvas-kernel") {
-    checkPins(manifest, "@fabrika/canvas-kernel", ["@fabrika/annotations", "@fabrika/daemon-kit"]);
-  }
-}
 
 if (problems.length > 0) {
   for (const problem of problems) console.error(`error: ${problem}`);
   process.exit(1);
 }
 
-console.log(`Release versions agree: ${rootVersion}, pinned exactly.`);
+console.log(`Agent Canvas dependencies are pinned exactly at ${rootVersion}.`);

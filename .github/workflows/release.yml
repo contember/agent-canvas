@@ -41,20 +41,5 @@ jobs:
       - name: Build
         run: bun run build
 
-      # Dependencies must exist on npm before their consumers are published.
-      - name: Publish shared packages
-        run: |
-          for package in daemon-kit annotations canvas-kernel; do
-            (
-              cd "packages/$package"
-              version=$(node -p "require('./package.json').version")
-              if npm view "@fabrika/$package@$version" version >/dev/null 2>&1; then
-                echo "@fabrika/$package@$version already published — skipping"
-                exit 0
-              fi
-              npm publish --provenance --access public
-            )
-          done
-
       - name: Publish agent-canvas
         run: npm publish --provenance --access public

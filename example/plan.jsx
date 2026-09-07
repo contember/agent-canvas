@@ -252,7 +252,7 @@ export default function Plan() {
 
       <Section title="Key Files">
         <FilePreview path="daemon/src/server.ts" lines={[1, 30]} />
-        <FilePreview path="packages/canvas-kernel/src/client/components/Section.tsx" />
+        <FilePreview path="daemon/client/App.tsx" lines={[1, 40]} />
       </Section>
 
       <Section title="Component Library">
