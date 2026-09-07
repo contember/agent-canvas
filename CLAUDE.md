@@ -8,22 +8,24 @@ Agent Canvas — an interactive browser-based visual canvas for Claude Code. Use
 
 ## Architecture
 
-Three processes communicate via HTTP and WebSocket, over a shared kernel:
+Three processes communicate via HTTP and WebSocket, over three shared packages:
 
 - **CLI** (`bin/agent-canvas.ts`) — pushes JSX canvases to the daemon, waits for user feedback, manages daemon lifecycle
 - **Daemon** (`daemon/src/server.ts`) — Bun HTTP+WS server on port 19400 (`CANVAS_PORT`). Compiles JSX, manages sessions, serves the browser UI
-- **Browser UI** (`daemon/client/`) — React 18 app loaded via CDN UMD with ESM import maps. Handles annotations, revision history, feedback collection, file browsing
+- **Browser UI** (`daemon/client/`) — React-typed app running on bundled Preact compat with ESM import maps. Handles annotations, revision history, feedback collection, file browsing
 
-**Kernel** (`packages/canvas-kernel/`, `@fabrika/canvas-kernel`) — the reusable half, published to npm as sources and consumed by this repo, `~/projects/contember/fabrika`, and `~/projects/contember/obrazovka`. Three rings, each with its own entry:
+Publish three source packages under `packages/`:
 
-| Entry | Ring | What it holds |
-|---|---|---|
-| `/daemon` | daemon runtime | WebSocket channel, CLI waiter, process lifecycle, router, paths — knows nothing about canvases |
-| `/annotate` | annotation surface | annotation state and drafts, list + draft footer, editor and popovers, the locator strategies (text, block, region), `renderAnnotation` |
-| `/server` | canvas engine | JSX compiler, session/revision store, watcher, the canvas WS vocabulary |
-| `/client` | canvas client | the annotation ring plus what only a canvas has: `PlanRenderer`, `AnnotationSidebar`, `generateMarkdown`, the revision contexts, the component library |
+| Package | Responsibility |
+|---|---|
+| `@fabrika/daemon-kit` | WebSocket channel, CLI waiter, process lifecycle, HTTP router/helpers; no canvas or UI dependencies |
+| `@fabrika/annotations` | Annotation state, editor/list/popovers, text/block/region locators and markdown; no canvas or daemon dependencies |
+| `@fabrika/canvas-kernel` | `/server`: compiler, revisions, watcher, canvas WS and paths; `/client`: renderer, canvas draft persistence, responses, sidebar and components |
 
-A host takes only the rings it needs. The kernel is published, so nothing under `packages/canvas-kernel/` may import from outside it.
+Use package imports across boundaries, never relative imports into sibling sources.
+Keep dependencies one-way: canvas server → daemon-kit; canvas client → annotations.
+Keep revisions, response pruning and canvas module loading out of annotations.
+Read each package's `README.md` for its API and the 0.2 migration.
 
 **Data flow:** CLI pushes JSX → daemon compiles via `Bun.build()` → browser loads compiled JS module → user annotates/responds → feedback sent back to CLI via WebSocket
 
@@ -37,15 +39,15 @@ bun run build              # builds client assets to daemon/dist/
 bun daemon/build.ts --watch  # watch mode with debounced rebuild
 ```
 
-The build produces three bundles (runtime.js, components.js, client.js) plus Tailwind CSS. React is loaded from CDN, not bundled. Import maps route `#canvas/components` and `#canvas/runtime` to the local bundles.
+The build produces Preact compat, annotation runtime, canvas runtime, components and client bundles plus Tailwind CSS. Externalize `@fabrika/annotations/runtime` and `#canvas/runtime` from all consuming bundles and map each to one asset; duplicate context instances break annotations and responses.
 
 ## Typecheck
 
 ```bash
-bun run typecheck          # runs tsc --noEmit across all three projects
+bun run typecheck          # CLI/scripts, three shared packages and daemon/client
 ```
 
-Three tsconfig files: `tsconfig.json` (root, covers `bin/`), `packages/canvas-kernel/tsconfig.json`, and `daemon/tsconfig.json` (covers `daemon/src/` and `daemon/client/`). The kernel's is the strictest — it ships as sources, so it is checked under the flags its strictest consumer sets. CI runs typecheck on every push and PR.
+Each shared package has a strict tsconfig because it ships sources. CI runs typecheck on every push and PR. Run `bun test` for all package and host tests.
 
 ## Key Technical Details
 
@@ -53,7 +55,7 @@ Three tsconfig files: `tsconfig.json` (root, covers `bin/`), `packages/canvas-ke
 - **JSX compilation** uses temp files because `Bun.build()` doesn't support `stdin`. See `packages/canvas-kernel/src/engine/compiler.ts`
 - **Component imports are injected** by the compiler — authored JSX can use `Section`, `Task`, `CodeBlock`, etc. without imports
 - **Adding a new component:** create in `packages/canvas-kernel/src/client/components/`, export from `index.ts`, add to `KERNEL_COMPONENTS` in `packages/canvas-kernel/src/engine/compiler.ts`, rebuild
-- **Adding a new annotation kind:** write an `AnnotationTarget` and register it in `ANNOTATION_TARGETS` (`packages/canvas-kernel/src/client/annotationDom.ts`). Creation and lookup must read the same selector — an annotation minted where the lookup does not scan can never be found again
+- **Adding a new annotation kind:** write an `AnnotationTarget` and register it in `ANNOTATION_TARGETS` (`packages/annotations/src/annotationDom.ts`). Creation and lookup must read the same selector — an annotation minted where the lookup does not scan can never be found again
 - **Bun's `spawn` throws synchronously** on missing executables — always check with `which` before spawning
 
 ## Testing with Demo
@@ -78,23 +80,20 @@ The CLI blocks waiting for feedback after push — press Ctrl+C to exit without 
 
 ## Publishing
 
-Two packages ship from this repo — `agent-canvas` and `@fabrika/canvas-kernel` —
-and they release in lockstep. The published `agent-canvas` imports the kernel by
-bare specifier, so it pins the kernel at an exact version rather than a range.
-Three numbers must therefore move together.
+Four packages ship in lockstep: `agent-canvas` and the three shared packages.
+Pin every internal dependency to the exact release version, never `workspace:*`.
 
 To release a new version:
 
-1. Bump **three** places to the same number: `version` in `package.json`,
-   `version` in `packages/canvas-kernel/package.json`, and the
-   `@fabrika/canvas-kernel` entry in the root `dependencies`
-2. Run `bun run check:versions` — it fails if any of the three disagree
+1. Bump `version` in the root and all three shared package manifests, plus the
+   three root dependency pins and the kernel's two shared-package pins
+2. Run `bun install` and `bun run check:versions`
 3. Commit the change and create a git tag: `git tag v<version>`
 4. Push both the commit and the tag: `git push && git push origin v<version>`
 
 The CI pipeline handles `npm publish` automatically when a new version tag is
-pushed — kernel first, then `agent-canvas`, because a tarball that pins a kernel
-version the registry does not have yet is uninstallable. Do not run
+pushed — daemon-kit and annotations first, then kernel, then `agent-canvas`.
+A consumer cannot install until its exact dependencies exist. Do not run
 `npm publish` manually.
 
 The `agent-canvas` tarball ships `bin/`, `daemon/` and `skills/` — named by the
@@ -103,10 +102,11 @@ meant the Cloudflare worker sources, the README screenshots and a second copy of
 the kernel. `daemon/dist/` is gitignored but must ship; the `files` allow-list is
 what lets it through, so do not replace it with an `.npmignore`.
 
-Both packages publish through npm **trusted publishing** (OIDC), so no npm token
+All packages publish through npm **trusted publishing** (OIDC), so no npm token
 lives in the repo or in CI secrets. The trust is configured per package on
 npmjs.com and names this repo plus `.github/workflows/release.yml`; renaming that
-workflow file breaks publishing until the trust is updated to match.
+workflow file breaks publishing until the trust is updated to match. Configure
+each new package's npm publishing setup before triggering its first release.
 
 ## Bundled Skill
 

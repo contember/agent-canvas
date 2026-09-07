@@ -2,12 +2,11 @@ import React, { useEffect, useState, useRef, useContext, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { SessionContext, CanvasFileCtx } from "#canvas/runtime";
 import { useAnnotations } from "./AnnotationProvider";
-import { extractContext } from "./annotationContext";
-import { ANNOTATABLE_SELECTOR, BLOCK_SELECTOR, getBlockSnippet } from "./annotationDom";
-import { AnnotationCreatePopover, AnnotationEditPopover } from "./Popover";
-import { generateAnnotationId } from "./utils";
-import { useTextAnnotation } from "./useTextAnnotation";
-import { useRegionAnnotation } from "./useRegionAnnotation";
+import {
+  extractContext, ANNOTATABLE_SELECTOR, BLOCK_SELECTOR, getBlockSnippet,
+  AnnotationCreatePopover, AnnotationEditPopover, generateAnnotationId,
+  useTextAnnotation, useRegionAnnotation,
+} from "@fabrika/annotations";
 import { useCanvasHost } from "./hostContext";
 import { RenderErrorContext, type CanvasRenderError } from "./RenderErrorContext";
 

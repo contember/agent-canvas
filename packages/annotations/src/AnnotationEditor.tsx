@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { autoResizeTextarea, hostAcceptsUploads } from "./utils";
-import { useCanvasHost, type CanvasHost } from "./hostContext";
+import { useAnnotationHost, type AnnotationHost } from "@fabrika/annotations/runtime";
 
 interface AnnotationEditorProps {
   note: string;
@@ -37,7 +37,7 @@ export function imageToUrl(path: string): string {
   return `/api/uploads/${filename}`;
 }
 
-async function uploadImage(host: CanvasHost, file: File): Promise<string | null> {
+async function uploadImage(host: AnnotationHost, file: File): Promise<string | null> {
   const endpoint = host.uploadUrl;
   if (!endpoint) return null;
   const formData = new FormData();
@@ -61,7 +61,7 @@ export function AnnotationEditor({
   textareaClassName, textareaStyle, minHeight,
   attachButton = "always", openFilePickerRef,
 }: AnnotationEditorProps) {
-  const host = useCanvasHost();
+  const host = useAnnotationHost();
   // Button, paste and drop all end in the same upload; a host with no endpoint
   // for it gets none of them rather than three ways to fail silently.
   const canAttach = !readOnly && hostAcceptsUploads(host);

@@ -1,11 +1,13 @@
 import { mkdirSync, cpSync, writeFileSync, readFileSync, existsSync, watch as fsWatch } from "fs";
 import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { $ } from "bun";
 
 const ROOT = dirname(import.meta.path);
 const DIST = join(ROOT, "dist");
 /** The kernel ships the runtime, the component library and the base stylesheet. */
 const KERNEL_CLIENT = join(ROOT, "..", "packages", "canvas-kernel", "src", "client");
+const ANNOTATIONS_RUNTIME = fileURLToPath(import.meta.resolve("@fabrika/annotations/runtime"));
 
 async function build() {
   console.log("Building canvas client...");
@@ -13,6 +15,20 @@ async function build() {
   mkdirSync(DIST, { recursive: true });
 
   const REACT_EXTERNALS = ["react", "react-dom", "react-dom/client", "react/jsx-runtime", "react/jsx-dev-runtime"];
+  const ANNOTATION_EXTERNALS = [...REACT_EXTERNALS, "@fabrika/annotations/runtime"];
+
+  const annotationResult = await Bun.build({
+    entrypoints: [ANNOTATIONS_RUNTIME],
+    outdir: DIST,
+    format: "esm",
+    external: REACT_EXTERNALS,
+    naming: "annotations-runtime.js",
+    minify: true,
+  });
+  if (!annotationResult.success) {
+    console.error("Annotation runtime build failed:", annotationResult.logs);
+    process.exit(1);
+  }
 
   // 0. Build preact-compat bundle
   console.log("  Building preact-compat...");
@@ -40,7 +56,7 @@ async function build() {
     entrypoints: [join(KERNEL_CLIENT, "runtime.ts")],
     outdir: DIST,
     format: "esm",
-    external: [...REACT_EXTERNALS],
+    external: ANNOTATION_EXTERNALS,
     naming: "runtime.js",
     minify: true,
   });
@@ -56,7 +72,7 @@ async function build() {
     entrypoints: [join(ROOT, "client/components/index.ts")],
     outdir: DIST,
     format: "esm",
-    external: [...REACT_EXTERNALS, "#canvas/runtime"],
+    external: [...ANNOTATION_EXTERNALS, "#canvas/runtime"],
     naming: "components.js",
     minify: true,
   });
@@ -72,7 +88,7 @@ async function build() {
     entrypoints: [join(ROOT, "client/App.tsx")],
     outdir: DIST,
     format: "esm",
-    external: [...REACT_EXTERNALS, "#canvas/components", "#canvas/runtime"],
+    external: [...ANNOTATION_EXTERNALS, "#canvas/components", "#canvas/runtime"],
     naming: "client.js",
     minify: true,
   });
@@ -120,6 +136,7 @@ ${themeCss}
       "react/jsx-runtime": "/assets/jsx-runtime.js",
       "react/jsx-dev-runtime": "/assets/jsx-runtime.js",
       "#canvas/components": "/assets/components.js",
+      "@fabrika/annotations/runtime": "/assets/annotations-runtime.js",
       "#canvas/runtime": "/assets/runtime.js"
     }
   }
@@ -144,6 +161,7 @@ ${themeCss}
       "preact-compat.js",
       "jsx-runtime.js",
       "runtime.js",
+      "annotations-runtime.js",
       "components.js",
       "client.js",
       "client.css",
@@ -159,7 +177,7 @@ build().then(() => {
   if (process.argv.includes("--watch")) {
     let timeout: ReturnType<typeof setTimeout> | null = null;
     console.log("Watching for changes in client/ and the kernel client...");
-    for (const dir of [join(ROOT, "client"), KERNEL_CLIENT]) {
+    for (const dir of [join(ROOT, "client"), KERNEL_CLIENT, dirname(ANNOTATIONS_RUNTIME)]) {
       fsWatch(dir, { recursive: true }, (_event: string, filename: string | null) => {
         if (!filename || filename.endsWith("~")) return;
         if (timeout) clearTimeout(timeout);

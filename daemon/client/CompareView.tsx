@@ -4,8 +4,8 @@ import { RevisionContext, type RevisionInfo, type CanvasFileInfo } from "@fabrik
 import { runDomDiff } from "./domDiff";
 import { extractBlockTree, matchBlocks, buildUnifiedDom } from "./unifiedDiff";
 import { useAnnotations } from "@fabrika/canvas-kernel/client";
-import { useTextAnnotation } from "@fabrika/canvas-kernel/client";
-import { extractContext } from "@fabrika/canvas-kernel/client";
+import { useTextAnnotation } from "@fabrika/annotations";
+import { extractContext } from "@fabrika/annotations";
 
 interface CompareViewProps {
   initialLeft: number;

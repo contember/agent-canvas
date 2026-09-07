@@ -1,6 +1,6 @@
 {
   "name": "agent-canvas",
-  "version": "0.1.45",
+  "version": "0.2.0",
   "description": "Interactive visual canvas for Claude Code — rich annotatable documents in the browser",
   "bin": {
     "agent-canvas": "bin/agent-canvas.js"
@@ -13,12 +13,14 @@
   "scripts": {
     "build": "bun daemon/build.ts",
     "check:versions": "bun scripts/check-release-versions.ts",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/canvas-kernel/tsconfig.json && tsc --noEmit -p daemon/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/daemon-kit/tsconfig.json && tsc --noEmit -p packages/annotations/tsconfig.json && tsc --noEmit -p packages/canvas-kernel/tsconfig.json && tsc --noEmit -p daemon/tsconfig.json",
     "test": "bun test",
     "prepublishOnly": "bun daemon/build.ts"
   },
   "dependencies": {
-    "@fabrika/canvas-kernel": "0.1.45",
+    "@fabrika/annotations": "0.2.0",
+    "@fabrika/canvas-kernel": "0.2.0",
+    "@fabrika/daemon-kit": "0.2.0",
     "marked": "^17.0.4",
     "mermaid-parser-bundle": "^0.1.2",
     "preact": "^10.25.0",

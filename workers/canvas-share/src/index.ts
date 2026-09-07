@@ -408,7 +408,8 @@ function sharedCanvasHtml(shareId: string): string {
       "react/jsx-runtime": "/assets/jsx-runtime.js",
       "react/jsx-dev-runtime": "/assets/jsx-runtime.js",
       "#canvas/components": "/assets/components.js",
-      "#canvas/runtime": "/assets/runtime.js"
+      "#canvas/runtime": "/assets/runtime.js",
+      "@fabrika/annotations/runtime": "/assets/annotations-runtime.js"
     }
   }
   </script>

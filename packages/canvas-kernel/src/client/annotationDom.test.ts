@@ -1,18 +1,17 @@
 // The harness registers `document`, so it has to be evaluated before the module
 // under test — ESM runs imports in source order.
-import { mountContainer } from "./testing/dom";
+import { mountContainer } from "@fabrika/annotations/testing/dom.ts";
 import { describe, expect, test } from "bun:test";
 import type { ActiveView, Annotation } from "./runtime";
 import {
   ANNOTATABLE_SELECTOR,
   BLOCK_SELECTOR,
   describeSnippet,
-  findAnnotationElement,
   getBlockSnippet,
   restoreAnnotationTargets,
-  scrollToAnnotation,
-} from "./annotationDom";
-import { RESPONSE_ANNOTATION_PATH } from "./utils";
+} from "@fabrika/annotations";
+import { findAnnotationElement, scrollToAnnotation } from "./annotationDom";
+import { RESPONSE_ANNOTATION_PATH } from "@fabrika/annotations";
 
 function annotation(
   props: { snippet: string; id?: string; filePath?: string; canvasFile?: string },

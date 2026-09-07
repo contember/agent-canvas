@@ -4,7 +4,7 @@
  * so a delivery closes it.
  */
 
-import { browserFrame, createNotificationChannel, type ChannelSocket, type TopicChannel } from "./channel";
+import { browserFrame, createNotificationChannel, type ChannelSocket, type TopicChannel } from "@fabrika/daemon-kit";
 import type { SessionManager, RemoteFeedbackEntry } from "./session";
 
 export type WSData = { type: "browser" | "wait"; sessionId: string };

@@ -1,6 +1,6 @@
 import { join, dirname } from "path";
 import { DATA_DIR } from "../paths";
-import type { Route } from "@fabrika/canvas-kernel/server";
+import type { Route } from "@fabrika/daemon-kit";
 
 const MIME_TYPES: Record<string, string> = {
   js: "application/javascript",

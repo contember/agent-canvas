@@ -1,8 +1,7 @@
 // The canvas document format: revisions, responses, required fields, sections.
 // Rendering one annotation is host-agnostic and lives in ./annotationMarkdown.
 import type { Annotation, PlanResponse, FeedbackEntry } from "./AnnotationProvider";
-import { renderAnnotation } from "./annotationMarkdown";
-import { RESPONSE_ANNOTATION_PATH } from "./utils";
+import { renderAnnotation, RESPONSE_ANNOTATION_PATH } from "@fabrika/annotations";
 
 /**
  * Drop answers whose question is not in this revision's canvas. A draft carried

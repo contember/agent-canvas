@@ -1,6 +1,6 @@
 import { spawn } from "child_process";
 import { randomUUID } from "crypto";
-import { waitForEvent, type WaiterSocket, type WaitVerdict } from "@fabrika/canvas-kernel/server";
+import { waitForEvent, type WaiterSocket, type WaitVerdict } from "@fabrika/daemon-kit";
 import { BASE_URL, WS_URL, TIMEOUT_MS } from "./config.ts";
 
 export function getSessionId(session?: string): string {

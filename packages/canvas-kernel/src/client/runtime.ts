@@ -4,49 +4,8 @@
 
 import { createContext, useContext, useEffect } from "react";
 
-export interface AnnotationContext {
-  before: string;
-  after: string;
-  hierarchy: string[];
-  lineStart?: number;
-  lineEnd?: number;
-}
-
-/** Identifies the person who created an annotation. For local annotations
- *  this is the daemon owner (unset). For remote annotations it carries the
- *  reviewer's self-reported name + stable anonymous id assigned by the worker. */
-export interface AnnotationAuthor {
-  id: string;
-  name: string;
-}
-
-/** An image or other file attached to an annotation. The richer sibling of
- *  `images: string[]`, carrying a mime type alongside a URL that can point at
- *  either a local upload (daemon) or a remote blob (CF Worker R2). */
-export interface AnnotationAttachment {
-  url: string;
-  mime?: string;
-}
-
-export interface Annotation {
-  id: string;
-  snippet: string;
-  note: string;
-  createdAt: string;
-  filePath?: string;
-  canvasFile?: string;
-  context?: AnnotationContext;
-  /** Attachments written by the local editor, as bare upload paths/URLs. Still
-   *  the only field it writes, and what persisted drafts hold. */
-  images?: string[];
-  /** Attachments that arrived over the wire, from a reviewer on a shared
-   *  canvas. Both fields render — see `renderAnnotation`. */
-  attachments?: AnnotationAttachment[];
-  /** "remote" annotations come from a shared view and are read-only locally. */
-  source?: "local" | "remote";
-  /** Only set for source === "remote". */
-  author?: AnnotationAuthor;
-}
+import type { AnnotationContextValue as BaseAnnotationContextValue } from "@fabrika/annotations/runtime";
+export type { Annotation, AnnotationAttachment, AnnotationAuthor, AnnotationContext } from "@fabrika/annotations/runtime";
 
 export interface PlanResponse {
   id: string;
@@ -65,19 +24,7 @@ export interface FeedbackEntry {
   required?: boolean;
 }
 
-export interface AnnotationContextValue {
-  annotations: Annotation[];
-  addAnnotation: (snippet: string, note: string, filePath?: string) => void;
-  addAnnotationWithId: (id: string, snippet: string, note: string, filePath?: string, context?: AnnotationContext, images?: string[], canvasFile?: string) => void;
-  updateAnnotation: (id: string, note: string) => void;
-  removeAnnotation: (id: string) => void;
-  addAnnotationImage: (id: string, imagePath: string) => void;
-  removeAnnotationImage: (id: string, imagePath: string) => void;
-  generalNote: string;
-  setGeneralNote: (text: string) => void;
-  clearAll: () => void;
-  activeAnnotationId: string | null;
-  setActiveAnnotationId: (id: string | null) => void;
+export interface AnnotationContextValue extends BaseAnnotationContextValue {
   /** Every answer held for this draft, including ones carried in from an
    *  earlier revision. Controls read and write this one. */
   responses: Map<string, PlanResponse>;
@@ -131,7 +78,7 @@ export function useFeedback(
   }, [id, markdown, options?.label, options?.required]);
 }
 
-export { SessionContext } from "./SessionContext";
+export { SessionContext } from "@fabrika/annotations/runtime";
 
 // CanvasFile context — tells components which canvas file they belong to
 export const CanvasFileCtx = createContext<string>("");

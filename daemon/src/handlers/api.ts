@@ -1,11 +1,10 @@
 import { readFileSync, readdirSync, existsSync } from "fs";
 import {
   compileJsx,
-  jsonResponse,
   watchSession,
-  type Route,
   type SessionManager,
 } from "@fabrika/canvas-kernel/server";
+import { jsonResponse, type Route } from "@fabrika/daemon-kit";
 import { loadShareConfig, shareRevision, revokeShare } from "../share";
 import { COMPILE_TEMP_DIR } from "../paths";
 import { HOST_COMPONENTS } from "../components";

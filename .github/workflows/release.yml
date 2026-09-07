@@ -41,19 +41,20 @@ jobs:
       - name: Build
         run: bun run build
 
-      # The kernel goes first: the agent-canvas manifest pins it exactly, so a
-      # tarball published before its kernel exists is uninstallable. Skipped
-      # when the version is already on the registry, which makes re-running a
-      # partially failed release safe.
-      - name: Publish @fabrika/canvas-kernel
-        working-directory: packages/canvas-kernel
+      # Dependencies must exist on npm before their consumers are published.
+      - name: Publish shared packages
         run: |
-          version=$(node -p "require('./package.json').version")
-          if npm view "@fabrika/canvas-kernel@$version" version >/dev/null 2>&1; then
-            echo "@fabrika/canvas-kernel@$version already published — skipping"
-            exit 0
-          fi
-          npm publish --provenance --access public
+          for package in daemon-kit annotations canvas-kernel; do
+            (
+              cd "packages/$package"
+              version=$(node -p "require('./package.json').version")
+              if npm view "@fabrika/$package@$version" version >/dev/null 2>&1; then
+                echo "@fabrika/$package@$version already published — skipping"
+                exit 0
+              fi
+              npm publish --provenance --access public
+            )
+          done
 
       - name: Publish agent-canvas
         run: npm publish --provenance --access public

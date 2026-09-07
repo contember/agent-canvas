@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { createApiHandlers } from "./handlers/api";
-import { dispatch, SessionManager, type Route } from "@fabrika/canvas-kernel/server";
+import { SessionManager } from "@fabrika/canvas-kernel/server";
+import { dispatch, type Route } from "@fabrika/daemon-kit";
 
 const testDirectories: string[] = [];
 

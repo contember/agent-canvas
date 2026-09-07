@@ -1,6 +1,7 @@
 import { join, resolve } from "path";
 import { readdir } from "fs/promises";
-import { jsonResponse, type Route, type SessionManager } from "@fabrika/canvas-kernel/server";
+import type { SessionManager } from "@fabrika/canvas-kernel/server";
+import { jsonResponse, type Route } from "@fabrika/daemon-kit";
 import { LANG_MAP } from "../../langMap";
 
 const IMAGE_MIME: Record<string, string> = {

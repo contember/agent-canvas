@@ -3,7 +3,7 @@ import { SessionContext } from "#canvas/runtime";
 import { useAnnotations } from "@fabrika/canvas-kernel/client";
 import { ActiveViewContext } from "@fabrika/canvas-kernel/client";
 import { FileIcon } from "@fabrika/canvas-kernel/client";
-import { RESPONSE_ANNOTATION_PATH } from "@fabrika/canvas-kernel/client";
+import { RESPONSE_ANNOTATION_PATH } from "@fabrika/annotations";
 import { FS_AVAILABLE } from "./clientApi";
 
 interface TreeEntry { name: string; type: "file" | "dir"; }

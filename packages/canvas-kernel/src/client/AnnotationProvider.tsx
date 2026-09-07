@@ -3,7 +3,9 @@ import { AnnotationCtx } from "#canvas/runtime";
 import type { Annotation, AnnotationContext, PlanResponse, FeedbackEntry, AnnotationContextValue } from "#canvas/runtime";
 import { annotationDraftKey, clearPersistedDraft, type AnnotationDraftPhase } from "./annotationDraft";
 import { canPruneResponses, pruneStaleResponses } from "./generateMarkdown";
-import { generateAnnotationId } from "./utils";
+import { useAnnotationState } from "@fabrika/annotations";
+import { AnnotationCtx as SurfaceAnnotationCtx, AnnotationHostContext } from "@fabrika/annotations/runtime";
+import { useCanvasHost } from "./hostContext";
 
 // Re-export types for convenience
 export type { Annotation, AnnotationContext, PlanResponse, FeedbackEntry, AnnotationContextValue };
@@ -76,17 +78,7 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, draftPhase
     (seed?.annotations ?? []).map((a) => ({ ...a, source: a.source ?? "local" as const })),
   );
 
-  // Merge local + remote annotations. Remote annotations are always
-  // rendered read-only; mutation helpers below operate on localAnnotations
-  // only so they silently no-op on remote ids.
-  const annotations = useMemo<Annotation[]>(() => {
-    if (!remoteAnnotations || remoteAnnotations.length === 0) return localAnnotations;
-    const localIds = new Set(localAnnotations.map((a) => a.id));
-    const filtered = remoteAnnotations.filter((a) => !localIds.has(a.id));
-    return [...localAnnotations, ...filtered.map((a) => ({ ...a, source: "remote" as const }))];
-  }, [localAnnotations, remoteAnnotations]);
   const [generalNote, setGeneralNote] = useState(() => seed?.generalNote ?? "");
-  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
   const [responses, setResponses] = useState<Map<string, PlanResponse>>(() =>
     seed?.responses ? new Map(seed.responses) : new Map(),
   );
@@ -153,36 +145,6 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, draftPhase
     return () => { if (persistTimerRef.current) clearTimeout(persistTimerRef.current); };
   }, [localAnnotations, generalNote, responses, feedbackEntries, sessionId, revision, isReadOnly, draftPhase, hydrated, saveState]);
 
-  const addAnnotationWithId = useCallback((id: string, snippet: string, note: string, filePath?: string, context?: AnnotationContext, images?: string[], canvasFile?: string) => {
-    setAnnotations((prev) => [...prev, { id, snippet, note, createdAt: new Date().toISOString(), filePath, context, ...(images?.length ? { images } : {}), ...(canvasFile ? { canvasFile } : {}) }]);
-  }, []);
-
-  const addAnnotation = useCallback((snippet: string, note: string, filePath?: string) => {
-    addAnnotationWithId(generateAnnotationId(), snippet, note, filePath);
-  }, [addAnnotationWithId]);
-
-  const updateAnnotation = useCallback((id: string, note: string) => {
-    setAnnotations((prev) => prev.map((a) => (a.id === id ? { ...a, note } : a)));
-  }, []);
-
-  const removeAnnotation = useCallback((id: string) => {
-    removeMarksFromDom(id);
-    setAnnotations((prev) => prev.filter((a) => a.id !== id));
-    setActiveAnnotationId((prev) => (prev === id ? null : prev));
-  }, []);
-
-  const addAnnotationImage = useCallback((id: string, imagePath: string) => {
-    setAnnotations((prev) => prev.map((a) =>
-      a.id === id ? { ...a, images: [...(a.images || []), imagePath] } : a
-    ));
-  }, []);
-
-  const removeAnnotationImage = useCallback((id: string, imagePath: string) => {
-    setAnnotations((prev) => prev.map((a) =>
-      a.id === id ? { ...a, images: (a.images || []).filter((p) => p !== imagePath) } : a
-    ));
-  }, []);
-
   const setResponse = useCallback((id: string, response: PlanResponse) => {
     setResponses((prev) => {
       const next = new Map(prev);
@@ -239,13 +201,7 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, draftPhase
     });
   }, []);
 
-  const clearAll = useCallback(() => {
-    for (const mark of document.querySelectorAll("[data-annotation-id]")) {
-      unwrapMark(mark as HTMLElement);
-    }
-    setAnnotations([]);
-    setGeneralNote("");
-    setActiveAnnotationId(null);
+  const clearCanvasState = useCallback(() => {
     setResponses(new Map());
     setFeedbackEntries(new Map());
     if (saveState) {
@@ -257,38 +213,27 @@ export function AnnotationProvider({ sessionId, revision, isReadOnly, draftPhase
     }
   }, [sessionId, revision, draftPhase, saveState]);
 
+  const annotationState = useAnnotationState({
+    annotations: localAnnotations, setAnnotations, generalNote, setGeneralNote,
+    remoteAnnotations, isReadOnly, onClear: clearCanvasState,
+  });
+  const { setActiveAnnotationId } = annotationState;
+  const host = useCanvasHost();
+
   return (
-    <AnnotationCtx.Provider
-      value={{
-        annotations, addAnnotation, addAnnotationWithId, updateAnnotation, removeAnnotation, addAnnotationImage, removeAnnotationImage,
-        generalNote, setGeneralNote, clearAll,
-        activeAnnotationId, setActiveAnnotationId,
-        responses, setResponse, submittableResponses,
-        registerResponse, registerCanvasRendered,
-        feedbackEntries, setFeedbackEntry, removeFeedbackEntry,
-        isReadOnly,
-      }}
-    >
-      {children}
-    </AnnotationCtx.Provider>
+    <AnnotationHostContext.Provider value={host}>
+      <SurfaceAnnotationCtx.Provider value={annotationState}>
+        <AnnotationCtx.Provider
+          value={{
+            ...annotationState,
+            responses, setResponse, submittableResponses,
+            registerResponse, registerCanvasRendered,
+            feedbackEntries, setFeedbackEntry, removeFeedbackEntry,
+          }}
+        >
+          {children}
+        </AnnotationCtx.Provider>
+      </SurfaceAnnotationCtx.Provider>
+    </AnnotationHostContext.Provider>
   );
-}
-
-function removeMarksFromDom(id: string) {
-  const marks = document.querySelectorAll(`[data-annotation-id="${id}"]`);
-  for (const mark of marks) unwrapMark(mark as HTMLElement);
-}
-
-function unwrapMark(mark: HTMLElement) {
-  const parent = mark.parentNode;
-  if (!parent) return;
-  // A region overlay wraps no text; swapping it for its text content would
-  // leave a stray empty node inside the image.
-  if (mark.tagName !== "MARK") {
-    parent.removeChild(mark);
-    return;
-  }
-  const text = document.createTextNode(mark.textContent || "");
-  parent.replaceChild(text, mark);
-  parent.normalize();
 }

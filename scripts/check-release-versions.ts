@@ -1,15 +1,9 @@
-/**
- * The kernel ships from this repo on the same release train as the package that
- * depends on it, so three numbers must agree: the two manifest versions and the
- * range between them. Guarding it here is not pedantry — the pin started life as
- * `workspace:*`, which npm publishes verbatim, and a tarball carrying that is
- * uninstallable for everyone.
- */
+// Exact internal pins keep separately published source packages compatible.
 
 import { readFileSync } from "fs";
 import { join } from "path";
 
-const KERNEL = "@fabrika/canvas-kernel";
+const packages = ["daemon-kit", "annotations", "canvas-kernel"];
 const REPO_ROOT = join(import.meta.dir, "..");
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -29,35 +23,31 @@ function versionOf(manifest: Record<string, unknown>, path: string): string {
 }
 
 const rootPath = join(REPO_ROOT, "package.json");
-const kernelPath = join(REPO_ROOT, "packages", "canvas-kernel", "package.json");
-
 const root = readManifest(rootPath);
-const kernel = readManifest(kernelPath);
-
 const rootVersion = versionOf(root, rootPath);
-const kernelVersion = versionOf(kernel, kernelPath);
-
-const dependencies = root.dependencies;
-if (!isRecord(dependencies)) throw new Error(`${rootPath}: "dependencies" is missing`);
-const pin = dependencies[KERNEL];
-
 const problems: string[] = [];
 
-if (rootVersion !== kernelVersion) {
-  problems.push(
-    `Version lockstep broken: agent-canvas is ${rootVersion}, ${KERNEL} is ${kernelVersion}. ` +
-      "Bump both to the same number.",
-  );
+function checkPins(manifest: Record<string, unknown>, name: string, expected: string[]) {
+  const dependencies = manifest.dependencies;
+  for (const dependency of expected) {
+    const pin = isRecord(dependencies) ? dependencies[dependency] : undefined;
+    if (pin !== rootVersion) {
+      problems.push(`${name} must pin ${dependency} at ${rootVersion}, got ${String(pin)}.`);
+    }
+  }
 }
 
-if (pin === undefined) {
-  problems.push(`agent-canvas no longer depends on ${KERNEL} — was that deliberate?`);
-} else if (pin !== rootVersion) {
-  problems.push(
-    `agent-canvas pins ${KERNEL} at "${String(pin)}", but the release is ${rootVersion}. ` +
-      "The pin must be the exact version — a range (or \"workspace:*\") ships a tarball that " +
-      "resolves to the wrong kernel, or to none at all.",
-  );
+checkPins(root, "agent-canvas", packages.map((name) => `@fabrika/${name}`));
+for (const name of packages) {
+  const path = join(REPO_ROOT, "packages", name, "package.json");
+  const manifest = readManifest(path);
+  const version = versionOf(manifest, path);
+  if (version !== rootVersion) {
+    problems.push(`Version lockstep broken: agent-canvas is ${rootVersion}, @fabrika/${name} is ${version}.`);
+  }
+  if (name === "canvas-kernel") {
+    checkPins(manifest, "@fabrika/canvas-kernel", ["@fabrika/annotations", "@fabrika/daemon-kit"]);
+  }
 }
 
 if (problems.length > 0) {

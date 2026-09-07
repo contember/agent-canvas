@@ -1,0 +1,17 @@
+{
+  "name": "@fabrika/daemon-kit",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Bun daemon lifecycle, HTTP routing, WebSocket channels and CLI waiters.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/contember/agent-canvas",
+    "directory": "packages/daemon-kit"
+  },
+  "publishConfig": { "access": "public" },
+  "files": ["index.ts", "src", "!src/**/*.test.ts"],
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": { ".": "./index.ts" }
+}

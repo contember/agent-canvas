@@ -12,13 +12,14 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "types": ["@types/bun"],
     "paths": {
       "#canvas/runtime": ["./src/client/runtime.ts"],
       "#canvas/components": ["./src/client/components/index.ts"]
     }
   },
-  "include": ["index.ts", "daemon.ts", "annotate.ts", "src/**/*"],
+  "include": ["index.ts", "src/**/*"],
   "exclude": [
     "src/client/preact-all.ts"
   ]

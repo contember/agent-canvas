@@ -82,6 +82,19 @@ Agent Canvas supports light and dark themes, automatically matching your system 
 
 ## Development
 
+### Reusable packages
+
+| Package | Use without the Agent Canvas shell |
+| --- | --- |
+| [`@fabrika/daemon-kit`](packages/daemon-kit/README.md) | Bun daemon lifecycle, HTTP routing, WebSocket channels and CLI waiters |
+| [`@fabrika/annotations`](packages/annotations/README.md) | Annotation state, editors and text/block/region locators |
+| [`@fabrika/canvas-kernel`](packages/canvas-kernel/README.md) | JSX compiler, revisions, renderer and interactive canvas components |
+
+The kernel depends on the other two; neither depends on the kernel. All ship as
+TypeScript sources. See the kernel README for the breaking 0.2 import migration.
+
+### Local commands
+
 ```bash
 bun install
 bun run build                  # build client assets

@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { useAnnotations, useResponseRegistration } from "#canvas/runtime";
 import { ResponseNote } from "./ResponseNote";
-import { autoResizeTextarea } from "../utils";
+import { autoResizeTextarea } from "@fabrika/annotations";
 
 /** Free text input from user */
 interface UserInputProps {

@@ -2,6 +2,7 @@
 
 @import "tailwindcss";
 @import "./theme.css";
+@import "@fabrika/annotations/styles.css";
 @source "./**/*.{tsx,ts,jsx,js}";
 
 /* ── Non-theme CSS variables (not used by Tailwind utilities, just custom CSS) ── */
@@ -94,80 +95,6 @@
 
 code, pre, .font-mono {
   font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
-}
-
-/* Annotation inline marks */
-mark[data-annotation-id] {
-  background: var(--color-highlight-annotation);
-  border-bottom: 1.5px solid var(--color-highlight-bg);
-  border-radius: 2px;
-  cursor: pointer;
-  transition: background 150ms ease, box-shadow 150ms ease;
-  color: inherit;
-  padding: 1px 0;
-}
-
-mark[data-annotation-id].mark-active {
-  background: var(--color-highlight-active);
-  border-bottom: 2px solid var(--color-highlight-border);
-  box-shadow: 0 0 0 1px var(--color-highlight-border);
-}
-
-@keyframes ann-flash {
-  0%, 100% { background: var(--color-highlight-annotation); }
-  25%, 75% { background: var(--color-highlight-active); }
-}
-
-.ann-flash {
-  animation: ann-flash 0.6s ease 2;
-}
-
-/* Region annotations — a normalized box drawn over an image block. The host
-   positions the boxes, so every host that marks one gets them placed right. */
-[data-annotation-image] {
-  position: relative;
-  cursor: crosshair;
-  touch-action: none;
-}
-
-.ann-region {
-  position: absolute;
-  background: var(--color-highlight-annotation);
-  border: 2px solid var(--color-highlight-bg);
-  border-radius: 2px;
-  cursor: pointer;
-  transition: background 150ms ease, box-shadow 150ms ease;
-}
-
-.ann-region[data-annotation-region="ellipse"] {
-  border-radius: 50%;
-}
-
-.ann-region.mark-active {
-  background: var(--color-highlight-active);
-  border-color: var(--color-highlight-border);
-  box-shadow: 0 0 0 1px var(--color-highlight-border);
-}
-
-/* The box being dragged out: not yet an annotation, and never a hit target. */
-.ann-region-draft {
-  pointer-events: none;
-  border-style: dashed;
-  border-color: var(--color-highlight-border);
-}
-
-/* Annotation highlight (legacy) */
-.annotation-highlight {
-  background: var(--color-highlight-bg);
-  border-bottom: 2px solid var(--color-highlight-border);
-  border-radius: 2px;
-  cursor: pointer;
-  transition: background 150ms ease;
-}
-
-.annotation-highlight:hover,
-.annotation-highlight.active {
-  background: var(--color-highlight-active);
 }
 
 /* Selection color */

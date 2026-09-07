@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Annotation, FeedbackEntry, PlanResponse } from "./runtime";
 import { canPruneResponses, generateMarkdown, pruneStaleResponses } from "./generateMarkdown";
-import { RESPONSE_ANNOTATION_PATH } from "./utils";
+import { RESPONSE_ANNOTATION_PATH } from "@fabrika/annotations";
 
 function response(id: string, label: string): PlanResponse {
   return { id, type: "text", label, value: `${id}-answer`, required: true };

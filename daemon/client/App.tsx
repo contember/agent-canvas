@@ -4,8 +4,6 @@ import { marked } from "marked";
 import { SessionContext, ActiveViewCtx } from "#canvas/runtime";
 import {
   ActiveViewContext,
-  AnnotationCreatePopover,
-  AnnotationEditPopover,
   AnnotationProvider,
   AnnotationSidebar,
   CanvasHostContext,
@@ -13,23 +11,20 @@ import {
   PlanRenderer,
   RenderErrorContext,
   RevisionContext,
-  RESPONSE_ANNOTATION_PATH,
   carryUnsubmittedDraft,
   clearPersistedDraft,
-  extractContext,
-  generateAnnotationId,
-  renameMarkId,
-  restoreMarks,
-  unwrapMarks,
-  updateAllMarkStates,
   useAnnotations,
-  wrapRangeWithMark,
   type ActiveView,
   type AnnotationDraftPhase,
   type CanvasFileInfo,
   type CanvasRenderError,
   type RevisionInfo,
 } from "@fabrika/canvas-kernel/client";
+import {
+  AnnotationCreatePopover, AnnotationEditPopover, RESPONSE_ANNOTATION_PATH,
+  extractContext, generateAnnotationId, renameMarkId, restoreMarks,
+  unwrapMarks, updateAllMarkStates, wrapRangeWithMark,
+} from "@fabrika/annotations";
 import { FileBrowser } from "./FileBrowser";
 import { FileViewer } from "./FileViewer";
 import { SessionSwitcher } from "./SessionSwitcher";

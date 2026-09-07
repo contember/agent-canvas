@@ -1,23 +1,4 @@
-/**
- * The WebSocket notification channel: a two-role socket registry keyed by an
- * opaque topic string.
- *
- * The kernel owns the plumbing — who is registered under which topic, how a
- * message reaches browsers or waiters, when a waiter is announced as present,
- * and the ping/pong sweep that evicts dead waiters. It owns no vocabulary: the
- * host supplies the frames, decides what a frame does, and decides whether a
- * relayed frame closes the waiters that received it.
- *
- * Two hosts map onto it today:
- *
- * - agent-canvas (`engine/websocket.ts`) — topic = session id, waiter policy
- *   `close-on-delivery` (the CLI's `wait` socket is satisfied by one frame),
- *   frames `submit` / `render-error`, presence frame `watcher-status`.
- * - obrazovka — topic = Figma file key, waiter policy `keep-open` (a `--page`
- *   waiter must survive a relay meant for a different page and filter frames
- *   client-side), frames `confirm-screens` / `submit` registered by the host
- *   plus server-initiated relays `run` / `feedback`, presence frame `presence`.
- */
+// Hosts own frame vocabulary and delivery policy; topics are opaque to the channel.
 
 export type ChannelRole = "browser" | "wait";
 

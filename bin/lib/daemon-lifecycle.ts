@@ -4,7 +4,7 @@ import {
   createDaemonLifecycle,
   DaemonStartError,
   type DaemonEvent,
-} from "@fabrika/canvas-kernel/server";
+} from "@fabrika/daemon-kit";
 import { PACKAGE_ROOT, TEMP_DIR, BASE_URL, PID_FILE, CLI_AUTH_FILE, VERSION } from "./config.ts";
 
 interface CanvasHealth {

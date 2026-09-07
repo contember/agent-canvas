@@ -1,84 +1,13 @@
-// @fabrika/canvas-kernel — server entry.
-//
-// The host-agnostic canvas engine: compile pipeline, session/revision store,
-// JSX watcher, WebSocket notification channel, daemon lifecycle, CLI waiter,
-// router, and the on-disk layout.
-// Imports nothing from preact/DOM, so a Bun.serve daemon can pull it in without
-// dragging the browser bundle along.
-//
-// The browser-facing surface (components + annotation runtime) is exposed
-// separately through the package `imports`/`exports` maps as `#canvas/components`
-// and `#canvas/runtime`.
-
-// --- Compile pipeline (JSX -> Bun.build) -----------------------------------
 export { compileJsx, compilePlan, KERNEL_COMPONENTS } from "./src/engine/compiler";
-export type {
-  CompileResult,
-  CompileOptions,
-  CanvasComponents,
-  CanvasComponentSpec,
-} from "./src/engine/compiler";
-
-// --- Session / revision / feedback store -----------------------------------
+export type { CompileResult, CompileOptions, CanvasComponents, CanvasComponentSpec } from "./src/engine/compiler";
 export { SessionManager } from "./src/engine/session";
 export type {
-  SessionData,
-  RevisionInfo,
-  CanvasFileInfo,
-  CanvasScope,
-  DiffStats,
-  SecretResolution,
-  RemoteFeedbackEntry,
-  RemoteAnnotation,
-  ShareEntry,
+  SessionData, RevisionInfo, CanvasFileInfo, CanvasScope, DiffStats, SecretResolution,
+  RemoteFeedbackEntry, RemoteAnnotation, ShareEntry,
 } from "./src/engine/session";
-
-// --- WebSocket notification channel (host-agnostic) ------------------------
-export { createNotificationChannel, browserFrame } from "./src/engine/channel";
-export type {
-  ChannelRole,
-  ChannelSocket,
-  TopicChannel,
-  RelayOptions,
-  BrowserFrameHandler,
-  NotificationChannel,
-  NotificationChannelOptions,
-} from "./src/engine/channel";
-
-// --- WebSocket feedback protocol (canvas vocabulary) -----------------------
 export { createWebSocketManager } from "./src/engine/websocket";
 export type { WSData, CanvasSocket, WebSocketManagerOptions } from "./src/engine/websocket";
-
-// --- CLI waiter ------------------------------------------------------------
-export { waitForEvent, WaitError } from "./src/engine/waiter";
-export type { WaiterSocket, WaitVerdict, WaitOptions, WaitMessages, WaitFailure } from "./src/engine/waiter";
-
-// --- Daemon process lifecycle ----------------------------------------------
-export { createDaemonLifecycle, DaemonStartError } from "./src/engine/lifecycle";
-export type {
-  DaemonLifecycle,
-  DaemonLifecycleConfig,
-  DaemonHealth,
-  DaemonHealthUp,
-  DaemonHealthDown,
-  DaemonPid,
-  DaemonStopResult,
-  DaemonStopReason,
-  DaemonEvent,
-  DaemonTimeouts,
-} from "./src/engine/lifecycle";
-
-// --- JSX watcher -----------------------------------------------------------
 export { watchSession, unwatchSession, unwatchAll } from "./src/engine/watcher";
 export type { WatchOptions } from "./src/engine/watcher";
-
-// --- Router ----------------------------------------------------------------
-export { dispatch } from "./src/engine/router";
-export type { Route, RouteHandler } from "./src/engine/router";
-
-// --- HTTP helpers ----------------------------------------------------------
-export { jsonResponse, corsHeaders } from "./src/engine/http-utils";
-
-// --- On-disk layout --------------------------------------------------------
 export { createCanvasPaths } from "./src/engine/paths";
 export type { CanvasPaths, CanvasPathsConfig } from "./src/engine/paths";

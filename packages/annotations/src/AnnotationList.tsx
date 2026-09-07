@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef } from "react";
 import { useAnnotations } from "./AnnotationProvider";
 import type { Annotation } from "./AnnotationProvider";
-import { SessionContext } from "#canvas/runtime";
+import { SessionContext } from "@fabrika/annotations/runtime";
 import { setMarkActive } from "./highlightRange";
 import { describeSnippet } from "./annotationDom";
 import { AnnotationEditor, ImageThumbnails } from "./AnnotationEditor";

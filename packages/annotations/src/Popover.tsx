@@ -2,8 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo, useContext } 
 import { createPortal } from "react-dom";
 import { getPopoverPosition, pxWidth } from "./popoverPosition";
 import { AnnotationEditor, AttachButton } from "./AnnotationEditor";
-import { SessionContext } from "#canvas/runtime";
-import { useCanvasHost } from "./hostContext";
+import { SessionContext, useAnnotationHost } from "@fabrika/annotations/runtime";
 import { hostAcceptsUploads } from "./utils";
 
 interface PopoverProps {
@@ -98,7 +97,7 @@ export function AnnotationPopover({
   const sessionId = useContext(SessionContext);
   // The footer draws the editor's attach button itself, so it owes the same
   // check the editor makes: no upload endpoint, no button.
-  const host = useCanvasHost();
+  const host = useAnnotationHost();
   const canAttach = hostAcceptsUploads(host);
   const isEditMode = initialNote !== "" || !!onDelete;
   const [note, setNote] = useState(initialNote);

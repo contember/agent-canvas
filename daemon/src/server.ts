@@ -3,13 +3,11 @@ import { join, dirname } from "path";
 import { tmpdir } from "os";
 import { randomBytes } from "crypto";
 import {
-  corsHeaders,
   createWebSocketManager,
-  dispatch,
-  jsonResponse,
   SessionManager,
   type WSData,
 } from "@fabrika/canvas-kernel/server";
+import { corsHeaders, dispatch, jsonResponse } from "@fabrika/daemon-kit";
 import { createApiHandlers } from "./handlers/api";
 import { createFileHandlers } from "./handlers/files";
 import { createStaticHandlers } from "./handlers/static";

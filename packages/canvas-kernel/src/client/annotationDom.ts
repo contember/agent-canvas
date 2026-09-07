@@ -1,62 +1,6 @@
 import type { Annotation } from "./AnnotationProvider";
 import type { ActiveView } from "./appContext";
-import { sealTarget, type SealedAnnotationTarget, type TargetAnnotation } from "./annotationTarget";
-import { blockTarget } from "./blockTarget";
-import { regionTarget } from "./regionTarget";
-import { textTarget } from "./textTarget";
-import { fileAnnotationPath } from "./utils";
-
-// The block selectors and the block snippet live with the block target now;
-// re-exported here because this is the path every caller already imports.
-export { ANNOTATABLE_SELECTOR, BLOCK_SELECTOR, getBlockSnippet } from "./blockTarget";
-
-/** Every locator strategy the kernel knows, cheapest and most specific first.
- *  Text claims any snippet at all, so it stays last. */
-export const ANNOTATION_TARGETS: SealedAnnotationTarget[] = [
-  sealTarget(regionTarget),
-  sealTarget(blockTarget),
-  sealTarget(textTarget),
-];
-
-/**
- * The element a snippet names inside `root`.
- *
- * Every target is asked, not just the first one that recognises the string: a
- * file annotation on a line that happens to read like a block snippet must
- * still fall through to the target that can actually resolve it.
- */
-export function findSnippetElement(snippet: string, root: ParentNode): HTMLElement | null {
-  for (const target of ANNOTATION_TARGETS) {
-    const el = target.find(snippet, root);
-    if (el) return el;
-  }
-  return null;
-}
-
-/**
- * Put every annotation's own decoration back after a render — inline marks,
- * region overlays. Each target is asked about each annotation; a snippet is not
- * owned exclusively, and every restore is idempotent, so asking all of them is
- * both correct and free.
- */
-export function restoreAnnotationTargets(root: HTMLElement, annotations: readonly TargetAnnotation[]): void {
-  for (const ann of annotations) {
-    if (!ann.snippet) continue;
-    for (const target of ANNOTATION_TARGETS) {
-      target.restore(root, ann);
-    }
-  }
-}
-
-/** The snippet as a reader should see it. Only a target that encodes something
- *  other than readable text has anything to say; the rest already read fine. */
-export function describeSnippet(snippet: string): string {
-  for (const target of ANNOTATION_TARGETS) {
-    const described = target.describe(snippet);
-    if (described !== null) return described;
-  }
-  return snippet;
-}
+import { findSnippetElement, fileAnnotationPath } from "@fabrika/annotations";
 
 /**
  * Find the DOM element for an annotation — the decoration this kernel drew for
