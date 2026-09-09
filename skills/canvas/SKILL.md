@@ -29,6 +29,10 @@ fresh, so the variable will not survive between commands.
 
 ## Instructions
 
+Always use absolute filesystem paths for local file references in canvas components
+(such as `FilePreview`), and verify that the referenced files exist. Resolve them
+against the user's project directory, not the temporary directory containing the JSX.
+
 Run these commands from the user's project root before using Canvas:
 
 ```bash

@@ -1,4 +1,4 @@
-import { join, resolve } from "path";
+import { isAbsolute, relative, resolve, sep } from "path";
 import { readdir } from "fs/promises";
 import type { SessionManager } from "@fabrika/canvas-kernel/server";
 import { jsonResponse, type Route } from "@fabrika/daemon-kit";
@@ -18,8 +18,9 @@ function resolveSessionPath(
   const session = sessionManager.get(sessionId);
   if (!session) return jsonResponse({ error: "Session not found" }, 404);
 
-  const fullPath = resolve(join(session.projectRoot, relPath));
-  if (!fullPath.startsWith(resolve(session.projectRoot))) {
+  const fullPath = resolve(session.projectRoot, relPath);
+  const relativePath = relative(resolve(session.projectRoot), fullPath);
+  if (!isAbsolute(relPath) && (relativePath === ".." || relativePath.startsWith(`..${sep}`))) {
     return jsonResponse({ error: "Path traversal rejected" }, 403);
   }
 
