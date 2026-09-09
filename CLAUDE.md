@@ -81,12 +81,12 @@ The CLI blocks waiting for feedback after push — press Ctrl+C to exit without 
 
 ## Publishing
 
-`agent-canvas` pins all three `@fabrika` dependencies to its exact release version. Their source and
-release pipeline live in `fabrika-platform`; publish that version there before tagging this repository.
+Pin all three `@fabrika` dependencies to exact published versions. The host version is independent.
+Their source and release pipeline live in `fabrika-platform`; verify dependency versions exist on npm before tagging this repository.
 
 To release a new version after its dependencies exist on npm:
 
-1. Bump the root `version` and the three dependency pins to the same version
+1. Bump the root `version`; update dependency pins only when upgrading shared packages
 2. Run `bun install` and `bun run check:versions`
 3. Commit the change and create a git tag: `git tag v<version>`
 4. Push both the commit and the tag: `git push && git push origin v<version>`

@@ -31,8 +31,10 @@ function checkPins(manifest: Record<string, unknown>, name: string, expected: st
   const dependencies = manifest.dependencies;
   for (const dependency of expected) {
     const pin = isRecord(dependencies) ? dependencies[dependency] : undefined;
-    if (pin !== rootVersion) {
-      problems.push(`${name} must pin ${dependency} at ${rootVersion}, got ${String(pin)}.`);
+    const installedPath = join(REPO_ROOT, "node_modules", dependency, "package.json");
+    const installedVersion = versionOf(readManifest(installedPath), installedPath);
+    if (pin !== installedVersion) {
+      problems.push(`${name} must pin ${dependency} exactly at its installed version ${installedVersion}, got ${String(pin)}.`);
     }
   }
 }
@@ -44,4 +46,4 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log(`Agent Canvas dependencies are pinned exactly at ${rootVersion}.`);
+console.log(`Agent Canvas ${rootVersion} dependencies match their exact installed versions.`);
