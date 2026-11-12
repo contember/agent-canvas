@@ -1,5 +1,13 @@
 # Agent Canvas
 
+> [!IMPORTANT]
+> **This repository is retired.** Agent Canvas now lives in
+> [`contember/fabrika-platform`](https://github.com/contember/fabrika-platform), in
+> [`packages/agent-canvas`](https://github.com/contember/fabrika-platform/tree/main/packages/agent-canvas). The
+> [`agent-canvas`](https://www.npmjs.com/package/agent-canvas) package on npm is published from there, so
+> `bunx agent-canvas` keeps working. Open issues and pull requests there. This copy stops at 0.2.1 and is kept for
+> history only.
+
 Interactive browser-based visual canvas for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Create rich, annotatable JSX documents that render in the browser — with revision history, inline annotations, and structured feedback that flows back to Claude.
 
 ![License](https://img.shields.io/npm/l/agent-canvas)
